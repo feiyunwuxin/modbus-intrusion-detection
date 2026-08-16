@@ -1,0 +1,62 @@
+================================================================================
+ENSEMBLE REPORT — v2: ALL_7 (LGB + RF + TCN_v4 + v3a + v3b + v3c + LSTM+Att)
+================================================================================
+Base models:
+
+  LGB v2      thr=0.64  F1m=0.8337  Bin-F1=0.7287  Acc=0.8999  PR-AUC=0.8165  ROC-AUC=0.9099
+  RF          thr=0.53  F1m=0.8330  Bin-F1=0.7358  Acc=0.8895  PR-AUC=0.8363  ROC-AUC=0.9153
+  TCN v4      thr=0.82  F1m=0.6624  Bin-F1=0.5253  Acc=0.7180  PR-AUC=0.4431  ROC-AUC=0.7488
+  TCN v3a     thr=0.41  F1m=0.6734  Bin-F1=0.5399  Acc=0.7279  PR-AUC=0.4544  ROC-AUC=0.7514
+  TCN v3b     thr=0.70  F1m=0.6634  Bin-F1=0.5183  Acc=0.7260  PR-AUC=0.4540  ROC-AUC=0.7524
+  TCN v3c     thr=0.54  F1m=0.6611  Bin-F1=0.5189  Acc=0.7208  PR-AUC=0.4559  ROC-AUC=0.7503
+  LSTM+Att    thr=0.65  F1m=0.6563  Bin-F1=0.5184  Acc=0.7116  PR-AUC=0.3963  ROC-AUC=0.7357
+
+================================================================================
+METHOD 1 — UNIFORM AVERAGE
+================================================================================
+
+  [ALL_7]  thr=0.80  F1m=0.7947  PR-AUC=0.7652
+  [LGB+RF+TCN_v4+LSTM_Att]  thr=0.65  F1m=0.8026  PR-AUC=0.7957
+  [LGB+TCN_v4+LSTM_Att]  thr=0.75  F1m=0.7906  PR-AUC=0.7728
+  [LGB+RF+LSTM_Att]  thr=0.55  F1m=0.8268  PR-AUC=0.8349
+  [LGB+TCN_v4+v3c+LSTM_Att]  thr=0.82  F1m=0.7864  PR-AUC=0.7589
+  [LGB+TCN_v3c+LSTM_Att]  thr=0.75  F1m=0.7848  PR-AUC=0.7610
+  [LGB+TCN_v4+v3a+v3c+LSTM_Att]  thr=0.85  F1m=0.7856  PR-AUC=0.7540
+
+================================================================================
+METHOD 2 — WEIGHTED AVERAGE (SLSQP on val)
+================================================================================
+
+  [ALL_7]  thr=0.52  F1m=0.8313  PR-AUC=0.8419
+    weights: LGB v2=0.2047, RF=0.4834, TCN v4=0.0, TCN v3a=0.1366, TCN v3b=0.0602, TCN v3c=0.0368, LSTM+Att=0.0782
+  [LGB+RF+TCN_v4+LSTM_Att]  thr=0.60  F1m=0.8302  PR-AUC=0.8482
+    weights: LGB v2=0.2482, RF=0.5861, TCN v4=0.0001, LSTM+Att=0.1656
+  [LGB+TCN_v4+LSTM_Att]  thr=0.78  F1m=0.7955  PR-AUC=0.7809
+    weights: LGB v2=0.2975, TCN v4=0.7024, LSTM+Att=0.0001
+  [LGB+RF+LSTM_Att]  thr=0.57  F1m=0.8399  PR-AUC=0.8466
+    weights: LGB v2=0.0993, RF=0.8091, LSTM+Att=0.0916
+  [LGB+TCN_v4+v3c+LSTM_Att]  thr=0.83  F1m=0.7995  PR-AUC=0.7723
+    weights: LGB v2=0.2482, TCN v4=0.5861, TCN v3c=0.0001, LSTM+Att=0.1656
+  [LGB+TCN_v3c+LSTM_Att]  thr=0.68  F1m=0.7920  PR-AUC=0.7764
+    weights: LGB v2=0.4372, TCN v3c=0.1015, LSTM+Att=0.4613
+  [LGB+TCN_v4+v3a+v3c+LSTM_Att]  thr=0.75  F1m=0.7962  PR-AUC=0.7745
+    weights: LGB v2=0.3327, TCN v4=0.0773, TCN v3a=0.351, TCN v3c=0.1223, LSTM+Att=0.1167
+
+================================================================================
+METHOD 3 — STACKING (LR, val-fit + 5-fold CV)
+================================================================================
+
+  [ALL_7]  thr=0.55  F1m=0.8478  PR-AUC=0.8433
+    C=2.0  inter=-6.154  coefs={'LGB v2': 3.2637, 'RF': 4.8314, 'TCN v4': 3.2841, 'TCN v3a': 1.539, 'TCN v3b': 0.478, 'TCN v3c': -2.2698, 'LSTM+Att': -0.922}
+  [LGB+RF+TCN_v4+LSTM_Att]  thr=0.53  F1m=0.8428  PR-AUC=0.8533
+    C=5.0  inter=-6.077  coefs={'LGB v2': 3.6001, 'RF': 4.4558, 'TCN v4': 3.2201, 'LSTM+Att': -1.235}
+  [LGB+TCN_v4+LSTM_Att]  thr=0.36  F1m=0.8361  PR-AUC=0.8479
+    C=5.0  inter=-5.739  coefs={'LGB v2': 7.1561, 'TCN v4': 3.2619, 'LSTM+Att': -1.2298}
+  [LGB+RF+LSTM_Att]  thr=0.52  F1m=0.8377  PR-AUC=0.8484
+    C=0.5  inter=-6.036  coefs={'LGB v2': 3.3966, 'RF': 4.6044, 'LSTM+Att': 1.9184}
+  [LGB+TCN_v4+v3c+LSTM_Att]  thr=0.36  F1m=0.8361  PR-AUC=0.8343
+    C=0.5  inter=-5.669  coefs={'LGB v2': 6.9883, 'TCN v4': 3.7412, 'TCN v3c': -1.013, 'LSTM+Att': -0.7087}
+  [LGB+TCN_v3c+LSTM_Att]  thr=0.36  F1m=0.8321  PR-AUC=0.8439
+    C=0.1  inter=-5.349  coefs={'LGB v2': 6.4857, 'TCN v3c': 1.3922, 'LSTM+Att': 0.5883}
+  [LGB+TCN_v4+v3a+v3c+LSTM_Att]  thr=0.31  F1m=0.8375  PR-AUC=0.8395
+    C=0.1  inter=-5.406  coefs={'LGB v2': 6.4415, 'TCN v4': 1.467, 'TCN v3a': 1.4902, 'TCN v3c': -0.3991, 'LSTM+Att': -0.431}

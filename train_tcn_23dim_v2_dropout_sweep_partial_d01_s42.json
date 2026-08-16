@@ -1,0 +1,90 @@
+{
+  "dropout": 0.1,
+  "lr": 0.004,
+  "batch": 64,
+  "epochs": 20,
+  "channels": 64,
+  "iters_per_ep": 188,
+  "seed": 42,
+  "n_features": 23,
+  "n_params": 73945,
+  "best_epoch": 6,
+  "actual_epochs_run": 11,
+  "early_stopped": true,
+  "best_val_f1m": 0.890780769901649,
+  "train_time_s": 142.13547658920288,
+  "test_macro_f1": 0.8618364896267319,
+  "test_binary_f1": 0.854952468567924,
+  "test_accuracy": 0.8621794871794872,
+  "test_roc_auc": 0.8958304034923137,
+  "test_pr_auc": 0.92684737830583,
+  "history": [
+    {
+      "epoch": 1,
+      "val_f1m": 0.7886800714251507,
+      "epoch_time_s": 11.569033145904541,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 2,
+      "val_f1m": 0.847243929012657,
+      "epoch_time_s": 14.074098587036133,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 3,
+      "val_f1m": 0.8213638367706853,
+      "epoch_time_s": 10.342298984527588,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 4,
+      "val_f1m": 0.8636325306117492,
+      "epoch_time_s": 9.552287101745605,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 5,
+      "val_f1m": 0.8575614988240801,
+      "epoch_time_s": 9.29325270652771,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 6,
+      "val_f1m": 0.890780769901649,
+      "epoch_time_s": 9.942307710647583,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 7,
+      "val_f1m": 0.8866747306630898,
+      "epoch_time_s": 9.747776508331299,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 8,
+      "val_f1m": 0.8634297883551418,
+      "epoch_time_s": 10.709903001785278,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 9,
+      "val_f1m": 0.8603760064764572,
+      "epoch_time_s": 21.654165983200073,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 10,
+      "val_f1m": 0.841965914176803,
+      "epoch_time_s": 18.790519952774048,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 11,
+      "val_f1m": 0.8855003755404275,
+      "epoch_time_s": 12.647501707077026,
+      "current_lr": 0.002
+    }
+  ],
+  "dropout_param": 0.1
+}

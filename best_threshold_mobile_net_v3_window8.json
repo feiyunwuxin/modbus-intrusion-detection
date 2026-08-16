@@ -1,0 +1,7 @@
+{
+  "best_threshold": 0.5099999999999998,
+  "val_macro_f1_at_best": 0.7799489931519631,
+  "val_binary_f1_at_best": 0.7457744049672301,
+  "val_macro_f1_at_0.5": 0.778997865941647,
+  "metric": "macro_f1"
+}

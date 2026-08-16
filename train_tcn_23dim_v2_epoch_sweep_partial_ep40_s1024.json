@@ -1,0 +1,172 @@
+{
+  "epochs": 40,
+  "lr": 0.004,
+  "batch": 64,
+  "iters_per_ep": 188,
+  "seed": 1024,
+  "n_features": 23,
+  "n_params": 73945,
+  "best_epoch": 20,
+  "actual_epochs_run": 25,
+  "early_stopped": true,
+  "best_val_f1m": 0.8955316541509324,
+  "train_time_s": 326.5855257511139,
+  "test_macro_f1": 0.8710213243546576,
+  "test_binary_f1": 0.8660606060606061,
+  "test_accuracy": 0.8712121212121212,
+  "test_roc_auc": 0.8971292949483014,
+  "test_pr_auc": 0.9138668691721434,
+  "history": [
+    {
+      "epoch": 1,
+      "val_f1m": 0.7645417979062124,
+      "epoch_time_s": 13.128379344940186,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 2,
+      "val_f1m": 0.8178982976750582,
+      "epoch_time_s": 11.740888833999634,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 3,
+      "val_f1m": 0.7634029420114838,
+      "epoch_time_s": 13.173969030380249,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 4,
+      "val_f1m": 0.7426264115721154,
+      "epoch_time_s": 11.125372409820557,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 5,
+      "val_f1m": 0.8624154161972366,
+      "epoch_time_s": 13.729122638702393,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 6,
+      "val_f1m": 0.8768729776532844,
+      "epoch_time_s": 12.386200189590454,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 7,
+      "val_f1m": 0.861675026371638,
+      "epoch_time_s": 12.288978576660156,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 8,
+      "val_f1m": 0.8684873703334701,
+      "epoch_time_s": 12.3844575881958,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 9,
+      "val_f1m": 0.8731295431303723,
+      "epoch_time_s": 10.930347204208374,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 10,
+      "val_f1m": 0.8765310471172313,
+      "epoch_time_s": 12.712381362915039,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 11,
+      "val_f1m": 0.8783335604924811,
+      "epoch_time_s": 12.148566007614136,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 12,
+      "val_f1m": 0.8801216994563031,
+      "epoch_time_s": 12.599195957183838,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 13,
+      "val_f1m": 0.8849682100150055,
+      "epoch_time_s": 13.919309854507446,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 14,
+      "val_f1m": 0.8687738225263579,
+      "epoch_time_s": 12.04209852218628,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 15,
+      "val_f1m": 0.8879610729675677,
+      "epoch_time_s": 11.668311834335327,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 16,
+      "val_f1m": 0.8905083648019672,
+      "epoch_time_s": 13.20604658126831,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 17,
+      "val_f1m": 0.8724551584184341,
+      "epoch_time_s": 12.145950078964233,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 18,
+      "val_f1m": 0.8938029730216643,
+      "epoch_time_s": 14.296393394470215,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 19,
+      "val_f1m": 0.8882655080855955,
+      "epoch_time_s": 12.472477197647095,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 20,
+      "val_f1m": 0.8955316541509324,
+      "epoch_time_s": 12.427892208099365,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 21,
+      "val_f1m": 0.8923578751164958,
+      "epoch_time_s": 14.298861742019653,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 22,
+      "val_f1m": 0.8819285051897358,
+      "epoch_time_s": 12.625253438949585,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 23,
+      "val_f1m": 0.8883279877283503,
+      "epoch_time_s": 12.870447635650635,
+      "current_lr": 0.001
+    },
+    {
+      "epoch": 24,
+      "val_f1m": 0.8910317997258803,
+      "epoch_time_s": 14.18595290184021,
+      "current_lr": 0.001
+    },
+    {
+      "epoch": 25,
+      "val_f1m": 0.893571128308674,
+      "epoch_time_s": 11.531265497207642,
+      "current_lr": 0.001
+    }
+  ],
+  "epoch_param": 40
+}

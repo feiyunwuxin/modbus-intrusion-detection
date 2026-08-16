@@ -1,0 +1,68 @@
+% 第 2 章 相关理论与技术基础
+
+\chapter{相关理论与技术基础}
+\label{chap:related}
+
+\todo[学生]{本章是"基础铺垫"，避免写成"教材搬运"。建议聚焦 3 个核心：
+（1）SCADA/Modbus 协议；（2）TCN 与 SE 注意力；（3）量化原理。每部分 ≤ 3 页。}
+
+\section{SCADA 入侵检测任务定义}
+\label{sec:scada_task}
+
+\par SCADA 系统通常由监控中心、通信网络、现场设备三层组成。Modbus 协议是
+SCADA 现场层最常用的通信协议之一，采用主-从（Master-Slave）交互模式，每次
+交互包含 4 行记录：\texttt{command\_address}、\texttt{command\_memory}、
+\texttt{response\_address}、\texttt{response\_memory}。
+
+\pitfall{P-2.1}{学生常把 SCADA 入侵检测任务定义写成"通用网络入侵检测"。
+必须明确：标签体系（三层）、评估指标（Macro-F1 vs Weighted-F1）、数据
+集划分（按时序而非随机）。}
+
+\section{时序卷积网络（TCN）}
+\label{sec:tcn}
+
+\par TCN \cite{ref:bai2018tcn} 由 Lea 等人于 2017 年提出，核心组件包括
+\textbf{因果卷积}、\textbf{膨胀卷积}、\textbf{残差连接}。对于长度为 $T$ 的
+输入序列，TCN 通过膨胀因子 $d = 2^i$ 的卷积核实现感受野指数级扩展。
+
+\begin{equation}
+  y_t = \sum_{i=0}^{k-1} w_i \cdot x_{t - d \cdot i}
+  \label{eq:tcn_conv}
+\end{equation}
+
+\pitfall{P-4.3}{公式未编号或编号混乱。重要公式必须用 equation 环境编号
+（如 \eqref{eq:tcn_conv}），引用格式应为"见式 (\ref{eq:tcn_conv})"。
+学生常把所有公式都编号，导致编号体系臃肿；正确做法是只对"后续会引用"
+的公式编号。}
+
+\good{本节用 3 个加粗的核心组件（因果/膨胀/残差）+ 1 个公式精确表达，
+既给定义又给物理意义，避免"教材搬运"。}
+
+\section{SE 通道注意力}
+\label{sec:se}
+
+\par SE（Squeeze-and-Excitation）模块 \cite{ref:hu2018senet} 通过
+"Squeeze $\to$ Excitation $\to$ Scale"三步实现通道维度的自适应重标定。
+
+\pitfall{P-2.1}{学生常把 SE 描述为"一种注意力机制"就完事。必须明确：
+（1）SE 关注的是通道维度，不是空间/时间维度；（2）SE 参数量极少（仅
+两层 FC），不会显著增加模型大小；（3）SE 是即插即用模块，可插入任何
+CNN 的残差块内。这 3 点必须写清，否则无法支撑第 4 章"SE 模块消融"。}
+
+\section{模型压缩与量化}
+\label{sec:quant}
+
+\par 模型量化是将 FP32 权重/激活映射到低位宽（INT8/INT4）表示的技术。
+按量化时机分为训练后量化（PTQ）与量化感知训练（QAT）；按粒度分为逐张量
+（per-tensor）与逐通道（per-channel）量化。
+
+\pitfall{P-2.2}{学生常忽略"INT8 推理为何反而慢"的物理原因——反量化/dequantize
+开销 + SIMD 指令不匹配。建议本章为第 5 章"混合 INT8 方案"做理论铺垫。}
+
+\pitfall{P-2.3}{引用格式不统一。常见错误：（1）GB/T 7714 与 IEEE 混用；
+（2）会议论文标 "Journal"；（3）arXiv 预印本未标注。本模板统一用
+\texttt{biblatex + gb7714-2015} 风格，正文引用形式 \texttt{\textbackslash cite\{key\}}，
+文末自动按出现顺序编号。}
+
+\pitfall{P-2.4}{自引过多或过少。硕士论文自引 0 次（缺）会让评委质疑
+"前期工作基础"；自引 5+ 次（过）会显得"自吹自擂"。建议 1-2 次为宜。}

@@ -1,0 +1,115 @@
+[
+  {
+    "label": "V7  ch=8,  b=2, SE=8 (sweet spot)",
+    "ch": 8,
+    "nb": 2,
+    "dils": [
+      1,
+      2,
+      4
+    ],
+    "use_se": true,
+    "fc_h": 32,
+    "params": 2561,
+    "best_epoch": 33,
+    "time": 13.4,
+    "val_f1m": 0.8288,
+    "test_f1m": 0.8082,
+    "test_pr": 0.9089,
+    "test_bin": 0.7853
+  },
+  {
+    "label": "V17 ch=8,  b=2, NO SE",
+    "ch": 8,
+    "nb": 2,
+    "dils": [
+      1,
+      2,
+      4
+    ],
+    "use_se": false,
+    "fc_h": 32,
+    "params": 2409,
+    "best_epoch": 33,
+    "time": 12.9,
+    "val_f1m": 0.7903,
+    "test_f1m": 0.7614,
+    "test_pr": 0.8967,
+    "test_bin": 0.7224
+  },
+  {
+    "label": "V18 ch=8,  b=2, dil=[1,2] only (no d=4)",
+    "ch": 8,
+    "nb": 2,
+    "dils": [
+      1,
+      2
+    ],
+    "use_se": true,
+    "fc_h": 32,
+    "params": 2561,
+    "best_epoch": 33,
+    "time": 14.9,
+    "val_f1m": 0.8288,
+    "test_f1m": 0.8082,
+    "test_pr": 0.9089,
+    "test_bin": 0.7853
+  },
+  {
+    "label": "V19 ch=12, b=2, SE=8 (ch=12 middle)",
+    "ch": 12,
+    "nb": 2,
+    "dils": [
+      1,
+      2,
+      4
+    ],
+    "use_se": true,
+    "fc_h": 32,
+    "params": 4237,
+    "best_epoch": 35,
+    "time": 16.9,
+    "val_f1m": 0.828,
+    "test_f1m": 0.8134,
+    "test_pr": 0.9133,
+    "test_bin": 0.7931
+  },
+  {
+    "label": "V20 ch=8,  b=2, fc=8 (smaller head)",
+    "ch": 8,
+    "nb": 2,
+    "dils": [
+      1,
+      2,
+      4
+    ],
+    "use_se": true,
+    "fc_h": 8,
+    "params": 2321,
+    "best_epoch": 33,
+    "time": 15.0,
+    "val_f1m": 0.8127,
+    "test_f1m": 0.7954,
+    "test_pr": 0.9081,
+    "test_bin": 0.7696
+  },
+  {
+    "label": "V21 ch=8,  b=2, dil=[1,2,4], fc=8",
+    "ch": 8,
+    "nb": 2,
+    "dils": [
+      1,
+      2,
+      4
+    ],
+    "use_se": true,
+    "fc_h": 8,
+    "params": 2321,
+    "best_epoch": 33,
+    "time": 16.2,
+    "val_f1m": 0.8127,
+    "test_f1m": 0.7954,
+    "test_pr": 0.9081,
+    "test_bin": 0.7696
+  }
+]

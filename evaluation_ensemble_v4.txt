@@ -1,0 +1,75 @@
+================================================================================
+ENSEMBLE REPORT — v4: ALL_10 (v3's 9 + 1D Transformer)
+================================================================================
+Base models:
+
+  LGB v2          thr=0.64  F1m=0.8337  Bin-F1=0.7287  Acc=0.8999  PR-AUC=0.8165  ROC-AUC=0.9099
+  RF              thr=0.53  F1m=0.8330  Bin-F1=0.7358  Acc=0.8895  PR-AUC=0.8363  ROC-AUC=0.9153
+  TCN v4          thr=0.82  F1m=0.6624  Bin-F1=0.5253  Acc=0.7180  PR-AUC=0.4431  ROC-AUC=0.7488
+  TCN v3a         thr=0.41  F1m=0.6734  Bin-F1=0.5399  Acc=0.7279  PR-AUC=0.4544  ROC-AUC=0.7514
+  TCN v3b         thr=0.70  F1m=0.6634  Bin-F1=0.5183  Acc=0.7260  PR-AUC=0.4540  ROC-AUC=0.7524
+  TCN v3c         thr=0.54  F1m=0.6611  Bin-F1=0.5189  Acc=0.7208  PR-AUC=0.4559  ROC-AUC=0.7503
+  LSTM+Att        thr=0.61  F1m=0.6520  Bin-F1=0.5138  Acc=0.7069  PR-AUC=0.3779  ROC-AUC=0.7236
+  TCN v4 v2       thr=0.65  F1m=0.6617  Bin-F1=0.5282  Acc=0.7145  PR-AUC=0.4094  ROC-AUC=0.7434
+  LSTM+Att v2     thr=0.61  F1m=0.6520  Bin-F1=0.5138  Acc=0.7069  PR-AUC=0.3779  ROC-AUC=0.7236
+  Transformer     thr=0.38  F1m=0.6574  Bin-F1=0.5090  Acc=0.7216  PR-AUC=0.3834  ROC-AUC=0.7182
+
+================================================================================
+METHOD 1 — UNIFORM AVERAGE
+================================================================================
+
+  [ALL_7_v2]  thr=0.80  F1m=0.7930  PR-AUC=0.7643
+  [ALL_9_v3]  thr=0.84  F1m=0.7870  PR-AUC=0.7546
+  [ALL_10]  thr=0.86  F1m=0.7814  PR-AUC=0.7453
+  [ALL_8_v4]  thr=0.82  F1m=0.7830  PR-AUC=0.7511
+  [ALL_10_no_v3c]  thr=0.84  F1m=0.7849  PR-AUC=0.7507
+  [ALL_10_no_v3a]  thr=0.84  F1m=0.7793  PR-AUC=0.7473
+  [diverse_6]  thr=0.76  F1m=0.7834  PR-AUC=0.7574
+  [attn_3_plus_trees]  thr=0.72  F1m=0.7872  PR-AUC=0.7644
+  [TF_alone]  thr=0.38  F1m=0.6574  PR-AUC=0.3834
+
+================================================================================
+METHOD 2 — WEIGHTED AVERAGE (SLSQP on val)
+================================================================================
+
+  [ALL_7_v2]  thr=0.53  F1m=0.8316  PR-AUC=0.8417
+    weights: LGB v2=0.2047, RF=0.4834, TCN v4=0.0, TCN v3a=0.1366, TCN v3b=0.0602, TCN v3c=0.0368, LSTM+Att=0.0782
+  [ALL_9_v3]  thr=0.61  F1m=0.7980  PR-AUC=0.7985
+    weights: LGB v2=0.1514, RF=0.3574, TCN v4=0.0, TCN v3a=0.101, TCN v3b=0.0445, TCN v3c=0.0272, LSTM+Att=0.0578, TCN v4 v2=0.1189, LSTM+Att v2=0.1418
+  [ALL_10]  thr=0.72  F1m=0.7906  PR-AUC=0.7708
+    weights: LGB v2=0.1244, RF=0.2936, TCN v4=0.0, TCN v3a=0.083, TCN v3b=0.0366, TCN v3c=0.0223, LSTM+Att=0.0475, TCN v4 v2=0.0977, LSTM+Att v2=0.1165, Transformer=0.1784
+  [ALL_8_v4]  thr=0.57  F1m=0.8196  PR-AUC=0.8164
+    weights: LGB v2=0.1764, RF=0.4164, TCN v4=0.0, TCN v3a=0.1177, TCN v3b=0.0519, TCN v3c=0.0317, LSTM+Att=0.0674, Transformer=0.1386
+  [ALL_10_no_v3c]  thr=0.65  F1m=0.8004  PR-AUC=0.7942
+    weights: LGB v2=0.1514, RF=0.3574, TCN v4=0.0, TCN v3a=0.101, TCN v3b=0.0445, LSTM+Att=0.0272, TCN v4 v2=0.0578, LSTM+Att v2=0.1189, Transformer=0.1418
+  [ALL_10_no_v3a]  thr=0.80  F1m=0.7963  PR-AUC=0.7716
+    weights: LGB v2=0.2347, RF=0.0545, TCN v4=0.2476, TCN v3b=0.0863, TCN v3c=0.0823, LSTM+Att=0.0167, TCN v4 v2=0.2573, LSTM+Att v2=0.0004, Transformer=0.0201
+  [diverse_6]  thr=0.50  F1m=0.8309  PR-AUC=0.8436
+    weights: LGB v2=0.2221, RF=0.5244, TCN v4=0.0, TCN v3c=0.1482, LSTM+Att=0.0653, Transformer=0.0399
+  [attn_3_plus_trees]  thr=0.51  F1m=0.8282  PR-AUC=0.8426
+    weights: LGB v2=0.2313, RF=0.5462, LSTM+Att=0.0, LSTM+Att v2=0.1543, Transformer=0.068
+  [TF_alone]  thr=0.38  F1m=0.6574  PR-AUC=0.3834
+    weights: Transformer=1.0
+
+================================================================================
+METHOD 3 — STACKING (LR, val-fit + 5-fold CV)
+================================================================================
+
+  [ALL_7_v2]  thr=0.54  F1m=0.8481  PR-AUC=0.8473
+    C=1.0  inter=-6.049  coefs={'LGB v2': 3.3026, 'RF': 4.7416, 'TCN v4': 2.7154, 'TCN v3a': 1.5909, 'TCN v3b': 0.303, 'TCN v3c': -1.676, 'LSTM+Att': -0.9347}
+  [ALL_9_v3]  thr=0.53  F1m=0.8443  PR-AUC=0.8488
+    C=5.0  inter=-6.147  coefs={'LGB v2': 3.0204, 'RF': 5.1309, 'TCN v4': 1.8941, 'TCN v3a': 1.4606, 'TCN v3b': 0.1427, 'TCN v3c': -2.069, 'LSTM+Att': -0.8956, 'TCN v4 v2': 2.3765, 'LSTM+Att v2': -0.8956}
+  [ALL_10]  thr=0.52  F1m=0.8450  PR-AUC=0.8394
+    C=5.0  inter=-6.132  coefs={'LGB v2': 3.1478, 'RF': 5.042, 'TCN v4': 1.6936, 'TCN v3a': 1.5912, 'TCN v3b': 0.5538, 'TCN v3c': -1.3236, 'LSTM+Att': -0.1484, 'TCN v4 v2': 1.9004, 'LSTM+Att v2': -0.1484, 'Transformer': -2.2485}
+  [ALL_8_v4]  thr=0.52  F1m=0.8441  PR-AUC=0.8389
+    C=0.5  inter=-6.003  coefs={'LGB v2': 3.356, 'RF': 4.6847, 'TCN v4': 1.9637, 'TCN v3a': 1.6774, 'TCN v3b': 0.5095, 'TCN v3c': -0.3237, 'LSTM+Att': 0.5005, 'Transformer': -2.5058}
+  [ALL_10_no_v3c]  thr=0.52  F1m=0.8446  PR-AUC=0.8432
+    C=5.0  inter=-6.106  coefs={'LGB v2': 3.2187, 'RF': 4.9694, 'TCN v4': 1.1182, 'TCN v3a': 1.6139, 'TCN v3b': 0.0152, 'LSTM+Att': -0.0878, 'TCN v4 v2': 1.7786, 'LSTM+Att v2': -0.0878, 'Transformer': -2.5276}
+  [ALL_10_no_v3a]  thr=0.50  F1m=0.8426  PR-AUC=0.8393
+    C=5.0  inter=-6.129  coefs={'LGB v2': 3.105, 'RF': 5.1181, 'TCN v4': 2.9765, 'TCN v3b': 1.1438, 'TCN v3c': -2.0157, 'LSTM+Att': -0.2271, 'TCN v4 v2': 2.1485, 'LSTM+Att v2': -0.2271, 'Transformer': -2.0054}
+  [diverse_6]  thr=0.50  F1m=0.8421  PR-AUC=0.8399
+    C=1.0  inter=-6.058  coefs={'LGB v2': 3.3241, 'RF': 4.8622, 'TCN v4': 3.5417, 'TCN v3c': -0.0779, 'LSTM+Att': 0.4556, 'Transformer': -2.2126}
+  [attn_3_plus_trees]  thr=0.50  F1m=0.8357  PR-AUC=0.8451
+    C=2.0  inter=-6.114  coefs={'LGB v2': 3.26, 'RF': 4.904, 'LSTM+Att': 1.0955, 'LSTM+Att v2': 1.0955, 'Transformer': -0.3619}
+  [TF_alone]  thr=0.15  F1m=0.6572  PR-AUC=0.3834
+    C=0.5  inter=-2.696  coefs={'Transformer': 2.5486}

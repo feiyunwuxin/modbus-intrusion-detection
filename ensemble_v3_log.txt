@@ -1,0 +1,50 @@
+[    0.0s] STEP 1: load ...
+[    0.0s]    LGB v2          val: (27462, 4)  test: (54927, 4)
+[    0.1s]    RF              val: (27462, 4)  test: (54927, 4)
+[    0.1s]    TCN v4          val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v3a         val: (27456, 4)  test: (54920, 4)
+[    0.1s]    TCN v3b         val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v3c         val: (27456, 4)  test: (54912, 4)
+[    0.1s]    LSTM+Att        val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v4 v2       val: (27456, 4)  test: (54912, 4)
+[    0.1s]    LSTM+Att v2     val: (27456, 4)  test: (54912, 4)
+[    0.1s]    align: val=27456  test=54912
+[    0.1s]    [ok] all y_true align
+[    0.1s] STEP 2: per-model benchmarks ...
+[    0.6s]    LGB v2          thr=0.64  F1m=0.8337  PR-AUC=0.8165
+[    1.0s]    RF              thr=0.53  F1m=0.8330  PR-AUC=0.8363
+[    1.4s]    TCN v4          thr=0.82  F1m=0.6624  PR-AUC=0.4431
+[    1.7s]    TCN v3a         thr=0.41  F1m=0.6734  PR-AUC=0.4544
+[    2.1s]    TCN v3b         thr=0.70  F1m=0.6634  PR-AUC=0.4540
+[    2.5s]    TCN v3c         thr=0.54  F1m=0.6611  PR-AUC=0.4559
+[    2.8s]    LSTM+Att        thr=0.61  F1m=0.6520  PR-AUC=0.3779
+[    3.2s]    TCN v4 v2       thr=0.65  F1m=0.6617  PR-AUC=0.4094
+[    3.6s]    LSTM+Att v2     thr=0.61  F1m=0.6520  PR-AUC=0.3779
+[    3.6s] STEP 3: probability matrix ...
+[    3.6s]    val  shape: (27456, 9)
+[    3.6s] STEP 4: uniform-average ensemble ...
+[    3.9s]    ALL_9                                               F1m=0.7870  PR-AUC=0.7546
+[    4.3s]    LGB+RF+TCN_v4+TCN_v4_v2                             F1m=0.8049  PR-AUC=0.8008
+[    4.7s]    LGB+RF+TCN_v4_v2+LSTM+Att_v2                        F1m=0.7990  PR-AUC=0.7970
+[    5.1s]    LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2        F1m=0.7906  PR-AUC=0.7692
+[    5.6s]    LGB+RF+v2_strong                                    F1m=0.7990  PR-AUC=0.7970
+[    6.0s]    LGB+RF+all_TCN+LSTM_v1+v2                           F1m=0.7870  PR-AUC=0.7546
+[    6.0s] STEP 5: weighted-average (SLSQP) ...
+[   27.6s]    ALL_9                                               weights=[0.15, 0.36, 0.0, 0.1, 0.04, 0.03, 0.06, 0.12, 0.14]  F1m=0.7980  PR-AUC=0.7985
+[   39.4s]    LGB+RF+TCN_v4+TCN_v4_v2                             weights=[0.25, 0.59, 0.0, 0.17]  F1m=0.8349  PR-AUC=0.8521
+[   51.3s]    LGB+RF+TCN_v4_v2+LSTM+Att_v2                        weights=[0.26, 0.4, 0.11, 0.23]  F1m=0.8239  PR-AUC=0.8357
+[   67.3s]    LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2        weights=[0.22, 0.52, 0.0, 0.15, 0.07, 0.04]  F1m=0.8333  PR-AUC=0.8459
+[   78.9s]    LGB+RF+v2_strong                                    weights=[0.26, 0.4, 0.11, 0.23]  F1m=0.8239  PR-AUC=0.8357
+[  101.3s]    LGB+RF+all_TCN+LSTM_v1+v2                           weights=[0.23, 0.05, 0.25, 0.09, 0.08, 0.02, 0.26, 0.0, 0.02]  F1m=0.8038  PR-AUC=0.7759
+[  101.3s] STEP 6: stacking (LR) ...
+[  105.7s]    ALL_9                                               C=5.0  F1m=0.8443  PR-AUC=0.8488  coefs=[3.0204, 5.1309, 1.8941, 1.4606, 0.1427, -2.069, -0.8956, 2.3765, -0.8956]
+[  109.9s]    LGB+RF+TCN_v4+TCN_v4_v2                             C=1.0  F1m=0.8348  PR-AUC=0.8519  coefs=[3.3514, 4.6588, 1.0226, 1.1105]
+[  114.1s]    LGB+RF+TCN_v4_v2+LSTM+Att_v2                        C=5.0  F1m=0.8456  PR-AUC=0.8534  coefs=[3.1806, 4.9126, 3.6408, -1.7413]
+[  118.3s]    LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2        C=1.0  F1m=0.8458  PR-AUC=0.8541  coefs=[3.5105, 4.493, 1.4159, 2.4494, -0.986, -0.986]
+[  122.5s]    LGB+RF+v2_strong                                    C=5.0  F1m=0.8456  PR-AUC=0.8534  coefs=[3.1806, 4.9126, 3.6408, -1.7413]
+[  127.0s]    LGB+RF+all_TCN+LSTM_v1+v2                           C=5.0  F1m=0.8443  PR-AUC=0.8488  coefs=[3.0204, 5.1309, 1.8941, 1.4606, 0.1427, -2.069, 2.3765, -0.8956, -0.8956]
+[  127.0s] STEP 7: save artifacts ...
+[  127.0s] STEP 8: best-of-best ...
+[  127.0s]    BEST: method=stack  members=LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2
+[  127.0s]       test F1m=0.8458  PR-AUC=0.8541  Acc=0.9012
+[  127.0s] DONE ensemble_v3.

@@ -1,0 +1,31 @@
+==============================================================================================================
+ 14-MODEL CROSS-COMPARISON ON 19-DIM SCADA FEATURES (Macro-F1 ranked)
+==============================================================================================================
+  # Model                      Family     Params             F1m  PR-AUC  Bin-F1     Acc  Train(s)
+--------------------------------------------------------------------------------------------------------------
+  1 TCN+SE 19-dim (champion)   TCN        72,921          0.8444  0.8892  0.8347  0.8450      59.2 [CHAMPION]
+  2 LightGBM                   Tree       ~400 iters      0.8341  0.8243  0.7289  0.9007       3.5
+  3 CNN-LSTM                   Hybrid     51,713          0.8329  0.8997  0.8217  0.8336      23.4
+  4 CNN 1D                     Lightweight 30,913          0.8280  0.9031  0.8175  0.8287      13.3
+  5 Random Forest              Tree       500 trees       0.8273  0.8262  0.7254  0.8874      11.0
+  6 ShuffleNet 1D              Mobile     5,905           0.8189  0.8873  0.8070  0.8196      22.8
+  7 MobileNet 1D               Mobile     30,401          0.8167  0.9058  0.8035  0.8176      21.4
+  8 BiLSTM                     Recurrent  147,009         0.8053  0.8948  0.7916  0.8062      42.2
+  9 SqueezeNet 1D              Mobile     61,873          0.8028  0.8959  0.7929  0.8033      25.3
+ 10 LSTM                       Recurrent  57,153          0.8003  0.8922  0.7781  0.8027      21.9
+ 11 GhostNet 1D                Mobile     48,225          0.7904  0.8808  0.7953  0.7905      40.6
+ 12 Vanilla RNN                Recurrent  15,873          0.7895  0.8879  0.7731  0.7908      14.2
+ 13 MobileViT 1D               Hybrid     75,617          0.7875  0.8992  0.7908  0.7876      49.0
+ 14 LinearSVM                  Classical  linear          0.6536  0.5366  0.4431  0.7815       7.4
+ 15 OCC-eSNN                   SNN        1 neurons       0.5817  0.6874  0.5159  0.5921       0.9
+==============================================================================================================
+
+Family-level summary:
+  TCN       : n=1, avg F1m=0.8444, max F1m=0.8444, min F1m=0.8444
+  Tree      : n=2, avg F1m=0.8307, max F1m=0.8341, min F1m=0.8273
+  Hybrid    : n=2, avg F1m=0.8102, max F1m=0.8329, min F1m=0.7875
+  Lightweight: n=1, avg F1m=0.8280, max F1m=0.8280, min F1m=0.8280
+  Mobile    : n=4, avg F1m=0.8072, max F1m=0.8189, min F1m=0.7904
+  Recurrent : n=3, avg F1m=0.7984, max F1m=0.8053, min F1m=0.7895
+  Classical : n=1, avg F1m=0.6536, max F1m=0.6536, min F1m=0.6536
+  SNN       : n=1, avg F1m=0.5817, max F1m=0.5817, min F1m=0.5817

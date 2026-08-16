@@ -1,0 +1,172 @@
+{
+  "epochs": 50,
+  "lr": 0.004,
+  "batch": 64,
+  "iters_per_ep": 188,
+  "seed": 1024,
+  "n_features": 23,
+  "n_params": 73945,
+  "best_epoch": 20,
+  "actual_epochs_run": 25,
+  "early_stopped": true,
+  "best_val_f1m": 0.8955316541509324,
+  "train_time_s": 277.3490478992462,
+  "test_macro_f1": 0.8710213243546576,
+  "test_binary_f1": 0.8660606060606061,
+  "test_accuracy": 0.8712121212121212,
+  "test_roc_auc": 0.8971292949483014,
+  "test_pr_auc": 0.9138668691721434,
+  "history": [
+    {
+      "epoch": 1,
+      "val_f1m": 0.7645417979062124,
+      "epoch_time_s": 9.365092039108276,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 2,
+      "val_f1m": 0.8178982976750582,
+      "epoch_time_s": 10.81088638305664,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 3,
+      "val_f1m": 0.7634029420114838,
+      "epoch_time_s": 10.887364625930786,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 4,
+      "val_f1m": 0.7426264115721154,
+      "epoch_time_s": 10.436070919036865,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 5,
+      "val_f1m": 0.8624154161972366,
+      "epoch_time_s": 9.201948404312134,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 6,
+      "val_f1m": 0.8768729776532844,
+      "epoch_time_s": 9.318207502365112,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 7,
+      "val_f1m": 0.861675026371638,
+      "epoch_time_s": 10.670971870422363,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 8,
+      "val_f1m": 0.8684873703334701,
+      "epoch_time_s": 12.724483728408813,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 9,
+      "val_f1m": 0.8731295431303723,
+      "epoch_time_s": 11.041810035705566,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 10,
+      "val_f1m": 0.8765310471172313,
+      "epoch_time_s": 10.054670095443726,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 11,
+      "val_f1m": 0.8783335604924811,
+      "epoch_time_s": 9.45162558555603,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 12,
+      "val_f1m": 0.8801216994563031,
+      "epoch_time_s": 9.716611862182617,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 13,
+      "val_f1m": 0.8849682100150055,
+      "epoch_time_s": 11.87995195388794,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 14,
+      "val_f1m": 0.8687738225263579,
+      "epoch_time_s": 11.169795751571655,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 15,
+      "val_f1m": 0.8879610729675677,
+      "epoch_time_s": 10.568450927734375,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 16,
+      "val_f1m": 0.8905083648019672,
+      "epoch_time_s": 10.65880823135376,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 17,
+      "val_f1m": 0.8724551584184341,
+      "epoch_time_s": 11.743215560913086,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 18,
+      "val_f1m": 0.8938029730216643,
+      "epoch_time_s": 11.171314477920532,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 19,
+      "val_f1m": 0.8882655080855955,
+      "epoch_time_s": 11.117281913757324,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 20,
+      "val_f1m": 0.8955316541509324,
+      "epoch_time_s": 10.452725887298584,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 21,
+      "val_f1m": 0.8923578751164958,
+      "epoch_time_s": 10.916280746459961,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 22,
+      "val_f1m": 0.8819285051897358,
+      "epoch_time_s": 11.467024803161621,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 23,
+      "val_f1m": 0.8883279877283503,
+      "epoch_time_s": 11.579113245010376,
+      "current_lr": 0.001
+    },
+    {
+      "epoch": 24,
+      "val_f1m": 0.8910317997258803,
+      "epoch_time_s": 10.146655321121216,
+      "current_lr": 0.001
+    },
+    {
+      "epoch": 25,
+      "val_f1m": 0.893571128308674,
+      "epoch_time_s": 11.025876522064209,
+      "current_lr": 0.001
+    }
+  ],
+  "epoch_param": 50
+}

@@ -1,0 +1,99 @@
+{
+  "baseline_27dim": {
+    "n_features": 27,
+    "n_params": 74969,
+    "best_epoch": 17,
+    "test_macro_f1": 0.8267954843613463,
+    "test_binary_f1": 0.8136234626300851,
+    "test_accuracy": 0.8277972027972028,
+    "test_roc_auc": 0.8609331451424798,
+    "test_pr_auc": 0.8988577654015886
+  },
+  "results_25dim": [
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 11,
+      "test_macro_f1": 0.8099502408847472,
+      "test_binary_f1": 0.788575180564675,
+      "test_accuracy": 0.8123543123543123,
+      "test_roc_auc": 0.8620799970034749,
+      "test_pr_auc": 0.9093766700386423
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 6,
+      "test_macro_f1": 0.7979273919665129,
+      "test_binary_f1": 0.7799104286628279,
+      "test_accuracy": 0.7995337995337995,
+      "test_roc_auc": 0.8450490085077476,
+      "test_pr_auc": 0.8979521650865747
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 8,
+      "test_macro_f1": 0.81714331603409,
+      "test_binary_f1": 0.7984420642648491,
+      "test_accuracy": 0.8190559440559441,
+      "test_roc_auc": 0.8592647957680895,
+      "test_pr_auc": 0.9083344455102291
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 13,
+      "test_macro_f1": 0.8305518160385417,
+      "test_binary_f1": 0.8173198482932996,
+      "test_accuracy": 0.8315850815850816,
+      "test_roc_auc": 0.8669079777371809,
+      "test_pr_auc": 0.9135325280994098
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8360840372536279,
+      "test_binary_f1": 0.823045267489712,
+      "test_accuracy": 0.8371212121212122,
+      "test_roc_auc": 0.8680682799094914,
+      "test_pr_auc": 0.9119459755380926
+    }
+  ],
+  "mean_f1m": 0.8183313604355039,
+  "std_f1m": 0.013801982560936397,
+  "mean_pr_auc": 0.9082283568545897,
+  "std_pr_auc": 0.005456829051653526,
+  "drop_features": {
+    "3": "setpoint",
+    "6": "deadband"
+  },
+  "keep_idx": [
+    0,
+    1,
+    2,
+    4,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+  ]
+}

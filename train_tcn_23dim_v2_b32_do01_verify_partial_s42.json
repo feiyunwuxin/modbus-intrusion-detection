@@ -1,0 +1,89 @@
+{
+  "batch": 32,
+  "dropout": 0.1,
+  "lr": 0.004,
+  "channels": 64,
+  "epochs": 20,
+  "iters_per_ep": 376,
+  "seed": 42,
+  "n_features": 23,
+  "n_params": 73945,
+  "best_epoch": 6,
+  "actual_epochs_run": 11,
+  "early_stopped": true,
+  "best_val_f1m": 0.8874423700030393,
+  "train_time_s": 340.74105191230774,
+  "test_macro_f1": 0.8630869270355448,
+  "test_binary_f1": 0.8571428571428571,
+  "test_accuracy": 0.8633449883449883,
+  "test_roc_auc": 0.8922275928880201,
+  "test_pr_auc": 0.9259474668249909,
+  "history": [
+    {
+      "epoch": 1,
+      "val_f1m": 0.828876057301701,
+      "epoch_time_s": 14.240115404129028,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 2,
+      "val_f1m": 0.8421986206173131,
+      "epoch_time_s": 15.799692869186401,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 3,
+      "val_f1m": 0.8291313296526379,
+      "epoch_time_s": 20.372323513031006,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 4,
+      "val_f1m": 0.8627216639798305,
+      "epoch_time_s": 21.850257396697998,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 5,
+      "val_f1m": 0.8707766898484445,
+      "epoch_time_s": 48.800944089889526,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 6,
+      "val_f1m": 0.8874423700030393,
+      "epoch_time_s": 53.65229606628418,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 7,
+      "val_f1m": 0.8757215007215007,
+      "epoch_time_s": 44.96248507499695,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 8,
+      "val_f1m": 0.8714598388100276,
+      "epoch_time_s": 26.512300729751587,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 9,
+      "val_f1m": 0.8556907617991389,
+      "epoch_time_s": 27.56029486656189,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 10,
+      "val_f1m": 0.8705250985735555,
+      "epoch_time_s": 27.245356559753418,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 11,
+      "val_f1m": 0.8866021534687202,
+      "epoch_time_s": 27.223234176635742,
+      "current_lr": 0.002
+    }
+  ]
+}

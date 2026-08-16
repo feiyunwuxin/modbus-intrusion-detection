@@ -1,0 +1,61 @@
+========================================================================
+EVALUATION REPORT — TCN v4 +SE on v2 (SCADA-aware features)
+========================================================================
+Preprocessing: v2 (27 dim: 19 row-level + 8 window-aggregates)
+Architecture: TCN v4 +SE (3 blocks, dilations=[1,2,4], channels=64, SE r=8)
+Features per step: 27  |  Params: 74,969
+Train/Val/Test windows: 12,014 / 1,716 / 3,432
+Best epoch: 35  |  Best val Macro-F1: 0.8594  |  Train time: 67.7s
+Tuned threshold: 0.50
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.8594  Binary-F1=0.8386  Acc=0.8625  ROC-AUC=0.8760  PR-AUC=0.9166
+              precision    recall  f1-score   support
+
+           0     0.7896    0.9943    0.8802       872
+           1     0.9919    0.7263    0.8386       844
+
+    accuracy                         0.8625      1716
+   macro avg     0.8908    0.8603    0.8594      1716
+weighted avg     0.8891    0.8625    0.8597      1716
+
+Confusion matrix: [[867, 5], [231, 613]]
+
+------------------------------------------------------------------------
+[val@0.50]  thr=0.50  Macro-F1=0.8594  Binary-F1=0.8386  Acc=0.8625  ROC-AUC=0.8760  PR-AUC=0.9166
+              precision    recall  f1-score   support
+
+           0     0.7896    0.9943    0.8802       872
+           1     0.9919    0.7263    0.8386       844
+
+    accuracy                         0.8625      1716
+   macro avg     0.8908    0.8603    0.8594      1716
+weighted avg     0.8891    0.8625    0.8597      1716
+
+Confusion matrix: [[867, 5], [231, 613]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.8367  Binary-F1=0.8241  Acc=0.8377  ROC-AUC=0.8643  PR-AUC=0.8990
+              precision    recall  f1-score   support
+
+           0     0.7585    0.9650    0.8493      1627
+           1     0.9581    0.7230    0.8241      1805
+
+    accuracy                         0.8377      3432
+   macro avg     0.8583    0.8440    0.8367      3432
+weighted avg     0.8635    0.8377    0.8361      3432
+
+Confusion matrix: [[1570, 57], [500, 1305]]
+
+------------------------------------------------------------------------
+[test@0.50]  thr=0.50  Macro-F1=0.8367  Binary-F1=0.8241  Acc=0.8377  ROC-AUC=0.8643  PR-AUC=0.8990
+              precision    recall  f1-score   support
+
+           0     0.7585    0.9650    0.8493      1627
+           1     0.9581    0.7230    0.8241      1805
+
+    accuracy                         0.8377      3432
+   macro avg     0.8583    0.8440    0.8367      3432
+weighted avg     0.8635    0.8377    0.8361      3432
+
+Confusion matrix: [[1570, 57], [500, 1305]]

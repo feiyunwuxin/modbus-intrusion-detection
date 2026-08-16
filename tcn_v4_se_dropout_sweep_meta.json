@@ -1,0 +1,76 @@
+{
+  "config": {
+    "lr": 0.002,
+    "batch": 128,
+    "epochs": 40,
+    "channels": 64,
+    "seed": 42
+  },
+  "dropouts_tested": [
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5
+  ],
+  "results": [
+    {
+      "dropout": 0.1,
+      "best_val_f1m": 0.8948071014898251,
+      "best_val_epoch": 30,
+      "best_threshold": 0.5100000000000002,
+      "test_f1m": 0.8636352059052561,
+      "test_binary_f1": 0.8640325392213829,
+      "test_pr_auc": 0.9171791082980869,
+      "test_acc": 0.8636363636363636,
+      "train_time": 91.4395022392273
+    },
+    {
+      "dropout": 0.2,
+      "best_val_f1m": 0.8942532198538826,
+      "best_val_epoch": 40,
+      "best_threshold": 0.5100000000000002,
+      "test_f1m": 0.8694361574317662,
+      "test_binary_f1": 0.8675340035481963,
+      "test_pr_auc": 0.902372110286248,
+      "test_acc": 0.8694638694638694,
+      "train_time": 99.73341846466064
+    },
+    {
+      "dropout": 0.3,
+      "best_val_f1m": 0.8855131316132653,
+      "best_val_epoch": 24,
+      "best_threshold": 0.46000000000000024,
+      "test_f1m": 0.8719270505576215,
+      "test_binary_f1": 0.8674116581093325,
+      "test_pr_auc": 0.9042824611543757,
+      "test_acc": 0.872086247086247,
+      "train_time": 85.06476163864136
+    },
+    {
+      "dropout": 0.4,
+      "best_val_f1m": 0.8861774479523055,
+      "best_val_epoch": 34,
+      "best_threshold": 0.4400000000000002,
+      "test_f1m": 0.8687413310125377,
+      "test_binary_f1": 0.8644578313253012,
+      "test_pr_auc": 0.9043009965926354,
+      "test_acc": 0.8688811188811189,
+      "train_time": 99.28648638725281
+    },
+    {
+      "dropout": 0.5,
+      "best_val_f1m": 0.8805631551019565,
+      "best_val_epoch": 18,
+      "best_threshold": 0.5600000000000003,
+      "test_f1m": 0.8574253380029182,
+      "test_binary_f1": 0.8500307314074985,
+      "test_pr_auc": 0.9143686271119171,
+      "test_acc": 0.8578088578088578,
+      "train_time": 69.41737365722656
+    }
+  ],
+  "total_time_seconds": 447.77637672424316,
+  "best_dropout": 0.3,
+  "best_test_f1m": 0.8719270505576215
+}

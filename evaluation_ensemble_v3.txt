@@ -1,0 +1,59 @@
+================================================================================
+ENSEMBLE REPORT — v3: ALL_9 (v1 7 models + v2 2 strong models)
+================================================================================
+Base models:
+
+  LGB v2          thr=0.64  F1m=0.8337  Bin-F1=0.7287  Acc=0.8999  PR-AUC=0.8165  ROC-AUC=0.9099
+  RF              thr=0.53  F1m=0.8330  Bin-F1=0.7358  Acc=0.8895  PR-AUC=0.8363  ROC-AUC=0.9153
+  TCN v4          thr=0.82  F1m=0.6624  Bin-F1=0.5253  Acc=0.7180  PR-AUC=0.4431  ROC-AUC=0.7488
+  TCN v3a         thr=0.41  F1m=0.6734  Bin-F1=0.5399  Acc=0.7279  PR-AUC=0.4544  ROC-AUC=0.7514
+  TCN v3b         thr=0.70  F1m=0.6634  Bin-F1=0.5183  Acc=0.7260  PR-AUC=0.4540  ROC-AUC=0.7524
+  TCN v3c         thr=0.54  F1m=0.6611  Bin-F1=0.5189  Acc=0.7208  PR-AUC=0.4559  ROC-AUC=0.7503
+  LSTM+Att        thr=0.61  F1m=0.6520  Bin-F1=0.5138  Acc=0.7069  PR-AUC=0.3779  ROC-AUC=0.7236
+  TCN v4 v2       thr=0.65  F1m=0.6617  Bin-F1=0.5282  Acc=0.7145  PR-AUC=0.4094  ROC-AUC=0.7434
+  LSTM+Att v2     thr=0.61  F1m=0.6520  Bin-F1=0.5138  Acc=0.7069  PR-AUC=0.3779  ROC-AUC=0.7236
+
+================================================================================
+METHOD 1 — UNIFORM AVERAGE
+================================================================================
+
+  [ALL_9]  thr=0.84  F1m=0.7870  PR-AUC=0.7546
+  [LGB+RF+TCN_v4+TCN_v4_v2]  thr=0.66  F1m=0.8049  PR-AUC=0.8008
+  [LGB+RF+TCN_v4_v2+LSTM+Att_v2]  thr=0.64  F1m=0.7990  PR-AUC=0.7970
+  [LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2]  thr=0.77  F1m=0.7906  PR-AUC=0.7692
+  [LGB+RF+v2_strong]  thr=0.64  F1m=0.7990  PR-AUC=0.7970
+  [LGB+RF+all_TCN+LSTM_v1+v2]  thr=0.84  F1m=0.7870  PR-AUC=0.7546
+
+================================================================================
+METHOD 2 — WEIGHTED AVERAGE (SLSQP on val)
+================================================================================
+
+  [ALL_9]  thr=0.61  F1m=0.7980  PR-AUC=0.7985
+    weights: LGB v2=0.1514, RF=0.3574, TCN v4=0.0, TCN v3a=0.101, TCN v3b=0.0445, TCN v3c=0.0272, LSTM+Att=0.0578, TCN v4 v2=0.1189, LSTM+Att v2=0.1418
+  [LGB+RF+TCN_v4+TCN_v4_v2]  thr=0.60  F1m=0.8349  PR-AUC=0.8521
+    weights: LGB v2=0.2482, RF=0.5861, TCN v4=0.0001, TCN v4 v2=0.1656
+  [LGB+RF+TCN_v4_v2+LSTM+Att_v2]  thr=0.54  F1m=0.8239  PR-AUC=0.8357
+    weights: LGB v2=0.2589, RF=0.3985, TCN v4 v2=0.1112, LSTM+Att v2=0.2314
+  [LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2]  thr=0.53  F1m=0.8333  PR-AUC=0.8459
+    weights: LGB v2=0.2221, RF=0.5244, TCN v4=0.0, TCN v4 v2=0.1482, LSTM+Att=0.0653, LSTM+Att v2=0.0399
+  [LGB+RF+v2_strong]  thr=0.54  F1m=0.8239  PR-AUC=0.8357
+    weights: LGB v2=0.2589, RF=0.3985, TCN v4 v2=0.1112, LSTM+Att v2=0.2314
+  [LGB+RF+all_TCN+LSTM_v1+v2]  thr=0.81  F1m=0.8038  PR-AUC=0.7759
+    weights: LGB v2=0.2347, RF=0.0545, TCN v4=0.2476, TCN v3a=0.0863, TCN v3b=0.0823, TCN v3c=0.0167, TCN v4 v2=0.2573, LSTM+Att=0.0004, LSTM+Att v2=0.0201
+
+================================================================================
+METHOD 3 — STACKING (LR, val-fit + 5-fold CV)
+================================================================================
+
+  [ALL_9]  thr=0.53  F1m=0.8443  PR-AUC=0.8488
+    C=5.0  inter=-6.147  coefs={'LGB v2': 3.0204, 'RF': 5.1309, 'TCN v4': 1.8941, 'TCN v3a': 1.4606, 'TCN v3b': 0.1427, 'TCN v3c': -2.069, 'LSTM+Att': -0.8956, 'TCN v4 v2': 2.3765, 'LSTM+Att v2': -0.8956}
+  [LGB+RF+TCN_v4+TCN_v4_v2]  thr=0.28  F1m=0.8348  PR-AUC=0.8519
+    C=1.0  inter=-6.157  coefs={'LGB v2': 3.3514, 'RF': 4.6588, 'TCN v4': 1.0226, 'TCN v4 v2': 1.1105}
+  [LGB+RF+TCN_v4_v2+LSTM+Att_v2]  thr=0.52  F1m=0.8456  PR-AUC=0.8534
+    C=5.0  inter=-6.081  coefs={'LGB v2': 3.1806, 'RF': 4.9126, 'TCN v4 v2': 3.6408, 'LSTM+Att v2': -1.7413}
+  [LGB+RF+TCN_v4+TCN_v4_v2+LSTM+Att+LSTM+Att_v2]  thr=0.52  F1m=0.8458  PR-AUC=0.8541
+    C=1.0  inter=-6.009  coefs={'LGB v2': 3.5105, 'RF': 4.493, 'TCN v4': 1.4159, 'TCN v4 v2': 2.4494, 'LSTM+Att': -0.986, 'LSTM+Att v2': -0.986}
+  [LGB+RF+v2_strong]  thr=0.52  F1m=0.8456  PR-AUC=0.8534
+    C=5.0  inter=-6.081  coefs={'LGB v2': 3.1806, 'RF': 4.9126, 'TCN v4 v2': 3.6408, 'LSTM+Att v2': -1.7413}
+  [LGB+RF+all_TCN+LSTM_v1+v2]  thr=0.53  F1m=0.8443  PR-AUC=0.8488
+    C=5.0  inter=-6.147  coefs={'LGB v2': 3.0204, 'RF': 5.1309, 'TCN v4': 1.8941, 'TCN v3a': 1.4606, 'TCN v3b': 0.1427, 'TCN v3c': -2.069, 'TCN v4 v2': 2.3765, 'LSTM+Att': -0.8956, 'LSTM+Att v2': -0.8956}

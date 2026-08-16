@@ -1,0 +1,33 @@
+feature,importance
+minute,4158
+hour,3409
+pressure measurement_rmean4,1974
+pressure measurement,1763
+crc rate_diff1,1645
+crc rate,1144
+reset rate,1140
+setpoint,1101
+dow,1052
+deadband,1050
+cycle time,855
+pressure measurement_rmin4,833
+dt,637
+gain,536
+pressure measurement_rmax4,493
+crc rate_rmean4,384
+crc rate_rmin4,372
+crc rate_rstd4,371
+crc rate_rmax4,308
+system mode,257
+pump,225
+rate,196
+is_resp,168
+length,166
+solenoid,163
+function,107
+control scheme,106
+is_read,67
+pressure measurement_diff1,53
+pressure measurement_rstd4,46
+is_write,21
+address,0

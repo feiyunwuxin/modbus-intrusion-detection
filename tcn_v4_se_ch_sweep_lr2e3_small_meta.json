@@ -1,0 +1,79 @@
+{
+  "config": {
+    "lr": 0.002,
+    "batch": 128,
+    "epochs": 40,
+    "seed": 42,
+    "window": 16,
+    "n_features": 19
+  },
+  "channels_tested": [
+    8,
+    12,
+    16,
+    24
+  ],
+  "results": [
+    {
+      "channels": 8,
+      "n_params": 2269,
+      "n_blocks": 3,
+      "crashed": false,
+      "best_val_f1m": 0.8653170666772698,
+      "best_val_epoch": 38,
+      "best_threshold": 0.5000000000000002,
+      "test_f1m": 0.847926267281106,
+      "test_binary_f1": 0.8387096774193549,
+      "test_pr_auc": 0.9146379369562553,
+      "test_acc": 0.8484848484848485,
+      "train_time": 42.078328132629395
+    },
+    {
+      "channels": 12,
+      "n_params": 4085,
+      "n_blocks": 3,
+      "crashed": false,
+      "best_val_f1m": 0.8745420234837115,
+      "best_val_epoch": 30,
+      "best_threshold": 0.5000000000000002,
+      "test_f1m": 0.8591951821651862,
+      "test_binary_f1": 0.8520564763658687,
+      "test_pr_auc": 0.9216460915233649,
+      "test_acc": 0.8595571095571095,
+      "train_time": 53.06726050376892
+    },
+    {
+      "channels": 16,
+      "n_params": 6381,
+      "n_blocks": 3,
+      "crashed": false,
+      "best_val_f1m": 0.875363461276981,
+      "best_val_epoch": 40,
+      "best_threshold": 0.48000000000000026,
+      "test_f1m": 0.8628053292471372,
+      "test_binary_f1": 0.8569689592209373,
+      "test_pr_auc": 0.929026704880588,
+      "test_acc": 0.8630536130536131,
+      "train_time": 59.992000102996826
+    },
+    {
+      "channels": 24,
+      "n_params": 12413,
+      "n_blocks": 3,
+      "crashed": false,
+      "best_val_f1m": 0.8830584707646176,
+      "best_val_epoch": 27,
+      "best_threshold": 0.5300000000000002,
+      "test_f1m": 0.8645219514784732,
+      "test_binary_f1": 0.8583638583638583,
+      "test_pr_auc": 0.9151589974071632,
+      "test_acc": 0.8648018648018648,
+      "train_time": 62.575886726379395
+    }
+  ],
+  "total_time_seconds": 220.7881474494934,
+  "best_channels_f1m": 24,
+  "best_test_f1m": 0.8645219514784732,
+  "best_channels_pr_auc": 16,
+  "best_test_pr_auc": 0.929026704880588
+}

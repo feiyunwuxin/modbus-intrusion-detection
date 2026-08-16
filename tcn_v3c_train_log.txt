@@ -1,0 +1,65 @@
+[device] cpu (cuda available: False)
+[tag]    v3c_window16_deep
+[    0.0s] STEP 1: load npy ...
+[    0.0s]    raw shapes: train=(192239, 17) val=(27462, 17) test=(54927, 17)
+[    0.0s] STEP 2: group every 16 rows into 1 window ...
+[    0.0s]    train windows: (12014, 16, 17)
+[    0.0s]    val   windows: (1716, 16, 17)
+[    0.0s]    test  windows: (3432, 16, 17)
+[    0.0s]    window-label dist: train 51.34%  val 49.18%  test 52.59%
+[    0.0s] STEP 3: one-hot encode function column at each timestep ...
+[    0.0s]    function unique codes: 28
+[    0.1s]    per-step feature dim: 44 (16 numeric + 28 one-hot)
+[    0.1s]    final TCN input shape: (12014, 44, 16)
+[    0.1s] STEP 4: DataLoaders ...
+[    0.1s]    TCN config: 6 blocks, channels=64, kernel=3, dilations=[1, 2, 4, 8, 16, 32]
+[    0.1s]    Effective receptive field: 253  (window=16, RF/W = 15.8x)
+[    0.1s]    model params: 150,913
+[    0.1s]    pos_weight = 0.948  (n_neg=5,846, n_pos=6,168)
+[    2.1s] STEP 6: training ...
+[    5.3s]    epoch  1  loss=0.6396  val Macro-F1=0.4725  val AUC=0.6918  lr=5.00e-04
+[    8.5s]    epoch  2  loss=0.5629  val Macro-F1=0.5989  val AUC=0.7660  lr=5.00e-04
+[   11.8s]    epoch  3  loss=0.4998  val Macro-F1=0.6618  val AUC=0.7995  lr=5.00e-04
+[   15.1s]    epoch  4  loss=0.4735  val Macro-F1=0.6797  val AUC=0.8090  lr=5.00e-04
+[   18.4s]    epoch  5  loss=0.4569  val Macro-F1=0.6896  val AUC=0.8129  lr=5.00e-04
+[   21.6s]    epoch  6  loss=0.4418  val Macro-F1=0.6949  val AUC=0.8195  lr=5.00e-04
+[   25.0s]    epoch  7  loss=0.4332  val Macro-F1=0.6972  val AUC=0.8178  lr=5.00e-04
+[   28.4s]    epoch  8  loss=0.4344  val Macro-F1=0.7142  val AUC=0.8182  lr=5.00e-04
+[   31.7s]    epoch  9  loss=0.4153  val Macro-F1=0.7039  val AUC=0.8187  lr=5.00e-04
+[   35.1s]    epoch 10  loss=0.4113  val Macro-F1=0.7179  val AUC=0.8174  lr=5.00e-04
+[   38.5s]    epoch 11  loss=0.4040  val Macro-F1=0.7280  val AUC=0.8204  lr=5.00e-04
+[   41.9s]    epoch 12  loss=0.3953  val Macro-F1=0.7237  val AUC=0.8191  lr=5.00e-04
+[   45.3s]    epoch 13  loss=0.3931  val Macro-F1=0.7223  val AUC=0.8245  lr=5.00e-04
+[   48.7s]    epoch 14  loss=0.3811  val Macro-F1=0.7444  val AUC=0.8223  lr=5.00e-04
+[   52.2s]    epoch 15  loss=0.3812  val Macro-F1=0.7687  val AUC=0.8258  lr=5.00e-04
+[   55.6s]    epoch 16  loss=0.3817  val Macro-F1=0.7680  val AUC=0.8280  lr=5.00e-04
+[   59.1s]    epoch 17  loss=0.3679  val Macro-F1=0.7493  val AUC=0.8332  lr=5.00e-04
+[   62.9s]    epoch 18  loss=0.3704  val Macro-F1=0.7890  val AUC=0.8409  lr=5.00e-04
+[   66.6s]    epoch 19  loss=0.3650  val Macro-F1=0.8088  val AUC=0.8445  lr=5.00e-04
+[   70.4s]    epoch 20  loss=0.3628  val Macro-F1=0.7856  val AUC=0.8461  lr=5.00e-04
+[   74.1s]    epoch 21  loss=0.3655  val Macro-F1=0.8121  val AUC=0.8457  lr=5.00e-04
+[   77.8s]    epoch 22  loss=0.3537  val Macro-F1=0.8114  val AUC=0.8458  lr=5.00e-04
+[   81.5s]    epoch 23  loss=0.3500  val Macro-F1=0.8244  val AUC=0.8454  lr=5.00e-04
+[   85.2s]    epoch 24  loss=0.3527  val Macro-F1=0.8205  val AUC=0.8508  lr=5.00e-04
+[   88.9s]    epoch 25  loss=0.3445  val Macro-F1=0.8173  val AUC=0.8457  lr=5.00e-04
+[   92.7s]    epoch 26  loss=0.3430  val Macro-F1=0.8256  val AUC=0.8503  lr=5.00e-04
+[   96.5s]    epoch 27  loss=0.3453  val Macro-F1=0.8295  val AUC=0.8494  lr=5.00e-04
+[  100.1s]    epoch 28  loss=0.3441  val Macro-F1=0.8276  val AUC=0.8497  lr=5.00e-04
+[  103.7s]    epoch 29  loss=0.3430  val Macro-F1=0.8282  val AUC=0.8498  lr=5.00e-04
+[  107.4s]    epoch 30  loss=0.3353  val Macro-F1=0.8315  val AUC=0.8522  lr=5.00e-04
+[  111.1s]    epoch 31  loss=0.3384  val Macro-F1=0.8340  val AUC=0.8550  lr=5.00e-04
+[  114.8s]    epoch 32  loss=0.3401  val Macro-F1=0.8397  val AUC=0.8539  lr=5.00e-04
+[  118.5s]    epoch 33  loss=0.3331  val Macro-F1=0.8334  val AUC=0.8564  lr=5.00e-04
+[  122.2s]    epoch 34  loss=0.3353  val Macro-F1=0.8391  val AUC=0.8596  lr=5.00e-04
+[  126.0s]    epoch 35  loss=0.3343  val Macro-F1=0.8308  val AUC=0.8565  lr=5.00e-04
+[  126.0s]    best epoch = 32  best val Macro-F1 = 0.8397  train_time=126.0s
+[  126.0s] STEP 7: threshold tuning on val ...
+[  126.4s]    best threshold = 0.20  ¡ú  val Macro-F1 = 0.8514  (vs 0.50 = 0.8397)
+[  126.4s] STEP 8: evaluation ...
+[  126.5s] STEP 9: save artifacts ...
+[  127.3s]    plots saved
+[  127.3s] ============================================================
+[  127.3s] DONE v3c_window16_deep.
+[  127.3s]    test@0.20: Macro-F1=0.8200  PR-AUC=0.9061  Binary-F1=0.8133  Acc=0.8202
+[  127.3s]    train time: 126.0s  |  params: 150,913  |  RF: 253
+[  127.3s] ============================================================

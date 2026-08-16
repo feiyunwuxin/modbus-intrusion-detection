@@ -1,0 +1,107 @@
+{
+  "channels": 32,
+  "lr": 0.004,
+  "batch": 64,
+  "epochs": 20,
+  "iters_per_ep": 188,
+  "seed": 456,
+  "n_features": 23,
+  "n_params": 20877,
+  "best_epoch": 9,
+  "actual_epochs_run": 14,
+  "early_stopped": true,
+  "best_val_f1m": 0.8754622301785331,
+  "train_time_s": 141.78998017311096,
+  "test_macro_f1": 0.8505740887969334,
+  "test_binary_f1": 0.841648590021692,
+  "test_accuracy": 0.8511072261072261,
+  "test_roc_auc": 0.8712335297532805,
+  "test_pr_auc": 0.910909371010168,
+  "history": [
+    {
+      "epoch": 1,
+      "val_f1m": 0.7791050295857989,
+      "epoch_time_s": 9.800580024719238,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 2,
+      "val_f1m": 0.8359277892867713,
+      "epoch_time_s": 10.164728164672852,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 3,
+      "val_f1m": 0.8400859149684314,
+      "epoch_time_s": 9.39300799369812,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 4,
+      "val_f1m": 0.8304727492748694,
+      "epoch_time_s": 9.293025732040405,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 5,
+      "val_f1m": 0.8605323848953847,
+      "epoch_time_s": 10.06662106513977,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 6,
+      "val_f1m": 0.8466042943646264,
+      "epoch_time_s": 9.694046974182129,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 7,
+      "val_f1m": 0.8641566034984411,
+      "epoch_time_s": 9.174515008926392,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 8,
+      "val_f1m": 0.8704257901474721,
+      "epoch_time_s": 11.318706035614014,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 9,
+      "val_f1m": 0.8754622301785331,
+      "epoch_time_s": 10.547210693359375,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 10,
+      "val_f1m": 0.8754310402662051,
+      "epoch_time_s": 9.74804973602295,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 11,
+      "val_f1m": 0.6544567658992639,
+      "epoch_time_s": 8.98264765739441,
+      "current_lr": 0.004
+    },
+    {
+      "epoch": 12,
+      "val_f1m": 0.8678696093719651,
+      "epoch_time_s": 9.066515445709229,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 13,
+      "val_f1m": 0.8630132574557128,
+      "epoch_time_s": 10.667716026306152,
+      "current_lr": 0.002
+    },
+    {
+      "epoch": 14,
+      "val_f1m": 0.8604025414169754,
+      "epoch_time_s": 9.107305765151978,
+      "current_lr": 0.002
+    }
+  ],
+  "ch_param": 32
+}

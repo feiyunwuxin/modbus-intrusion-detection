@@ -1,0 +1,57 @@
+[device] cpu  [tag] v2_v4se_window16
+[    0.0s] STEP 1: load v2 windowed npy ...
+[    0.0s]    shapes: train=(12014, 16, 27) val=(1716, 16, 27) test=(3432, 16, 27)
+[    0.0s]    features per step: 27  (was 44 in v1)
+[    0.0s]    final TCN input shape: (12014, 27, 16)
+[    0.0s] STEP 2: DataLoaders ...
+[    0.0s] STEP 3: build model ...
+[    0.1s]    TCN v4 +SE on 27-dim input, params: 74,969
+[    0.1s]    pos_weight = 0.948  (n_neg=5,846, n_pos=6,168)
+[    2.5s] STEP 4: training ...
+[    4.3s]    epoch  1  loss=0.6284  val Macro-F1=0.6758  val AUC=0.7458  lr=5.00e-04
+[    5.9s]    epoch  2  loss=0.5417  val Macro-F1=0.6873  val AUC=0.7861  lr=5.00e-04
+[    7.5s]    epoch  3  loss=0.5029  val Macro-F1=0.7522  val AUC=0.8108  lr=5.00e-04
+[    9.2s]    epoch  4  loss=0.4717  val Macro-F1=0.7881  val AUC=0.8149  lr=5.00e-04
+[   10.9s]    epoch  5  loss=0.4523  val Macro-F1=0.8075  val AUC=0.8371  lr=5.00e-04
+[   12.6s]    epoch  6  loss=0.4402  val Macro-F1=0.7990  val AUC=0.8383  lr=5.00e-04
+[   14.2s]    epoch  7  loss=0.4261  val Macro-F1=0.8217  val AUC=0.8405  lr=5.00e-04
+[   15.9s]    epoch  8  loss=0.4128  val Macro-F1=0.8081  val AUC=0.8429  lr=5.00e-04
+[   17.6s]    epoch  9  loss=0.4029  val Macro-F1=0.8251  val AUC=0.8398  lr=5.00e-04
+[   19.3s]    epoch 10  loss=0.3954  val Macro-F1=0.8296  val AUC=0.8429  lr=5.00e-04
+[   21.0s]    epoch 11  loss=0.3916  val Macro-F1=0.8256  val AUC=0.8438  lr=5.00e-04
+[   22.8s]    epoch 12  loss=0.3858  val Macro-F1=0.8449  val AUC=0.8595  lr=5.00e-04
+[   24.6s]    epoch 13  loss=0.3830  val Macro-F1=0.8256  val AUC=0.8520  lr=5.00e-04
+[   26.3s]    epoch 14  loss=0.3731  val Macro-F1=0.8340  val AUC=0.8622  lr=5.00e-04
+[   28.0s]    epoch 15  loss=0.3705  val Macro-F1=0.8353  val AUC=0.8614  lr=5.00e-04
+[   29.8s]    epoch 16  loss=0.3603  val Macro-F1=0.8385  val AUC=0.8649  lr=2.50e-04
+[   31.5s]    epoch 17  loss=0.3594  val Macro-F1=0.8468  val AUC=0.8723  lr=2.50e-04
+[   33.3s]    epoch 18  loss=0.3547  val Macro-F1=0.8467  val AUC=0.8643  lr=2.50e-04
+[   35.1s]    epoch 19  loss=0.3559  val Macro-F1=0.8467  val AUC=0.8679  lr=2.50e-04
+[   36.8s]    epoch 20  loss=0.3521  val Macro-F1=0.8410  val AUC=0.8685  lr=2.50e-04
+[   38.7s]    epoch 21  loss=0.3497  val Macro-F1=0.8442  val AUC=0.8723  lr=1.25e-04
+[   40.4s]    epoch 22  loss=0.3449  val Macro-F1=0.8460  val AUC=0.8766  lr=1.25e-04
+[   42.2s]    epoch 23  loss=0.3413  val Macro-F1=0.8479  val AUC=0.8722  lr=1.25e-04
+[   44.0s]    epoch 24  loss=0.3427  val Macro-F1=0.8479  val AUC=0.8742  lr=1.25e-04
+[   45.8s]    epoch 25  loss=0.3423  val Macro-F1=0.8492  val AUC=0.8729  lr=1.25e-04
+[   47.7s]    epoch 26  loss=0.3378  val Macro-F1=0.8494  val AUC=0.8717  lr=1.25e-04
+[   49.5s]    epoch 27  loss=0.3370  val Macro-F1=0.8536  val AUC=0.8728  lr=1.25e-04
+[   51.3s]    epoch 28  loss=0.3349  val Macro-F1=0.8544  val AUC=0.8740  lr=1.25e-04
+[   53.1s]    epoch 29  loss=0.3351  val Macro-F1=0.8529  val AUC=0.8738  lr=1.25e-04
+[   55.0s]    epoch 30  loss=0.3315  val Macro-F1=0.8504  val AUC=0.8718  lr=1.25e-04
+[   56.8s]    epoch 31  loss=0.3326  val Macro-F1=0.8537  val AUC=0.8718  lr=1.25e-04
+[   58.6s]    epoch 32  loss=0.3330  val Macro-F1=0.8562  val AUC=0.8734  lr=6.25e-05
+[   60.4s]    epoch 33  loss=0.3272  val Macro-F1=0.8561  val AUC=0.8747  lr=6.25e-05
+[   62.2s]    epoch 34  loss=0.3317  val Macro-F1=0.8562  val AUC=0.8737  lr=6.25e-05
+[   64.0s]    epoch 35  loss=0.3346  val Macro-F1=0.8594  val AUC=0.8760  lr=6.25e-05
+[   64.0s]    best epoch = 35  best val Macro-F1 = 0.8594  train_time=64.0s
+[   64.1s] STEP 5: threshold tuning on val ...
+[   64.4s]    best threshold = 0.50  ¡ú  val Macro-F1 = 0.8594  (vs 0.50 = 0.8594)
+[   64.4s] STEP 6: evaluation ...
+[   64.4s] STEP 7: save artifacts ...
+[   65.5s]    plots saved
+[   65.5s] ============================================================
+[   65.5s] DONE v2_v4se_window16.
+[   65.5s]    test@0.50: Macro-F1=0.8367  PR-AUC=0.8990  Bin-F1=0.8241  Acc=0.8377
+[   65.5s]    vs TCN v4 baseline (0.8340): ¦¤Macro-F1 = +0.0027
+[   65.5s]    vs TCN v4 baseline (0.9025): ¦¤PR-AUC   = -0.0035
+[   65.5s] ============================================================

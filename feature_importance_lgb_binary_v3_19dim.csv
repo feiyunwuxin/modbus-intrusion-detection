@@ -1,0 +1,20 @@
+feature,importance
+crc rate,4870
+pressure measurement,3807
+reset rate,2980
+setpoint,2881
+deadband,2516
+cycle time,1909
+gain,1362
+time_since_last_same_addr_func,1194
+time_diff,1090
+solenoid,434
+system mode,420
+pump,412
+control scheme,293
+length,227
+rate,195
+function,148
+is_unusual_fc,0
+address,0
+is_response,0

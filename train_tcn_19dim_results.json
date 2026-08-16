@@ -1,0 +1,89 @@
+{
+  "baseline_27dim": {
+    "n_features": 27,
+    "n_params": 74969,
+    "best_epoch": 17,
+    "test_macro_f1": 0.8267954843613463,
+    "test_binary_f1": 0.8136234626300851,
+    "test_accuracy": 0.8277972027972028,
+    "test_roc_auc": 0.8609331451424798,
+    "test_pr_auc": 0.8988577654015886
+  },
+  "results_19dim": [
+    {
+      "n_features": 19,
+      "n_params": 72921,
+      "best_epoch": 20,
+      "test_macro_f1": 0.8269590151536098,
+      "test_binary_f1": 0.8112784363985902,
+      "test_accuracy": 0.8283799533799534,
+      "test_roc_auc": 0.8640956708725847,
+      "test_pr_auc": 0.9035329726367493
+    },
+    {
+      "n_features": 19,
+      "n_params": 72921,
+      "best_epoch": 18,
+      "test_macro_f1": 0.8169859186447799,
+      "test_binary_f1": 0.7975220084773395,
+      "test_accuracy": 0.8190559440559441,
+      "test_roc_auc": 0.861979034540059,
+      "test_pr_auc": 0.9077303477868046
+    },
+    {
+      "n_features": 19,
+      "n_params": 72921,
+      "best_epoch": 2,
+      "test_macro_f1": 0.7452028974824179,
+      "test_binary_f1": 0.6968716289104638,
+      "test_accuracy": 0.7543706293706294,
+      "test_roc_auc": 0.8045858751300339,
+      "test_pr_auc": 0.8674742145630765
+    },
+    {
+      "n_features": 19,
+      "n_params": 72921,
+      "best_epoch": 19,
+      "test_macro_f1": 0.819782543038357,
+      "test_binary_f1": 0.8012987012987013,
+      "test_accuracy": 0.8216783216783217,
+      "test_roc_auc": 0.8634852991502469,
+      "test_pr_auc": 0.9046553046736552
+    },
+    {
+      "n_features": 19,
+      "n_params": 72921,
+      "best_epoch": 17,
+      "test_macro_f1": 0.8157479472205146,
+      "test_binary_f1": 0.7972797927461139,
+      "test_accuracy": 0.8175990675990676,
+      "test_roc_auc": 0.8602837845430386,
+      "test_pr_auc": 0.9030781303736608
+    }
+  ],
+  "mean_f1m": 0.8049356643079358,
+  "std_f1m": 0.030118350932623956,
+  "mean_pr_auc": 0.8972941940067892,
+  "std_pr_auc": 0.0149980445971006,
+  "keep_idx": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+  ]
+}

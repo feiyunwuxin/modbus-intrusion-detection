@@ -1,0 +1,49 @@
+% 第 6 章 总结与展望
+
+\chapter{总结与展望}
+\label{chap:conclusion}
+
+\section{全文总结}
+\label{sec:conclusion_summary}
+
+\par 本文围绕"面向 SCADA 工控系统的轻量化入侵检测"这一主题，开展了从
+数据特征、模型架构到边缘部署的全栈研究，主要工作与结论如下：
+
+\begin{enumerate}
+  \item \textbf{基于 SCADA 协议语义的 27 维特征工程}：通过分析 Modbus 4 行
+        主-从交互结构，设计 3 个行级特征 + 8 个窗口级特征。LightGBM 上
+        Macro-F1 从 83.37\% 提升至 83.64\%，验证了"领域特征工程的边际
+        收益 > 模型升级"的结论。
+  \item \textbf{TCN-SE 轻量入侵检测模型}：在 27 种时序模型的横向对比基础
+        上，提出融合 SE 注意力的 TCN-SE 模型，测试集 Macro-F1 = 83.40\%，
+        首次在该任务上超越 LightGBM（83.37\%），并通过窗口长度与 SE 模块
+        的消融实验，揭示了 8 步窗口（2 个 Modbus 周期）的 Pareto 最优
+        结构。
+  \item \textbf{极限压缩与混合精度量化}：通过系统的通道宽度消融，得到
+        4{,}237 参数的 TCN V19 变体，PR-AUC 反升至 0.9133（+0.67\%）；
+        进一步提出"权重 INT8 + 激活 FP32"的混合精度方案，在 Cortex-M4
+        平台上实现 5.5\,KB 模型、0.47\,ms 推理、99.80\% 预测一致率。
+\end{enumerate}
+
+\section{主要创新点}
+\label{sec:conclusion_innov}
+
+\pitfall{P-6.1}{总结章节不能再创新点，必须与第 1.4 节严格对应。建议
+复制第 1.4 节的三个创新点，加上"全文验证"的视角。}
+
+\section{研究不足与展望}
+\label{sec:conclusion_future}
+
+\par 尽管本文在 SCADA 入侵检测的全栈优化上取得了一定成果，但仍存在以下
+不足，有待未来工作进一步研究：
+
+\begin{itemize}
+  \item \textbf{类别不平衡问题}：当前 Macro-F1 仍受少数类（仅占 0.3\%）
+        制约，未来可引入 Focal Loss、class-weighted sampling 等策略；
+  \item \textbf{跨场景泛化}：本文实验仅在 IanArffDataset 上验证，未来
+        需在 BATADAL、SWaT 等公开数据集上测试迁移能力；
+  \item \textbf{在线学习}：当前模型为离线训练，攻击模式演化后需重训；
+        未来可探索联邦学习 / 增量学习框架；
+  \item \textbf{可解释性}：TCN-SE 缺乏可解释性输出，未来可结合 SHAP/
+        Attention 可视化技术。
+\end{itemize}

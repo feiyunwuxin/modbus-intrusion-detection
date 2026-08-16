@@ -1,0 +1,136 @@
+% 第 3 章 SCADA 协议特征工程（创新点 1）
+
+\chapter{SCADA 协议特征工程}
+\label{chap:feat}
+
+\todo[学生]{本章对应创新点 1。务必明确：（1）特征设计动机（为什么是 27 维？）
+（2）三组对比实验（17/27/44 维）；（3）消融实验（去掉行级 vs 去掉窗口级）。}
+
+\section{引言}
+\label{sec:feat_intro}
+
+\par 通过对 Modbus 协议主-从交互结构的深入分析，本章提出基于协议语义的特
+征工程方法。\good{首段点明"为什么 27 维"——上一章说协议有 4 行结构，本章
+就围绕这个结构设计特征。}
+
+\section{数据集与预处理}
+\label{sec:feat_data}
+
+\par 实验采用 IanArffDataset 数据集，包含 274{,}000 条 SCADA 燃气管道记录
+\cite{ref:ian_arff_dataset}。原始数据包含 20 维数值特征与 1 维类别特征
+（function code）。经过 10 步预处理后 \cite{ref:preprocess_pipeline}，得到
+17 维最小特征集。
+
+\section{协议语义特征设计}
+\label{sec:feat_design}
+
+\par 基于 4 行 Modbus 周期结构，本文设计 3 个行级特征 + 8 个窗口级特征，
+构成 27 维 SCADA 协议语义特征集。
+
+\subsection{行级特征（3 维）}
+\label{sec:row_feat}
+
+\begin{itemize}
+  \item \texttt{time\_diff\_intra}：同一 Modbus 周期内相邻行的时间差；
+  \item \texttt{cmd\_resp\_diff}：命令值与响应值的差值；
+  \item \texttt{address\_distance}：主-从地址的距离。
+\end{itemize}
+
+\subsection{窗口级特征（8 维）}
+\label{sec:win_feat}
+
+\begin{itemize}
+  \item 4 个滚动统计量：mean、std、min、max（针对 4 个关键原始特征）；
+\end{itemize}
+
+\pitfall{P-3.1}{学生常在"特征设计"小节只列公式不解释物理意义。必须
+每个特征说明"为什么这个特征能区分攻击 vs 正常"。}
+
+\section{对比实验与分析}
+\label{sec:feat_exp}
+
+\par 设计三组实验：17 维最小特征、27 维协议特征、44 维原始特征。基线模型
+采用 LightGBM，验证特征集对所有模型的影响。
+
+\begin{table}[H]
+\centering
+\caption{不同特征集在 LightGBM 上的性能对比}
+\label{tab:feat_compare}
+\begin{tabular}{lccc}
+\toprule
+特征集 & Macro-F1 / \% & PR-AUC & 训练时间 / s \\
+\midrule
+17 维最小 & 83.37 & 0.8765 & 12.3 \\
+\textbf{27 维协议} & \textbf{83.64} & \textbf{0.8873} & 14.1 \\
+44 维原始 & 82.91 & 0.8721 & 18.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.3}{实验结果表必须配文字分析，且分析不能只说"27 维最优"——
+必须解释"为什么 27 > 44"（冗余特征引入噪声）和"为什么 27 > 17"（窗口
+级特征捕捉时序依赖）。}
+
+\pitfall{P-3.4}{本表实验只有 1 次结果，缺：
+（1）多次运行的标准差（建议 ≥ 5 次）；
+（2）配对 t 检验 p 值；
+（3）基线对比（除了 LightGBM，还应有 1D-CNN、TCN 等多个模型）。
+
+修改建议：表头改为 "Macro-F1 / \% $\pm$ std"，并加注 "5 次独立运行"。}
+
+\pitfall{P-4.2}{表头不规范问题：
+（1）"Macro-F1 / \%" 是正确格式——既给名称又给单位；
+（2）"PR-AUC" 缺单位（无量纲），应注明 "[-]" 或 "归一化值"；
+（3）三线表用 \texttt{\textbackslash toprule / midrule / bottomrule}，
+本表正确，但其他学生常加竖线，须删除。}
+
+\section{行级 vs 窗口级特征消融}
+\label{sec:feat_ablation}
+
+\todo[学生]{增加消融实验：去掉 3 个行级特征 / 去掉 8 个窗口级特征，
+验证"为什么是 11 维 = 3 + 8，而不是 8 + 3 或 5 + 6"。}
+
+\begin{table}[H]
+\centering
+\caption{行级 vs 窗口级特征消融（LightGBM）}
+\label{tab:feat_ablation}
+\begin{tabular}{lcc}
+\toprule
+配置 & Macro-F1 / \% & PR-AUC \\
+\midrule
+完整 27 维（3 行 + 8 窗） & \textbf{83.64} & \textbf{0.8873} \\
+去掉 3 个行级（仅 24 维）   & 83.21 & 0.8812 \\
+去掉 8 个窗口级（仅 19 维） & 82.95 & 0.8734 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.2}{消融实验是"创新点 1"的关键证据。学生常只做"加 vs 不加"
+1 组消融，本表必须展示"行级 vs 窗口级"的"为什么是 3+8"——这是支撑创
+新点 1 的核心论据。}
+
+\section{复现性说明}
+\label{sec:feat_reproduce}
+
+\good{本节是 P-3.4 的"处方"——所有数字必须可复现。}
+
+\par 为保证实验可复现，本文所有实验固定以下设置：
+\begin{itemize}
+  \item \textbf{随机种子}：numpy / pytorch / random 全部设为 42；
+  \item \textbf{数据集划分}：按 7:1:2 比例划为训练/验证/测试集，
+        \textbf{按时序}而非随机划分（避免未来信息泄露）；
+  \item \textbf{硬件环境}：NVIDIA RTX 3090 (24\,GB) / Intel Xeon 6248；
+  \item \textbf{软件版本}：Python 3.10.12, PyTorch 2.1.0, LightGBM 4.1.0；
+  \item \textbf{训练超参}：epoch=50, batch=128, lr=1e-3 (Adam), 早停 patience=5。
+\end{itemize}
+
+\section{本章小结}
+\label{sec:feat_summary}
+
+\todo[学生]{小结必须回指创新点 1，给出量化指标提升。建议结构：
+"本章针对 X 问题，提出 27 维 SCADA 协议特征，在 LightGBM / TCN 上
+Macro-F1 提升 0.27--0.73pp（详见 \tabref{tab:feat_compare}）。通过行级
+vs 窗口级消融（详见 \tabref{tab:feat_ablation}）证明 3+8 的设计最优。"}
+
+\pitfall{P-6.1}{本章小结不能再创新点，必须严格对应第 1.4 节创新点 1 的
+表述。建议直接复制第 1.4 节的措辞，加上"本章验证"视角。}

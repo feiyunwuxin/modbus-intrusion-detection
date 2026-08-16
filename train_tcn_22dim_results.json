@@ -1,0 +1,89 @@
+{
+  "results_22dim": [
+    {
+      "n_features": 22,
+      "n_params": 73689,
+      "best_epoch": 3,
+      "test_macro_f1": 0.7703836128242905,
+      "test_binary_f1": 0.7319804058782365,
+      "test_accuracy": 0.7768065268065268,
+      "test_roc_auc": 0.8252232496292651,
+      "test_pr_auc": 0.8854633782142148
+    },
+    {
+      "n_features": 22,
+      "n_params": 73689,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8204572648634407,
+      "test_binary_f1": 0.802461139896373,
+      "test_accuracy": 0.8222610722610723,
+      "test_roc_auc": 0.8555904771795888,
+      "test_pr_auc": 0.8891668241428257
+    },
+    {
+      "n_features": 22,
+      "n_params": 73689,
+      "best_epoch": 16,
+      "test_macro_f1": 0.8270673765056924,
+      "test_binary_f1": 0.8120012767315672,
+      "test_accuracy": 0.8283799533799534,
+      "test_roc_auc": 0.8620519045811079,
+      "test_pr_auc": 0.8921975703455101
+    },
+    {
+      "n_features": 22,
+      "n_params": 73689,
+      "best_epoch": 20,
+      "test_macro_f1": 0.8236800320033757,
+      "test_binary_f1": 0.8074454428754814,
+      "test_accuracy": 0.8251748251748252,
+      "test_roc_auc": 0.8600992258409423,
+      "test_pr_auc": 0.8956985745413311
+    },
+    {
+      "n_features": 22,
+      "n_params": 73689,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8154541372051081,
+      "test_binary_f1": 0.7955584585238407,
+      "test_accuracy": 0.8175990675990676,
+      "test_roc_auc": 0.8617902194103315,
+      "test_pr_auc": 0.9083026847677999
+    }
+  ],
+  "mean_f1m": 0.8114084846803813,
+  "std_f1m": 0.020866622174458983,
+  "mean_pr_auc": 0.8941658064023363,
+  "std_pr_auc": 0.007833220809648262,
+  "drop_features": {
+    "2": "length",
+    "3": "setpoint",
+    "19": "press_mean_w",
+    "20": "crc_mean_w",
+    "22": "cmd_count_w"
+  },
+  "keep_idx": [
+    0,
+    1,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    21,
+    23,
+    24,
+    25,
+    26
+  ]
+}

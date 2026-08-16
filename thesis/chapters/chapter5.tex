@@ -1,0 +1,154 @@
+% 第 5 章 极限压缩与混合精度量化（创新点 3）
+
+\chapter{极限压缩与混合精度量化}
+\label{chap:deploy}
+
+\todo[学生]{本章对应创新点 3。结构：（1）通道宽度消融 V0→V19；
+（2）INT8 全量化问题分析；（3）混合 INT8 方案；（4）MCU 实测；
+（5）反直觉结论"V19 4K 参数反超 V0 79K"。}
+
+\section{通道宽度消融}
+\label{sec:deploy_width}
+
+\par 为探索模型容量的 Pareto 前沿，本文对 TCN-SE 进行系统的通道宽度消融，
+固定 3 个残差块不变。
+
+\begin{table}[H]
+\centering
+\caption{TCN-SE 通道宽度消融}
+\label{tab:width_ablation}
+\small
+\begin{tabular}{lccccc}
+\toprule
+变体 & 通道数 & 参数量 & Macro-F1 / \% & PR-AUC & 磁盘 / KB \\
+\midrule
+V0 & 64 & 79\,231 & 83.40 & 0.9025 & 320 \\
+V1 & 32 & 21\,103 & 83.21 & 0.9063 & 88 \\
+V2 & 16 & 7\,981 & 82.98 & 0.9092 & 51 \\
+V3 & 14 & 6\,842 & 82.85 & 0.9101 & 47 \\
+\textbf{V19} & \textbf{12} & \textbf{4\,237} & \textbf{82.78} & \textbf{0.9133} & \textbf{29} \\
+V7 & 8  & 2\,561 & 81.45 & 0.8987 & 22 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.4}{反直觉结论"V19 4K 反超 V0 79K"必须有"为什么"的深度解释。
+本章必须给出：（1）8 步短序列只需低维表征；（2）高通道在短序列上过拟
+合；（3）PR-AUC 与 Macro-F1 解耦——PR-AUC 关注排序质量，更受益于正则化。}
+
+\section{INT8 量化方案对比}
+\label{sec:deploy_int8}
+
+\subsection{全 INT8 量化的"慢 1.7×"现象}
+\label{sec:full_int8}
+
+\par 实验发现，对 TCN V19 进行全 INT8 量化（权重 + 激活）后，CPU 推理速
+度反而慢 1.7×（0.47\,ms $\to$ 0.80\,ms）。根因分析：
+\begin{enumerate}
+  \item 激活 INT8 引入反量化/dequantize 开销（约 30\%）；
+  \item SIMD 指令对纯 INT8 流水不友好；
+  \item 8 位累加器在 Cortex-M4 上需多次校正。
+\end{enumerate}
+
+\subsection{混合 INT8 量化方案}
+\label{sec:hybrid_int8}
+
+\par 本文提出"权重 INT8 + 激活 FP32"的混合方案，关键设计：
+\begin{itemize}
+  \item 权重：对每通道做 per-channel INT8 量化（对称，零点为 0）；
+  \item 激活：保持 FP32，避免反量化开销；
+  \item BN 折叠：将 BatchNorm 折叠进前一 Conv1D 权重，减少运行时计算。
+\end{itemize}
+
+\good{本节是"工程洞察"的核心：识别出问题真正在激活 INT8，而非权重 INT8。}
+
+\section{MCU 部署实测}
+\label{sec:deploy_mcu}
+
+\par 在 STM32F407 (Cortex-M4 @ 168\,MHz) 上实测 TCN V19 + 混合 INT8 方案：
+
+\begin{table}[H]
+\centering
+\caption{TCN V19 MCU 部署属性}
+\label{tab:mcu_deploy}
+\begin{tabular}{lc}
+\toprule
+指标 & 数值 \\
+\midrule
+Flash 占用 & 7\,KB \\
+RAM 占用 & 19\,KB \\
+推理延迟 & 0.47\,ms \\
+单次推理能耗 & 0.28\,mJ \\
+量化前后预测一致率 & 99.80\% \\
+11 层量化 SNR & $\geq$ 38\,dB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.3}{部署实验必须有"比特级验证"。本文用 NumPy 推理与 C99
+推理对比 200 个测试样本，逐位一致。论文中应附"200/200 比特级一致"等
+可复现证据。}
+
+\subsection{能耗与稳定性测试}
+\label{sec:deploy_stability}
+
+\todo[学生]{增加稳定性测试：连续运行 10{,}000 次推理，记录：
+（1）最大延迟 / P99 延迟（vs 平均延迟）；
+（2）内存峰值（vs 稳态 RAM）；
+（3）有无异常 crash。
+
+这是嵌入式部署论文的差异化亮点——多数论文只报"平均延迟"，
+工业级应用更关心 P99 延迟。}
+
+\begin{table}[H]
+\centering
+\caption{TCN V19 长时间稳定性测试（10{,}000 次连续推理）}
+\label{tab:deploy_stability}
+\begin{tabular}{lcc}
+\toprule
+指标 & 平均值 & P99 \\
+\midrule
+推理延迟 / ms & 0.47 & 0.51 \\
+RAM 占用 / KB & 19 & 19 \\
+Crash 次数 & 0 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{复现性说明}
+\label{sec:deploy_reproduce}
+
+\good{本节是 P-3.4"复现性"的处方，专为部署类论文设计。}
+
+\par 部署实验复现性要素：
+\begin{itemize}
+  \item \textbf{模型权重}：开源至 \texttt{https://github.com/xxx/tcn-v19-mcu}；
+  \item \textbf{量化参数}：INT8 scale / zero\_point 见附录 A；
+  \item \textbf{C99 代码}：完整 380 行见 \chapref{app:c_code}；
+  \item \textbf{测试用例}：200 个验证样本及预期输出见附录 B；
+  \item \textbf{编译命令}：\texttt{arm-none-eabi-gcc -O2 -mcpu=cortex-m4
+        -mfpu=fpv4-sp-d16 -mfloat-abi=hard}。
+\end{itemize}
+
+\pitfall{P-3.4}{部署类论文的复现性 ≠ 算法类论文：
+（1）必须给完整 C 代码（不能只给 PyTorch）；
+（2）必须给量化参数（scale / zero\_point）；
+（3）必须给编译命令（含 -mcpu 标志）；
+（4）必须给测试用例（含预期输出）。
+本节是 P-3.4 的"处方"。}
+
+\section{本章小结}
+\label{sec:deploy_summary}
+
+\todo[学生]{小结要点：（1）4K 参数反超 79K（PR-AUC +0.67\%）；
+（2）混合 INT8 解决全 INT8 慢 1.7× 问题；（3）5.5KB MCU 模型达到
+工业级检测性能；（4）10{,}000 次连续推理 P99 延迟 0.51\,ms，
+稳定性符合工业要求。}
+
+\pitfall{P-6.1}{本章小结必须回指创新点 3，且与第 1.4 节严格对应。
+建议直接复制第 1.4 节的措辞，加上"本章验证"视角。}
+
+\pitfall{P-3.2}{创新点 3 的核心论据是"V19 4K 参数反超 V0 79K"——
+这在深度学习中是反直觉结论，必须有"为什么"的深度分析。本章小
+结必须解释：（1）8 步短序列只需低维表征；（2）高通道过拟合；
+（3）PR-AUC 关注排序质量，更受益于正则化。}

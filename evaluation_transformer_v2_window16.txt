@@ -1,0 +1,62 @@
+========================================================================
+EVALUATION REPORT — 1D Transformer Encoder on v2 (SCADA features)
+========================================================================
+Preprocessing: v2 (27 dim)
+Architecture: Linear(27→128) + LearnedPos + 3x Pre-LN Transformer blocks (heads=4, ffn=512) + AttentionPool + FC
+Training: AdamW lr=0.0003 warmup+cosine, label_smoothing=0.05, batch=256
+Features per step: 27  |  Params: 605,249
+Train/Val/Test windows: 12,014 / 1,716 / 3,432
+Best epoch: 34  |  Best val Macro-F1: 0.8134  |  Train time: 571.6s
+Tuned threshold: 0.32
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.8134  Binary-F1=0.7768  Acc=0.8205  ROC-AUC=0.8370  PR-AUC=0.8859
+              precision    recall  f1-score   support
+
+           0     0.7390    1.0000    0.8499       872
+           1     1.0000    0.6351    0.7768       844
+
+    accuracy                         0.8205      1716
+   macro avg     0.8695    0.8175    0.8134      1716
+weighted avg     0.8674    0.8205    0.8140      1716
+
+Confusion matrix: [[872, 0], [308, 536]]
+
+------------------------------------------------------------------------
+[val@0.32]  thr=0.32  Macro-F1=0.8264  Binary-F1=0.7949  Acc=0.8322  ROC-AUC=0.8370  PR-AUC=0.8859
+              precision    recall  f1-score   support
+
+           0     0.7526    0.9977    0.8580       872
+           1     0.9964    0.6611    0.7949       844
+
+    accuracy                         0.8322      1716
+   macro avg     0.8745    0.8294    0.8264      1716
+weighted avg     0.8725    0.8322    0.8269      1716
+
+Confusion matrix: [[870, 2], [286, 558]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.7914  Binary-F1=0.7632  Acc=0.7952  ROC-AUC=0.8337  PR-AUC=0.8910
+              precision    recall  f1-score   support
+
+           0     0.7037    0.9809    0.8195      1627
+           1     0.9734    0.6277    0.7632      1805
+
+    accuracy                         0.7952      3432
+   macro avg     0.8385    0.8043    0.7914      3432
+weighted avg     0.8455    0.7952    0.7899      3432
+
+Confusion matrix: [[1596, 31], [672, 1133]]
+
+------------------------------------------------------------------------
+[test@0.32]  thr=0.32  Macro-F1=0.7907  Binary-F1=0.7694  Acc=0.7928  ROC-AUC=0.8337  PR-AUC=0.8910
+              precision    recall  f1-score   support
+
+           0     0.7126    0.9435    0.8120      1627
+           1     0.9280    0.6571    0.7694      1805
+
+    accuracy                         0.7928      3432
+   macro avg     0.8203    0.8003    0.7907      3432
+weighted avg     0.8259    0.7928    0.7896      3432
+
+Confusion matrix: [[1535, 92], [619, 1186]]

@@ -1,0 +1,182 @@
+{
+  "model": "TCN V19 (ch=12, b=2, SE=8)",
+  "strategy": "weights INT8 per-channel symmetric, activations FP32, BN folded into Conv",
+  "total_params": 4141,
+  "n_quant_tensors": 11,
+  "n_bias_tensors": 11,
+  "bin_size_bytes": 5553,
+  "tensors": [
+    {
+      "name": "tcn.0.c1.weight",
+      "shape": [
+        12,
+        44,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.0.c2.weight",
+      "shape": [
+        12,
+        12,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.0.rs.weight",
+      "shape": [
+        12,
+        44,
+        1
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.0.se.fc1.weight",
+      "shape": [
+        4,
+        12
+      ],
+      "dtype": "int8",
+      "scale_count": 4
+    },
+    {
+      "name": "tcn.0.se.fc2.weight",
+      "shape": [
+        12,
+        4
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.1.c1.weight",
+      "shape": [
+        12,
+        12,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.1.c2.weight",
+      "shape": [
+        12,
+        12,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "tcn.1.se.fc1.weight",
+      "shape": [
+        4,
+        12
+      ],
+      "dtype": "int8",
+      "scale_count": 4
+    },
+    {
+      "name": "tcn.1.se.fc2.weight",
+      "shape": [
+        12,
+        4
+      ],
+      "dtype": "int8",
+      "scale_count": 12
+    },
+    {
+      "name": "fc1.weight",
+      "shape": [
+        32,
+        12
+      ],
+      "dtype": "int8",
+      "scale_count": 32
+    },
+    {
+      "name": "fc2.weight",
+      "shape": [
+        1,
+        32
+      ],
+      "dtype": "int8",
+      "scale_count": 1
+    },
+    {
+      "name": "tcn.0.c1.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.c2.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.rs.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.se.fc1.bias",
+      "numel": 4,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.se.fc2.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.c1.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.c2.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.se.fc1.bias",
+      "numel": 4,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.se.fc2.bias",
+      "numel": 12,
+      "dtype": "float32"
+    },
+    {
+      "name": "fc1.bias",
+      "numel": 32,
+      "dtype": "float32"
+    },
+    {
+      "name": "fc2.bias",
+      "numel": 1,
+      "dtype": "float32"
+    }
+  ],
+  "snr_db": {
+    "tcn.0.c1": 38.4569525718689,
+    "tcn.0.c2": 44.46979999542236,
+    "tcn.0.rs": 42.27489948272705,
+    "tcn.0.se.fc1": 47.565927505493164,
+    "tcn.0.se.fc2": 51.07879161834717,
+    "tcn.1.c1": 44.60705280303955,
+    "tcn.1.c2": 45.11916160583496,
+    "tcn.1.se.fc1": 47.05888748168945,
+    "tcn.1.se.fc2": 50.716590881347656,
+    "fc1": 48.117218017578125,
+    "fc2": 46.92286491394043
+  }
+}

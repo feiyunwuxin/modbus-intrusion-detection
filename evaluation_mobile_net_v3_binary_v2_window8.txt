@@ -1,0 +1,74 @@
+========================================================================
+EVALUATION REPORT — MobileNetV3-Small 1D Binary (v2, sliding window=8)
+========================================================================
+Window: 8 rows  |  Features per step: 44 (16 raw + 28 one-hot function)
+Architecture: MobileNetV3-Small adapted to 1D (h-swish + SE + NAS-optimised blocks)
+Bottleneck config (exp_ch, out_ch, kernel, stride, use_se, use_hs):
+  b 1: exp= 16 out= 16 k=3 stride=1 SE RE
+  b 2: exp= 72 out= 24 k=3 stride=1    RE
+  b 3: exp= 88 out= 24 k=3 stride=1    RE
+  b 4: exp= 96 out= 40 k=5 stride=1 SE HS
+  b 5: exp=240 out= 40 k=5 stride=1 SE HS
+  b 6: exp=240 out= 40 k=5 stride=1 SE HS
+  b 7: exp=120 out= 48 k=5 stride=1 SE HS
+  b 8: exp=144 out= 48 k=5 stride=1 SE HS
+  b 9: exp=288 out= 96 k=5 stride=1 SE HS
+  b10: exp=576 out= 96 k=5 stride=1 SE HS
+  b11: exp=576 out= 96 k=5 stride=1 SE HS
+SE ratio: 0.25  |  Strides forced to 1 to preserve window length
+Train windows: 24,029  |  Val windows: 3,432  |  Test windows: 6,865
+Model params: 876,991  (stem=2,144 + bottlenecks=817,822 + final_expand=56,448 + head=577)
+Best epoch: 5  |  Best val Macro-F1: 0.7790
+Tuned threshold (chosen on val, optimizing Macro-F1): 0.51
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.7790  Binary-F1=0.7454  Acc=0.7841  ROC-AUC=0.8384  PR-AUC=0.8556
+              precision    recall  f1-score   support
+
+           0     0.7575    0.8762    0.8125      1833
+           1     0.8270    0.6785    0.7454      1599
+
+    accuracy                         0.7841      3432
+   macro avg     0.7923    0.7774    0.7790      3432
+weighted avg     0.7899    0.7841    0.7813      3432
+
+Confusion matrix: [[1606, 227], [514, 1085]]
+
+------------------------------------------------------------------------
+[val@0.51]  thr=0.51  Macro-F1=0.7799  Binary-F1=0.7458  Acc=0.7853  ROC-AUC=0.8384  PR-AUC=0.8556
+              precision    recall  f1-score   support
+
+           0     0.7570    0.8805    0.8141      1833
+           1     0.8315    0.6760    0.7458      1599
+
+    accuracy                         0.7853      3432
+   macro avg     0.7943    0.7783    0.7799      3432
+weighted avg     0.7917    0.7853    0.7823      3432
+
+Confusion matrix: [[1614, 219], [518, 1081]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.7471  Binary-F1=0.7367  Acc=0.7476  ROC-AUC=0.8131  PR-AUC=0.8546
+              precision    recall  f1-score   support
+
+           0     0.7289    0.7886    0.7576      3434
+           1     0.7695    0.7065    0.7367      3431
+
+    accuracy                         0.7476      6865
+   macro avg     0.7492    0.7475    0.7471      6865
+weighted avg     0.7492    0.7476    0.7471      6865
+
+Confusion matrix: [[2708, 726], [1007, 2424]]
+
+------------------------------------------------------------------------
+[test@0.51]  thr=0.51  Macro-F1=0.7478  Binary-F1=0.7364  Acc=0.7483  ROC-AUC=0.8131  PR-AUC=0.8546
+              precision    recall  f1-score   support
+
+           0     0.7281    0.7930    0.7591      3434
+           1     0.7725    0.7036    0.7364      3431
+
+    accuracy                         0.7483      6865
+   macro avg     0.7503    0.7483    0.7478      6865
+weighted avg     0.7503    0.7483    0.7478      6865
+
+Confusion matrix: [[2723, 711], [1017, 2414]]

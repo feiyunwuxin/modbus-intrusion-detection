@@ -1,0 +1,77 @@
+{
+  "results_17dim": [
+    {
+      "n_features": 17,
+      "n_params": 72409,
+      "best_epoch": 20,
+      "test_macro_f1": 0.800178527687467,
+      "test_binary_f1": 0.7763070814030444,
+      "test_accuracy": 0.803030303030303,
+      "test_roc_auc": 0.8523554219226454,
+      "test_pr_auc": 0.8967863096815898
+    },
+    {
+      "n_features": 17,
+      "n_params": 72409,
+      "best_epoch": 6,
+      "test_macro_f1": 0.7504990152509405,
+      "test_binary_f1": 0.708479327259986,
+      "test_accuracy": 0.7575757575757576,
+      "test_roc_auc": 0.8463114649432107,
+      "test_pr_auc": 0.8965939913540465
+    },
+    {
+      "n_features": 17,
+      "n_params": 72409,
+      "best_epoch": 35,
+      "test_macro_f1": 0.8158301103602646,
+      "test_binary_f1": 0.7963506028022157,
+      "test_accuracy": 0.8178904428904429,
+      "test_roc_auc": 0.8698765806244009,
+      "test_pr_auc": 0.9092339314243141
+    },
+    {
+      "n_features": 17,
+      "n_params": 72409,
+      "best_epoch": 31,
+      "test_macro_f1": 0.827974456950162,
+      "test_binary_f1": 0.8131377551020408,
+      "test_accuracy": 0.8292540792540792,
+      "test_roc_auc": 0.8623581971134611,
+      "test_pr_auc": 0.8931568313691408
+    },
+    {
+      "n_features": 17,
+      "n_params": 72409,
+      "best_epoch": 14,
+      "test_macro_f1": 0.8040900077566173,
+      "test_binary_f1": 0.7809712586719524,
+      "test_accuracy": 0.8068181818181818,
+      "test_roc_auc": 0.8536725308888953,
+      "test_pr_auc": 0.9037432457994227
+    }
+  ],
+  "mean_f1m": 0.7997144236010902,
+  "std_f1m": 0.026456992999914237,
+  "mean_pr_auc": 0.8999028619257029,
+  "std_pr_auc": 0.005796341206412341,
+  "feature_names": [
+    "address",
+    "function",
+    "length",
+    "setpoint",
+    "gain",
+    "reset rate",
+    "deadband",
+    "cycle time",
+    "rate",
+    "system mode",
+    "control scheme",
+    "pump",
+    "solenoid",
+    "pressure measurement",
+    "crc rate",
+    "command response",
+    "time_diff"
+  ]
+}

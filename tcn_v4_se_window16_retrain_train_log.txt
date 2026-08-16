@@ -1,0 +1,114 @@
+[    0.0s] STEP 1: load v1 row-level npy (17-dim) ...
+[    0.0s]    raw shapes: train=(192239, 17) val=(27462, 17) test=(54927, 17)
+[    0.0s]    raw features: 17
+[    0.0s] STEP 2: window every 16 rows into 1 sequence ...
+[    0.0s]    train windows: (12014, 16, 17)  val: (1716, 16, 17)  test: (3432, 16, 17)
+[    0.0s]    window-label dist: train 51.34%  val 49.18%  test 52.59%
+[    0.0s] STEP 3: one-hot encode function column at each timestep ...
+[    0.0s]    function unique codes: 28  values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 43, 128, 132, 133, 136, 137, 138, 139, 140, 141, 142, 171]
+[    0.1s]    per-step feature dim: 44  (16 numeric + 28 one-hot)
+[    0.1s]    raw label dist: train 21.97% val 21.11% test 21.86%
+[    0.1s]    final TCN input shape: (12014, 44, 16)
+[    0.1s] STEP 4: DataLoaders ...
+[    0.1s] STEP 5: build model ...
+[    0.2s]    TCN config: 3 blocks, channels=64, kernel=3, dilations=[1,2,4]
+[    0.2s]    SE reduction: 8  (bottleneck = 8)
+[    0.2s]    Effective receptive field: 29  (window=16, RF/W = 1.8x)
+[    0.2s]    model params: 79,321
+[    0.2s] 
+[    0.2s] FULL PARAMETER BREAKDOWN:
+[    0.2s]    name                                                    shape                          numel
+[    0.2s]    ---------------------------------------------------------------------------------------------
+[    0.2s]    tcn.0.conv1.weight                                      [64, 44, 3]                    8,448
+[    0.2s]    tcn.0.conv1.bias                                        [64]                              64
+[    0.2s]    tcn.0.bn1.weight                                        [64]                              64
+[    0.2s]    tcn.0.bn1.bias                                          [64]                              64
+[    0.2s]    tcn.0.conv2.weight                                      [64, 64, 3]                   12,288
+[    0.2s]    tcn.0.conv2.bias                                        [64]                              64
+[    0.2s]    tcn.0.bn2.weight                                        [64]                              64
+[    0.2s]    tcn.0.bn2.bias                                          [64]                              64
+[    0.2s]    tcn.0.se.fc1.weight                                     [8, 64]                          512
+[    0.2s]    tcn.0.se.fc1.bias                                       [8]                                8
+[    0.2s]    tcn.0.se.fc2.weight                                     [64, 8]                          512
+[    0.2s]    tcn.0.se.fc2.bias                                       [64]                              64
+[    0.2s]    tcn.0.residual.weight                                   [64, 44, 1]                    2,816
+[    0.2s]    tcn.0.residual.bias                                     [64]                              64
+[    0.2s]    tcn.1.conv1.weight                                      [64, 64, 3]                   12,288
+[    0.2s]    tcn.1.conv1.bias                                        [64]                              64
+[    0.2s]    tcn.1.bn1.weight                                        [64]                              64
+[    0.2s]    tcn.1.bn1.bias                                          [64]                              64
+[    0.2s]    tcn.1.conv2.weight                                      [64, 64, 3]                   12,288
+[    0.2s]    tcn.1.conv2.bias                                        [64]                              64
+[    0.2s]    tcn.1.bn2.weight                                        [64]                              64
+[    0.2s]    tcn.1.bn2.bias                                          [64]                              64
+[    0.2s]    tcn.1.se.fc1.weight                                     [8, 64]                          512
+[    0.2s]    tcn.1.se.fc1.bias                                       [8]                                8
+[    0.2s]    tcn.1.se.fc2.weight                                     [64, 8]                          512
+[    0.2s]    tcn.1.se.fc2.bias                                       [64]                              64
+[    0.2s]    tcn.2.conv1.weight                                      [64, 64, 3]                   12,288
+[    0.2s]    tcn.2.conv1.bias                                        [64]                              64
+[    0.2s]    tcn.2.bn1.weight                                        [64]                              64
+[    0.2s]    tcn.2.bn1.bias                                          [64]                              64
+[    0.2s]    tcn.2.conv2.weight                                      [64, 64, 3]                   12,288
+[    0.2s]    tcn.2.conv2.bias                                        [64]                              64
+[    0.2s]    tcn.2.bn2.weight                                        [64]                              64
+[    0.2s]    tcn.2.bn2.bias                                          [64]                              64
+[    0.2s]    tcn.2.se.fc1.weight                                     [8, 64]                          512
+[    0.2s]    tcn.2.se.fc1.bias                                       [8]                                8
+[    0.2s]    tcn.2.se.fc2.weight                                     [64, 8]                          512
+[    0.2s]    tcn.2.se.fc2.bias                                       [64]                              64
+[    0.2s]    fc1.weight                                              [32, 64]                       2,048
+[    0.2s]    fc1.bias                                                [32]                              32
+[    0.2s]    fc2.weight                                              [1, 32]                           32
+[    0.2s]    fc2.bias                                                [1]                                1
+[    0.2s]    ---------------------------------------------------------------------------------------------
+[    0.2s]    TOTAL                                                                                 79,321
+[    0.2s] 
+[    0.2s]    pos_weight = 0.948  (n_neg=5,846, n_pos=6,168)
+[    4.8s] STEP 6: training ...
+[    6.6s]    epoch  1  loss=0.6466  val Macro-F1=0.6190  val AUC=0.7043  lr=5.00e-04
+[    8.1s]    epoch  2  loss=0.5770  val Macro-F1=0.7104  val AUC=0.7924  lr=5.00e-04
+[    9.8s]    epoch  3  loss=0.5065  val Macro-F1=0.7061  val AUC=0.8042  lr=5.00e-04
+[   11.4s]    epoch  4  loss=0.4626  val Macro-F1=0.7618  val AUC=0.8092  lr=5.00e-04
+[   13.0s]    epoch  5  loss=0.4419  val Macro-F1=0.7556  val AUC=0.8138  lr=5.00e-04
+[   14.7s]    epoch  6  loss=0.4241  val Macro-F1=0.7789  val AUC=0.8161  lr=5.00e-04
+[   16.4s]    epoch  7  loss=0.4081  val Macro-F1=0.8011  val AUC=0.8258  lr=5.00e-04
+[   18.1s]    epoch  8  loss=0.4014  val Macro-F1=0.7936  val AUC=0.8211  lr=5.00e-04
+[   19.7s]    epoch  9  loss=0.3942  val Macro-F1=0.8049  val AUC=0.8269  lr=5.00e-04
+[   21.4s]    epoch 10  loss=0.3845  val Macro-F1=0.8056  val AUC=0.8267  lr=5.00e-04
+[   23.1s]    epoch 11  loss=0.3808  val Macro-F1=0.8062  val AUC=0.8355  lr=5.00e-04
+[   24.9s]    epoch 12  loss=0.3747  val Macro-F1=0.8206  val AUC=0.8336  lr=5.00e-04
+[   26.6s]    epoch 13  loss=0.3733  val Macro-F1=0.8173  val AUC=0.8399  lr=5.00e-04
+[   28.3s]    epoch 14  loss=0.3628  val Macro-F1=0.8225  val AUC=0.8468  lr=5.00e-04
+[   30.1s]    epoch 15  loss=0.3605  val Macro-F1=0.8231  val AUC=0.8459  lr=5.00e-04
+[   31.8s]    epoch 16  loss=0.3558  val Macro-F1=0.8270  val AUC=0.8505  lr=5.00e-04
+[   33.5s]    epoch 17  loss=0.3521  val Macro-F1=0.8296  val AUC=0.8515  lr=5.00e-04
+[   35.3s]    epoch 18  loss=0.3508  val Macro-F1=0.8276  val AUC=0.8507  lr=5.00e-04
+[   37.1s]    epoch 19  loss=0.3471  val Macro-F1=0.8353  val AUC=0.8463  lr=5.00e-04
+[   39.0s]    epoch 20  loss=0.3473  val Macro-F1=0.8366  val AUC=0.8453  lr=5.00e-04
+[   40.9s]    epoch 21  loss=0.3435  val Macro-F1=0.8340  val AUC=0.8548  lr=5.00e-04
+[   42.8s]    epoch 22  loss=0.3398  val Macro-F1=0.8378  val AUC=0.8593  lr=5.00e-04
+[   44.7s]    epoch 23  loss=0.3410  val Macro-F1=0.8372  val AUC=0.8546  lr=5.00e-04
+[   46.4s]    epoch 24  loss=0.3406  val Macro-F1=0.8372  val AUC=0.8530  lr=5.00e-04
+[   48.3s]    epoch 25  loss=0.3369  val Macro-F1=0.8393  val AUC=0.8558  lr=5.00e-04
+[   50.1s]    epoch 26  loss=0.3326  val Macro-F1=0.8460  val AUC=0.8528  lr=5.00e-04
+[   51.8s]    epoch 27  loss=0.3323  val Macro-F1=0.8423  val AUC=0.8600  lr=5.00e-04
+[   53.5s]    epoch 28  loss=0.3319  val Macro-F1=0.8378  val AUC=0.8535  lr=5.00e-04
+[   55.3s]    epoch 29  loss=0.3297  val Macro-F1=0.8460  val AUC=0.8562  lr=5.00e-04
+[   57.1s]    epoch 30  loss=0.3284  val Macro-F1=0.8517  val AUC=0.8613  lr=2.50e-04
+[   58.9s]    epoch 31  loss=0.3253  val Macro-F1=0.8473  val AUC=0.8699  lr=2.50e-04
+[   60.7s]    epoch 32  loss=0.3264  val Macro-F1=0.8523  val AUC=0.8759  lr=2.50e-04
+[   62.5s]    epoch 33  loss=0.3238  val Macro-F1=0.8473  val AUC=0.8680  lr=2.50e-04
+[   64.3s]    epoch 34  loss=0.3266  val Macro-F1=0.8523  val AUC=0.8706  lr=2.50e-04
+[   66.1s]    epoch 35  loss=0.3255  val Macro-F1=0.8473  val AUC=0.8697  lr=2.50e-04
+[   66.1s]    best epoch = 32  best val Macro-F1 = 0.8523  train_time=66.1s
+[   66.1s] STEP 7: threshold tuning on val ...
+[   66.5s]    best threshold = 0.48  →  val Macro-F1 = 0.8529  (vs 0.50 = 0.8523)
+[   66.5s] STEP 8: evaluation ...
+[   66.5s] STEP 9: save artifacts ...
+[   68.1s]    plots saved
+[   68.1s] ============================================================
+[   68.1s] DONE v4_se_window16_retrain.
+[   68.1s]    test@0.48: Macro-F1=0.8340  PR-AUC=0.9025  Bin-F1=0.8207  Acc=0.8351
+[   68.1s]    params: 79,321  train_time: 66.1s  best_epoch: 32
+[   68.1s] ============================================================

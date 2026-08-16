@@ -1,0 +1,63 @@
+========================================================================
+EVALUATION REPORT — MobileNetV2_1D (mobilenetv2_19dim_window16)
+========================================================================
+Architecture: MobileNetV2 1D (Sandler 2018) — linear bottleneck + inverted residual
+Stem: Conv1d(19→32, k=3) → BN → ReLU6
+Blocks: InvertedRes(c=32,s=1,e=1) → InvertedRes(c=48,s=1,e=6) → InvertedRes(c=64,s=1,e=6) → InvertedRes(c=96,s=1,e=6) → InvertedRes(c=128,s=1,e=6)
+Head: GAP → FC(32→32) → ReLU → Drop → FC(32→1)
+Features per step: 19  |  Params: 256,129
+Train/Val/Test windows: 12,014 / 1,716 / 3,432
+Best epoch: 22  |  Best val Macro-F1: 0.8181  |  Train time: 170.0s
+Tuned threshold: 0.23
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.8181  Binary-F1=0.7836  Acc=0.8246  ROC-AUC=0.8731  PR-AUC=0.9096
+              precision    recall  f1-score   support
+
+           0     0.7442    0.9977    0.8525       872
+           1     0.9963    0.6457    0.7836       844
+
+    accuracy                         0.8246      1716
+   macro avg     0.8703    0.8217    0.8181      1716
+weighted avg     0.8682    0.8246    0.8186      1716
+
+Confusion matrix: [[870, 2], [299, 545]]
+
+------------------------------------------------------------------------
+[val@0.23]  thr=0.23  Macro-F1=0.8407  Binary-F1=0.8162  Acc=0.8444  ROC-AUC=0.8731  PR-AUC=0.9096
+              precision    recall  f1-score   support
+
+           0     0.7733    0.9817    0.8651       872
+           1     0.9737    0.7026    0.8162       844
+
+    accuracy                         0.8444      1716
+   macro avg     0.8735    0.8421    0.8407      1716
+weighted avg     0.8719    0.8444    0.8411      1716
+
+Confusion matrix: [[856, 16], [251, 593]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.7770  Binary-F1=0.7452  Acc=0.7815  ROC-AUC=0.8561  PR-AUC=0.8964
+              precision    recall  f1-score   support
+
+           0     0.6912    0.9742    0.8087      1627
+           1     0.9631    0.6078    0.7452      1805
+
+    accuracy                         0.7815      3432
+   macro avg     0.8272    0.7910    0.7770      3432
+weighted avg     0.8342    0.7815    0.7753      3432
+
+Confusion matrix: [[1585, 42], [708, 1097]]
+
+------------------------------------------------------------------------
+[test@0.23]  thr=0.23  Macro-F1=0.8226  Binary-F1=0.8085  Acc=0.8237  ROC-AUC=0.8561  PR-AUC=0.8964
+              precision    recall  f1-score   support
+
+           0     0.7459    0.9527    0.8367      1627
+           1     0.9431    0.7075    0.8085      1805
+
+    accuracy                         0.8237      3432
+   macro avg     0.8445    0.8301    0.8226      3432
+weighted avg     0.8496    0.8237    0.8219      3432
+
+Confusion matrix: [[1550, 77], [528, 1277]]

@@ -1,0 +1,80 @@
+========================================================================
+EVALUATION REPORT — IanArffDataset Binary Intrusion Detection (v2, minimal)
+========================================================================
+Total records: 274,628  |  Train: 192,239  |  Val: 27,462  |  Test: 54,927
+Features used: 17  |  Categorical: ['function']
+Best LGB iteration: 284
+Tuned threshold (chosen on val, optimizing Macro-F1): 0.64
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.7229  Binary-F1=0.6134  Acc=0.7661  ROC-AUC=0.9129  PR-AUC=0.8157
+              precision    recall  f1-score   support
+
+           0     0.9579    0.7359    0.8324     21666
+           1     0.4711    0.8791    0.6134      5796
+
+    accuracy                         0.7661     27462
+   macro avg     0.7145    0.8075    0.7229     27462
+weighted avg     0.8551    0.7661    0.7862     27462
+
+Confusion matrix: [[15945, 5721], [701, 5095]]
+
+------------------------------------------------------------------------
+[val@0.64]  thr=0.64  Macro-F1=0.8387  Binary-F1=0.7331  Acc=0.9079  ROC-AUC=0.9129  PR-AUC=0.8157
+              precision    recall  f1-score   support
+
+           0     0.9024    0.9904    0.9443     21666
+           1     0.9433    0.5996    0.7331      5796
+
+    accuracy                         0.9079     27462
+   macro avg     0.9228    0.7950    0.8387     27462
+weighted avg     0.9110    0.9079    0.8998     27462
+
+Confusion matrix: [[21457, 209], [2321, 3475]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.7248  Binary-F1=0.6197  Acc=0.7650  ROC-AUC=0.9099  PR-AUC=0.8166
+              precision    recall  f1-score   support
+
+           0     0.9548    0.7339    0.8299     42918
+           1     0.4795    0.8759    0.6197     12009
+
+    accuracy                         0.7650     54927
+   macro avg     0.7172    0.8049    0.7248     54927
+weighted avg     0.8509    0.7650    0.7840     54927
+
+Confusion matrix: [[31499, 11419], [1490, 10519]]
+
+------------------------------------------------------------------------
+[test@0.64]  thr=0.64  Macro-F1=0.8337  Binary-F1=0.7287  Acc=0.8999  ROC-AUC=0.9099  PR-AUC=0.8166
+              precision    recall  f1-score   support
+
+           0     0.9009    0.9796    0.9386     42918
+           1     0.8940    0.6150    0.7287     12009
+
+    accuracy                         0.8999     54927
+   macro avg     0.8975    0.7973    0.8337     54927
+weighted avg     0.8994    0.8999    0.8927     54927
+
+Confusion matrix: [[42042, 876], [4623, 7386]]
+
+------------------------------------------------------------------------
+[TOP-17 FEATURE IMPORTANCE]
+------------------------------------------------------------------------
+  crc rate                              3186  ████████████████████████████████████████
+  pressure measurement                  2699  █████████████████████████████████
+  reset rate                            2326  █████████████████████████████
+  setpoint                              2111  ██████████████████████████
+  deadband                              1889  ███████████████████████
+  cycle time                            1554  ███████████████████
+  gain                                  1101  █████████████
+  time_diff                              987  ████████████
+  solenoid                               340  ████
+  system mode                            332  ████
+  pump                                   319  ████
+  length                                 224  ██
+  control scheme                         200  ██
+  rate                                   190  ██
+  function                               139  █
+  command response                        11  
+  address                                  0  

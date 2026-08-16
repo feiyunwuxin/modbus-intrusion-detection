@@ -1,0 +1,74 @@
+% 英文摘要
+\chapter*{\hfill ABSTRACT \hfill}
+\addcontentsline{toc}{chapter}{ABSTRACT}
+
+\par SCADA (Supervisory Control and Data Acquisition) systems serve as the central
+nervous system of critical national infrastructure, widely deployed in gas, power,
+and water industrial control scenarios. Security breaches directly threaten public
+safety and economic stability. With the deep integration of Industrial Internet of
+Things (IIoT) and artificial intelligence, traditional signature-based intrusion
+detection methods can no longer cope with increasingly sophisticated cyber attacks.
+There is an urgent need to develop intelligent, lightweight intrusion detection
+methods tailored for SCADA systems.
+
+\par However, SCADA scenarios impose unique and stringent requirements on detection
+models. On one hand, the temporal structure of industrial control protocols (e.g.,
+Modbus) contains rich domain semantics that general time-series models fail to
+exploit. On the other hand, constrained by the limited computing power and storage
+of edge devices, detection models must balance accuracy with deployability. Existing
+work often re-uses generic network intrusion detection features without protocol-level
+semantic encoding, and few studies systematically explore the complete optimization
+chain from algorithm design to on-chip deployment.
+
+\par To address these issues, this thesis takes the IanArffDataset (274{,}000
+SCADA gas-pipeline records, 20 raw features, three-layer labels) as the research
+object, and conducts a full-stack study covering data features, model architecture,
+and edge deployment, all centered on the core goal of ``lightweight intrusion
+detection''. The main contributions are as follows:
+
+\par (1) A domain feature engineering method based on SCADA protocol semantics is
+proposed. By analyzing the 4-row master-slave interaction structure of Modbus
+and treating 4 rows as one Modbus cycle, 27-dimensional protocol semantic features
+(3 row-level + 8 window-level) are designed on top of the 17-dimensional minimal
+feature set. Comparison experiments on multiple models (LightGBM, TCN, etc.)
+demonstrate that the proposed feature set consistently outperforms the original
+44-dimensional features, validating the conclusion that ``the marginal benefit of
+domain feature engineering exceeds that of model upgrading''.
+
+\par (2) A lightweight intrusion detection model (TCN-SE) that integrates SE
+attention into Temporal Convolutional Network is proposed. Through a systematic
+comparison of 27 typical time-series models, the inductive bias of TCN's causal
+convolution is found to naturally fit Modbus short-term temporal structure.
+Further introducing the SE channel attention, with only 3{,}300 additional parameters
+(+4.3\%), the model achieves Macro-F1 = 0.8340 and PR-AUC = 0.9025 on the test
+set, marking the first time a deep learning model surpasses gradient boosting
+trees (LightGBM, Macro-F1 = 0.8337) on this task. Ablation studies on window
+length ($w=4, 8, 16$) and channel width (ch=8 $\sim$ 64) reveal that ``8-step
+window (2 Modbus cycles) is the Pareto-optimal structure for this dataset'' and
+verify the role of SE in improving minority-class recall.
+
+\par (3) An extreme compression and mixed-precision quantization scheme for MCU
+deployment is proposed. Through systematic channel width ablation, a TCN V19
+variant with only 4{,}237 parameters is obtained, and the PR-AUC counterintuitively
+rises to 0.9133 (+0.67\%), challenging the conventional belief that ``larger models
+yield better performance''. A ``weight-INT8 + activation-FP32'' hybrid quantization
+scheme is further proposed, achieving a 5.5\,KB model with 0.47\,ms inference latency
+on the Cortex-M4 168\,MHz platform. The prediction consistency before and after
+quantization reaches 99.80\%, with SNR $\geq$ 38\,dB, indicating essentially lossless
+quantization. A complete 380-line C99 inference implementation is open-sourced and
+can be directly deployed on STM32, ESP32, Arduino and other embedded platforms.
+
+\par Following a progressive ``data-algorithm-chip'' research route, this thesis
+forms a complete innovation chain from domain features to MCU deployment. The
+three innovations achieve the best Macro-F1 = 0.8340 (single model) and
+PR-AUC = 0.9133 (compressed single model) on the public dataset, and verify the
+feasibility of maintaining industrial-grade detection performance on a 5.5\,KB
+embedded model, providing a reproducible reference for the engineering deployment
+of SCADA intrusion detection.
+
+\vspace{1em}
+
+\noindent\textbf{Keywords:} SCADA; Intrusion Detection; Temporal Convolutional
+Network; Model Compression; Mixed-Precision Quantization; Embedded Deployment
+
+\clearpage

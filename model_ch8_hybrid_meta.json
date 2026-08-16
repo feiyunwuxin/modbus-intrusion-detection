@@ -1,0 +1,245 @@
+{
+  "model": "TCN+SE ch=8 (19-dim SCADA, b=3, d=[1,2,4], SE_r=8, LR=2e-3, seed=42)",
+  "strategy": "weights INT8 per-channel symmetric, activations FP32, BN folded into Conv",
+  "channels": 8,
+  "n_quant_tensors": 15,
+  "n_bias_tensors": 15,
+  "bin_size_bytes": 3837,
+  "h_size_bytes": 21017,
+  "snr_db": {
+    "tcn.0.conv1": 41.17708683013916,
+    "tcn.0.conv2": 46.239919662475586,
+    "tcn.0.residual": 44.76717948913574,
+    "tcn.0.se.fc1": 50.65451145172119,
+    "tcn.0.se.fc2": 52.29255676269531,
+    "tcn.1.conv1": 44.961395263671875,
+    "tcn.1.conv2": 45.52696704864502,
+    "tcn.1.se.fc1": 51.0598087310791,
+    "tcn.1.se.fc2": 50.603742599487305,
+    "tcn.2.conv1": 46.02659225463867,
+    "tcn.2.conv2": 46.293087005615234,
+    "tcn.2.se.fc1": 51.240272521972656,
+    "tcn.2.se.fc2": 52.42131233215332,
+    "fc1": 48.01871299743652,
+    "fc2": 49.28579807281494
+  },
+  "tensors": [
+    {
+      "name": "tcn.0.conv1.weight",
+      "shape": [
+        8,
+        19,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.0.conv2.weight",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.0.residual.weight",
+      "shape": [
+        8,
+        19,
+        1
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.0.se.fc1.weight",
+      "shape": [
+        4,
+        8
+      ],
+      "dtype": "int8",
+      "scale_count": 4
+    },
+    {
+      "name": "tcn.0.se.fc2.weight",
+      "shape": [
+        8,
+        4
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.1.conv1.weight",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.1.conv2.weight",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.1.se.fc1.weight",
+      "shape": [
+        4,
+        8
+      ],
+      "dtype": "int8",
+      "scale_count": 4
+    },
+    {
+      "name": "tcn.1.se.fc2.weight",
+      "shape": [
+        8,
+        4
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.2.conv1.weight",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.2.conv2.weight",
+      "shape": [
+        8,
+        8,
+        3
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "tcn.2.se.fc1.weight",
+      "shape": [
+        4,
+        8
+      ],
+      "dtype": "int8",
+      "scale_count": 4
+    },
+    {
+      "name": "tcn.2.se.fc2.weight",
+      "shape": [
+        8,
+        4
+      ],
+      "dtype": "int8",
+      "scale_count": 8
+    },
+    {
+      "name": "fc1.weight",
+      "shape": [
+        32,
+        8
+      ],
+      "dtype": "int8",
+      "scale_count": 32
+    },
+    {
+      "name": "fc2.weight",
+      "shape": [
+        1,
+        32
+      ],
+      "dtype": "int8",
+      "scale_count": 1
+    },
+    {
+      "name": "tcn.0.conv1.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.conv2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.residual.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.se.fc1.bias",
+      "numel": 4,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.0.se.fc2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.conv1.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.conv2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.se.fc1.bias",
+      "numel": 4,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.1.se.fc2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.2.conv1.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.2.conv2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.2.se.fc1.bias",
+      "numel": 4,
+      "dtype": "float32"
+    },
+    {
+      "name": "tcn.2.se.fc2.bias",
+      "numel": 8,
+      "dtype": "float32"
+    },
+    {
+      "name": "fc1.bias",
+      "numel": 32,
+      "dtype": "float32"
+    },
+    {
+      "name": "fc2.bias",
+      "numel": 1,
+      "dtype": "float32"
+    }
+  ]
+}

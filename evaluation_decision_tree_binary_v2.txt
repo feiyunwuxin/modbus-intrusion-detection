@@ -1,0 +1,213 @@
+========================================================================
+EVALUATION REPORT — Single Decision Tree (sklearn, v2 binary IDS)
+========================================================================
+Features: 17 (16 raw + time_diff)
+Splits: train=192,239  val=27,462  test=54,927
+Hyperparams: max_depth=8  min_samples_leaf=10  criterion=gini  class_weight=balanced
+Tree size: n_nodes=183  n_leaves=92
+Best val Macro-F1: 0.7786  (best max_depth = 8)
+Tuned threshold: 0.70
+
+Depth search:
+   max_depth   val_F1m   val_AUC   n_leaves  train_time
+           8    0.7786    0.8477         92        0.39
+          12    0.7092    0.8905        350        0.48
+          16    0.7098    0.8991        877        0.55
+          20    0.7091    0.8960      1,563        0.62
+        None    0.7689    0.8836      5,682        1.11
+
+Top 10 features (impurity-based importance):
+                crc rate: 0.4445
+    pressure measurement: 0.1991
+                function: 0.1182
+                  length: 0.1038
+                    gain: 0.0380
+                    rate: 0.0284
+                setpoint: 0.0250
+              reset rate: 0.0232
+              cycle time: 0.0181
+                    pump: 0.0006
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.7786  Binary-F1=0.6306  Acc=0.8775  ROC-AUC=0.8477  PR-AUC=0.6647
+              precision    recall  f1-score   support
+
+           0     0.8789    0.9798    0.9266     21666
+           1     0.8679    0.4952    0.6306      5796
+
+    accuracy                         0.8775     27462
+   macro avg     0.8734    0.7375    0.7786     27462
+weighted avg     0.8765    0.8775    0.8641     27462
+
+Confusion matrix: [[21229, 437], [2926, 2870]]
+
+------------------------------------------------------------------------
+[val@0.70]  thr=0.70  Macro-F1=0.7888  Binary-F1=0.6441  Acc=0.8879  ROC-AUC=0.8477  PR-AUC=0.6647
+              precision    recall  f1-score   support
+
+           0     0.8777    0.9969    0.9335     21666
+           1     0.9765    0.4805    0.6441      5796
+
+    accuracy                         0.8879     27462
+   macro avg     0.9271    0.7387    0.7888     27462
+weighted avg     0.8985    0.8879    0.8724     27462
+
+Confusion matrix: [[21599, 67], [3011, 2785]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.7935  Binary-F1=0.6567  Acc=0.8842  ROC-AUC=0.8520  PR-AUC=0.6795
+              precision    recall  f1-score   support
+
+           0     0.8776    0.9898    0.9303     42918
+           1     0.9327    0.5068    0.6567     12009
+
+    accuracy                         0.8842     54927
+   macro avg     0.9052    0.7483    0.7935     54927
+weighted avg     0.8897    0.8842    0.8705     54927
+
+Confusion matrix: [[42479, 439], [5923, 6086]]
+
+------------------------------------------------------------------------
+[test@0.70]  thr=0.70  Macro-F1=0.7921  Binary-F1=0.6528  Acc=0.8855  ROC-AUC=0.8520  PR-AUC=0.6795
+              precision    recall  f1-score   support
+
+           0     0.8751    0.9955    0.9314     42918
+           1     0.9682    0.4924    0.6528     12009
+
+    accuracy                         0.8855     54927
+   macro avg     0.9217    0.7439    0.7921     54927
+weighted avg     0.8955    0.8855    0.8705     54927
+
+Confusion matrix: [[42724, 194], [6096, 5913]]
+
+
+========================================================================
+TREE STRUCTURE (first 5 levels, full tree is much larger)
+========================================================================
+|--- crc rate <= -0.26
+|   |--- crc rate <= -0.26
+|   |   |--- pressure measurement <= 0.58
+|   |   |   |--- gain <= 88.50
+|   |   |   |   |--- crc rate <= -0.37
+|   |   |   |   |   |--- time_diff <= -0.86
+|   |   |   |   |   |   |--- truncated branch of depth 2
+|   |   |   |   |   |--- time_diff >  -0.86
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |--- crc rate >  -0.37
+|   |   |   |   |   |--- class: 1
+|   |   |   |--- gain >  88.50
+|   |   |   |   |--- rate <= 0.00
+|   |   |   |   |   |--- setpoint <= 19.75
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- setpoint >  19.75
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |--- rate >  0.00
+|   |   |   |   |   |--- class: 1
+|   |   |--- pressure measurement >  0.58
+|   |   |   |--- pressure measurement <= 23.72
+|   |   |   |   |--- pressure measurement <= 0.65
+|   |   |   |   |   |--- crc rate <= -0.37
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- crc rate >  -0.37
+|   |   |   |   |   |   |--- truncated branch of depth 2
+|   |   |   |   |--- pressure measurement >  0.65
+|   |   |   |   |   |--- pressure measurement <= 4.45
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- pressure measurement >  4.45
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |--- pressure measurement >  23.72
+|   |   |   |   |--- pressure measurement <= 39.83
+|   |   |   |   |   |--- pressure measurement <= 31.47
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- pressure measurement >  31.47
+|   |   |   |   |   |   |--- truncated branch of depth 2
+|   |   |   |   |--- pressure measurement >  39.83
+|   |   |   |   |   |--- time_diff <= -0.89
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- time_diff >  -0.89
+|   |   |   |   |   |   |--- class: 1
+|   |--- crc rate >  -0.26
+|   |   |--- length <= 0.50
+|   |   |   |--- time_diff <= 0.08
+|   |   |   |   |--- time_diff <= -0.00
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- time_diff >  -0.00
+|   |   |   |   |   |--- class: 0
+|   |   |   |--- time_diff >  0.08
+|   |   |   |   |--- time_diff <= 0.08
+|   |   |   |   |   |--- class: 0
+|   |   |   |   |--- time_diff >  0.08
+|   |   |   |   |   |--- time_diff <= 0.20
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- time_diff >  0.20
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |--- length >  0.50
+|   |   |   |--- pump <= 0.50
+|   |   |   |   |--- pressure measurement <= 1.06
+|   |   |   |   |   |--- cycle time <= 0.28
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- cycle time >  0.28
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |--- pressure measurement >  1.06
+|   |   |   |   |   |--- pressure measurement <= 1.29
+|   |   |   |   |   |   |--- class: 0
+|   |   |   |   |   |--- pressure measurement >  1.29
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |--- pump >  0.50
+|   |   |   |   |--- cycle time <= 1.08
+|   |   |   |   |   |--- setpoint <= 16.85
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- setpoint >  16.85
+|   |   |   |   |   |   |--- class: 0
+|   |   |   |   |--- cycle time >  1.08
+|   |   |   |   |   |--- setpoint <= 1.38
+|   |   |   |   |   |   |--- class: 0
+|   |   |   |   |   |--- setpoint >  1.38
+|   |   |   |   |   |   |--- class: 0
+|--- crc rate >  -0.26
+|   |--- length <= -0.03
+|   |   |--- class: 1
+|   |--- length >  -0.03
+|   |   |--- pressure measurement <= 0.56
+|   |   |   |--- function <= 9.50
+|   |   |   |   |--- crc rate <= 0.79
+|   |   |   |   |   |--- pressure measurement <= 0.47
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- pressure measurement >  0.47
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |--- crc rate >  0.79
+|   |   |   |   |   |--- pressure measurement <= 0.42
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- pressure measurement >  0.42
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |--- function >  9.50
+|   |   |   |   |--- rate <= 0.00
+|   |   |   |   |   |--- setpoint <= 19.95
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- setpoint >  19.95
+|   |   |   |   |   |   |--- truncated branch of depth 2
+|   |   |   |   |--- rate >  0.00
+|   |   |   |   |   |--- cycle time <= 0.54
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |   |--- cycle time >  0.54
+|   |   |   |   |   |   |--- class: 1
+|   |   |--- pressure measurement >  0.56
+|   |   |   |--- pressure measurement <= 24.12
+|   |   |   |   |--- pressure measurement <= 0.63
+|   |   |   |   |   |--- crc rate <= 0.77
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- crc rate >  0.77
+|   |   |   |   |   |   |--- class: 1
+|   |   |   |   |--- pressure measurement >  0.63
+|   |   |   |   |   |--- pressure measurement <= 1.15
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- pressure measurement >  1.15
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |--- pressure measurement >  24.12
+|   |   |   |   |--- pressure measurement <= 39.79
+|   |   |   |   |   |--- pressure measurement <= 31.76
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |   |--- pressure measurement >  31.76
+|   |   |   |   |   |   |--- truncated branch of depth 3
+|   |   |   |   |--- pressure measurement >  39.79
+|   |   |   |   |   |--- class: 1

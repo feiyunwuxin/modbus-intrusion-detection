@@ -1,0 +1,89 @@
+{
+  "results_24dim": [
+    {
+      "n_features": 24,
+      "n_params": 74201,
+      "best_epoch": 11,
+      "test_macro_f1": 0.8019520910511877,
+      "test_binary_f1": 0.7782925215089345,
+      "test_accuracy": 0.8047785547785548,
+      "test_roc_auc": 0.8632116959821026,
+      "test_pr_auc": 0.9096540961817707
+    },
+    {
+      "n_features": 24,
+      "n_params": 74201,
+      "best_epoch": 13,
+      "test_macro_f1": 0.8098482129306876,
+      "test_binary_f1": 0.7880184331797235,
+      "test_accuracy": 0.8123543123543123,
+      "test_roc_auc": 0.8641035026994264,
+      "test_pr_auc": 0.9104401384988331
+    },
+    {
+      "n_features": 24,
+      "n_params": 74201,
+      "best_epoch": 5,
+      "test_macro_f1": 0.7881367163470359,
+      "test_binary_f1": 0.7607895617263298,
+      "test_accuracy": 0.7916666666666666,
+      "test_roc_auc": 0.8529625587599834,
+      "test_pr_auc": 0.9030547645360472
+    },
+    {
+      "n_features": 24,
+      "n_params": 74201,
+      "best_epoch": 16,
+      "test_macro_f1": 0.8277754656390495,
+      "test_binary_f1": 0.8118175979447656,
+      "test_accuracy": 0.8292540792540792,
+      "test_roc_auc": 0.8689335265183955,
+      "test_pr_auc": 0.9023795879991297
+    },
+    {
+      "n_features": 24,
+      "n_params": 74201,
+      "best_epoch": 7,
+      "test_macro_f1": 0.812409979551672,
+      "test_binary_f1": 0.7945911139729556,
+      "test_accuracy": 0.8141025641025641,
+      "test_roc_auc": 0.8598875962591109,
+      "test_pr_auc": 0.907072669013023
+    }
+  ],
+  "mean_f1m": 0.8080244931039265,
+  "std_f1m": 0.013000439165621209,
+  "mean_pr_auc": 0.9065202512457606,
+  "std_pr_auc": 0.0033059448212740803,
+  "drop_features": {
+    "2": "length",
+    "20": "crc_mean_w",
+    "3": "setpoint"
+  },
+  "keep_idx": [
+    0,
+    1,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+  ]
+}

@@ -1,0 +1,62 @@
+[    0.0s] STEP 1: load base-model predictions ...
+[    0.0s]    LGB v2          val: (27462, 4)  test: (54927, 4)
+[    0.1s]    RF              val: (27462, 4)  test: (54927, 4)
+[    0.1s]    TCN v4          val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v3a         val: (27456, 4)  test: (54920, 4)
+[    0.1s]    TCN v3b         val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v3c         val: (27456, 4)  test: (54912, 4)
+[    0.1s]    LSTM+Att        val: (27456, 4)  test: (54912, 4)
+[    0.1s]    TCN v4 v2       val: (27456, 4)  test: (54912, 4)
+[    0.1s]    LSTM+Att v2     val: (27456, 4)  test: (54912, 4)
+[    0.2s]    Transformer     val: (27456, 4)  test: (54912, 4)
+[    0.2s]    align: val=27456  test=54912
+[    0.2s]    [ok] all y_true align
+[    0.2s] STEP 2: per-model benchmarks on test @ best val threshold ...
+[    0.6s]    LGB v2          thr=0.64  F1m=0.8337  PR-AUC=0.8165  Bin-F1=0.7287  Acc=0.8999
+[    1.1s]    RF              thr=0.53  F1m=0.8330  PR-AUC=0.8363  Bin-F1=0.7358  Acc=0.8895
+[    1.5s]    TCN v4          thr=0.82  F1m=0.6624  PR-AUC=0.4431  Bin-F1=0.5253  Acc=0.7180
+[    2.0s]    TCN v3a         thr=0.41  F1m=0.6734  PR-AUC=0.4544  Bin-F1=0.5399  Acc=0.7279
+[    2.4s]    TCN v3b         thr=0.70  F1m=0.6634  PR-AUC=0.4540  Bin-F1=0.5183  Acc=0.7260
+[    2.8s]    TCN v3c         thr=0.54  F1m=0.6611  PR-AUC=0.4559  Bin-F1=0.5189  Acc=0.7208
+[    3.3s]    LSTM+Att        thr=0.61  F1m=0.6520  PR-AUC=0.3779  Bin-F1=0.5138  Acc=0.7069
+[    3.7s]    TCN v4 v2       thr=0.65  F1m=0.6617  PR-AUC=0.4094  Bin-F1=0.5282  Acc=0.7145
+[    4.2s]    LSTM+Att v2     thr=0.61  F1m=0.6520  PR-AUC=0.3779  Bin-F1=0.5138  Acc=0.7069
+[    4.6s]    Transformer     thr=0.38  F1m=0.6574  PR-AUC=0.3834  Bin-F1=0.5090  Acc=0.7216
+[    4.6s] STEP 3: probability matrix ...
+[    4.6s]    val  shape: (27456, 10)
+[    4.6s]    test shape: (54912, 10)
+[    4.6s] STEP 4: uniform-average ensemble ...
+[    5.1s]    ALL_7_v2            thr=0.80  F1m=0.7930  PR-AUC=0.7643
+[    5.6s]    ALL_9_v3            thr=0.84  F1m=0.7870  PR-AUC=0.7546
+[    6.0s]    ALL_10              thr=0.86  F1m=0.7814  PR-AUC=0.7453
+[    6.5s]    ALL_8_v4            thr=0.82  F1m=0.7830  PR-AUC=0.7511
+[    7.0s]    ALL_10_no_v3c       thr=0.84  F1m=0.7849  PR-AUC=0.7507
+[    7.4s]    ALL_10_no_v3a       thr=0.84  F1m=0.7793  PR-AUC=0.7473
+[    7.9s]    diverse_6           thr=0.76  F1m=0.7834  PR-AUC=0.7574
+[    8.4s]    attn_3_plus_trees   thr=0.72  F1m=0.7872  PR-AUC=0.7644
+[    8.8s]    TF_alone            thr=0.38  F1m=0.6574  PR-AUC=0.3834
+[    8.8s] STEP 5: weighted-average ensemble (SLSQP on val) ...
+[   31.3s]    ALL_7_v2            weights=[0.2, 0.48, 0.0, 0.14, 0.06, 0.04, 0.08]  F1m=0.8316  PR-AUC=0.8417
+[   58.0s]    ALL_9_v3            weights=[0.15, 0.36, 0.0, 0.1, 0.04, 0.03, 0.06, 0.12, 0.14]  F1m=0.7980  PR-AUC=0.7985
+[   88.8s]    ALL_10              weights=[0.12, 0.29, 0.0, 0.08, 0.04, 0.02, 0.05, 0.1, 0.12, 0.18]  F1m=0.7906  PR-AUC=0.7708
+[  114.0s]    ALL_8_v4            weights=[0.18, 0.42, 0.0, 0.12, 0.05, 0.03, 0.07, 0.14]  F1m=0.8196  PR-AUC=0.8164
+[  141.4s]    ALL_10_no_v3c       weights=[0.15, 0.36, 0.0, 0.1, 0.04, 0.03, 0.06, 0.12, 0.14]  F1m=0.8004  PR-AUC=0.7942
+[  167.1s]    ALL_10_no_v3a       weights=[0.23, 0.05, 0.25, 0.09, 0.08, 0.02, 0.26, 0.0, 0.02]  F1m=0.7963  PR-AUC=0.7716
+[  186.1s]    diverse_6           weights=[0.22, 0.52, 0.0, 0.15, 0.07, 0.04]  F1m=0.8309  PR-AUC=0.8436
+[  205.5s]    attn_3_plus_trees   weights=[0.23, 0.55, 0.0, 0.15, 0.07]  F1m=0.8282  PR-AUC=0.8426
+[  210.8s]    TF_alone            weights=[1.0]  F1m=0.6574  PR-AUC=0.3834
+[  210.8s] STEP 6: stacking with Logistic Regression ...
+[  216.5s]    ALL_7_v2            C=1.0  F1m=0.8481  PR-AUC=0.8473  coefs=[3.3026, 4.7416, 2.7154, 1.5909, 0.303, -1.676, -0.9347]
+[  222.0s]    ALL_9_v3            C=5.0  F1m=0.8443  PR-AUC=0.8488  coefs=[3.0204, 5.1309, 1.8941, 1.4606, 0.1427, -2.069, -0.8956, 2.3765, -0.8956]
+[  227.2s]    ALL_10              C=5.0  F1m=0.8450  PR-AUC=0.8394  coefs=[3.1478, 5.042, 1.6936, 1.5912, 0.5538, -1.3236, -0.1484, 1.9004, -0.1484, -2.2485]
+[  232.9s]    ALL_8_v4            C=0.5  F1m=0.8441  PR-AUC=0.8389  coefs=[3.356, 4.6847, 1.9637, 1.6774, 0.5095, -0.3237, 0.5005, -2.5058]
+[  239.1s]    ALL_10_no_v3c       C=5.0  F1m=0.8446  PR-AUC=0.8432  coefs=[3.2187, 4.9694, 1.1182, 1.6139, 0.0152, -0.0878, 1.7786, -0.0878, -2.5276]
+[  244.4s]    ALL_10_no_v3a       C=5.0  F1m=0.8426  PR-AUC=0.8393  coefs=[3.105, 5.1181, 2.9765, 1.1438, -2.0157, -0.2271, 2.1485, -0.2271, -2.0054]
+[  249.3s]    diverse_6           C=1.0  F1m=0.8421  PR-AUC=0.8399  coefs=[3.3241, 4.8622, 3.5417, -0.0779, 0.4556, -2.2126]
+[  254.2s]    attn_3_plus_trees   C=2.0  F1m=0.8357  PR-AUC=0.8451  coefs=[3.26, 4.904, 1.0955, 1.0955, -0.3619]
+[  258.5s]    TF_alone            C=0.5  F1m=0.6572  PR-AUC=0.3834  coefs=[2.5486]
+[  258.5s] STEP 7: save artifacts ...
+[  258.5s] STEP 8: best-of-best ...
+[  258.5s]    BEST: method=stack  members=ALL_7_v2
+[  258.5s]       test F1m=0.8481  PR-AUC=0.8473  Acc=0.9018
+[  258.5s] DONE ensemble_v4.

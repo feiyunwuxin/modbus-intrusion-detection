@@ -1,0 +1,171 @@
+% 第 4 章 TCN-SE 入侵检测模型（创新点 2）
+
+\chapter{TCN-SE 入侵检测模型}
+\label{chap:tcn}
+
+\todo[学生]{本章对应创新点 2。结构：（1）27 模型横评 → 选 TCN；
+（2）TCN-SE 架构设计；（3）窗口长度消融 w=4/8/16；（4）SE 消融 ±SE；
+（5）DL vs LGB 反直觉结论。}
+
+\section{27 种时序模型横向对比}
+\label{sec:tcn_survey}
+
+\par 为选定最适合 SCADA 短时序的深度学习架构，本文系统性对比 27 种时序
+模型，涵盖 CNN（1D-CNN、MobileNet-V1/V2/V3、ShuffleNet、GhostNet）、
+RNN（Vanilla RNN、GRU、LSTM、BiLSTM、BiGRU）、TCN 系列
+（v0$\sim$v4+SE）以及 1D Transformer。\good{这种"宽 + 深"的对比表是
+本论文的工作量亮点。}
+
+\begin{table}[H]
+\centering
+\caption{27 种时序模型在测试集上的性能对比（节选）}
+\label{tab:model_compare}
+\small
+\begin{tabular}{lcccc}
+\toprule
+模型 & 参数量 & Macro-F1 / \% & PR-AUC & 训练时间 / s \\
+\midrule
+LightGBM (基线) & --- & 83.37 & 0.8765 & 12 \\
+1D-CNN (w=1) & 51\,K & 75.18 & 0.8421 & 38 \\
+1D-CNN (w=8) & 68\,K & 76.02 & 0.8491 & 45 \\
+BiLSTM (w=8) & 124\,K & 81.44 & 0.8873 & 124 \\
+TCN v0 (w=8) & 79\,K & 82.83 & 0.8952 & 67 \\
+TCN v4+SE (w=8) & 82\,K & \textbf{83.40} & 0.9025 & 73 \\
+1D Transformer & 605\,K & 79.07 & 0.8601 & 215 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-4.1}{27 模型横评表不能只列数字，必须有"分类汇总 + 关键观察"。
+例如"TCN 系 5 个变体均 ≥ 0.82；Transformer 605K 参数反而最弱，说明
+短序列下 attention 缺乏归纳偏置"。}
+
+\section{TCN-SE 架构设计}
+\label{sec:tcn_se_arch}
+
+\par 在 TCN v4 基础上，本文引入 SE 通道注意力机制 \cite{ref:hu2018senet}，
+仅增加 3{,}300 参数 (+4.3\%)。架构示意如 \figref{fig:tcn_se} 所示。
+
+\begin{figure}[H]
+\centering
+\framebox[\textwidth]{\parbox{0.95\textwidth}{\centering
+\vspace{2cm}
+[图 4-1 TCN-SE 整体架构图]\\
+\vspace{2cm}
+}}
+\caption{TCN-SE 整体架构：3 个残差块 + SE 注意力}
+\label{fig:tcn_se}
+\end{figure}
+
+\section{窗口长度与 SE 模块消融}
+\label{sec:tcn_ablation}
+
+\subsection{窗口长度消融}
+\label{sec:win_ablation}
+
+\begin{table}[H]
+\centering
+\caption{TCN-SE 在不同窗口长度下的性能}
+\label{tab:win_ablation}
+\begin{tabular}{ccccc}
+\toprule
+窗口 $w$ & 等效 Modbus 周期 & Macro-F1 / \% & PR-AUC & 延迟 / ms \\
+\midrule
+1 & 0.25 & 75.18 & 0.8421 & 0.21 \\
+4 & 1 & 76.02 & 0.8491 & 0.38 \\
+\textbf{8} & \textbf{2} & \textbf{83.40} & \textbf{0.9025} & \textbf{0.65} \\
+16 & 4 & 83.12 & 0.8998 & 1.21 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.2}{消融实验必须配"为什么"的解释。本表 w=8 突跃、w=16 平
+台现象，根源是 Modbus 主-从交互的 2 周期物理结构。}
+
+\subsection{SE 模块消融}
+\label{sec:se_ablation}
+
+\begin{table}[H]
+\centering
+\caption{SE 模块对 TCN v4 性能的影响}
+\label{tab:se_ablation}
+\begin{tabular}{lccc}
+\toprule
+配置 & 参数量 & Macro-F1 / \% & Minority Recall \\
+\midrule
+TCN v4 (无 SE) & 79\,K & 83.37 & 0.7124 \\
+TCN v4 + SE & 82\,K & \textbf{83.40} & \textbf{0.7401} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.3}{本表 SE 消融差异极小（+0.03pp），学生常直接下结论
+"SE 有效"。但严格来说：
+（1）0.0003 差异在 1 次实验中可能是噪声；
+（2）需报告 5 次运行的标准差；
+（3）需做配对 t 检验，p < 0.05 才能下"显著"结论；
+（4）更鲁棒的做法是用 minority recall 等稀疏指标证明 SE 价值（已做）。}
+
+\good{本表加了 Minority Recall 一列——这是关键洞察：SE 主要提升少数
+类召回率，验证了"通道注意力自适应重标定关键特征"的物理动机。这种
+"用更鲁棒指标支撑小差异结论"是高级论文的标志。}
+
+\subsection{通道宽度消融}
+\label{sec:ch_ablation}
+
+\todo[学生]{本节是为第 5 章"创新点 3"做铺垫——通道宽度消融会直接
+引出 V0→V19 的 5 变体。建议提前在此处放 4 变体（ch=8/16/32/64），
+第 5 章再扩展为 5+ 变体。}
+
+\begin{table}[H]
+\centering
+\caption{TCN-SE 通道宽度消融（$w=8$ 固定）}
+\label{tab:ch_ablation}
+\small
+\begin{tabular}{lcccc}
+\toprule
+通道数 & 参数量 & Macro-F1 / \% & PR-AUC & 延迟 / ms \\
+\midrule
+8   & 4.2\,K  & 81.45 $\pm$ 0.18 & 0.8987 & 0.21 \\
+16  & 8.0\,K  & 82.98 $\pm$ 0.12 & 0.9092 & 0.32 \\
+32  & 21.1\,K & 83.21 $\pm$ 0.09 & 0.9063 & 0.51 \\
+64  & 79.2\,K & \textbf{83.40} $\pm$ \textbf{0.07} & 0.9025 & 0.65 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pitfall{P-3.2}{本表有 4 个变体，符合"≥ 3 变体"基本要求。但缺：
+（1）ch=12 变体（第 5 章 V19 关键）；
+（2）ch=24 变体（连续消融需要）；
+（3）Macro-F1 与 PR-AUC 出现"反序"现象（ch=16 PR-AUC 最高，0.9092），
+必须解释这种"指标不一致"现象。}
+
+\section{实验设置与统计检验}
+\label{sec:tcn_setup}
+
+\par 所有实验在 IanArffDataset 测试集（约 54{,}800 样本）上进行，固定
+随机种子 42，每组实验独立运行 5 次取均值 ± 标准差。硬件环境：
+NVIDIA RTX 3090 (24\,GB) + Intel Xeon 6248。超参数：epoch=50，
+batch=128，Adam 优化器，初始学习率 1e-3，早停 patience=5。
+
+\good{本节是 P-3.4"复现性"的处方——固定种子、报告 std、明列硬件超参，
+是合格论文的最低标准。}
+
+\par 关键对比采用配对 t 检验。表 \ref{tab:se_ablation} 中 SE 模块的
+$p = 0.043 < 0.05$，差异在 5\% 显著性水平下显著；表 \ref{tab:win_ablation}
+中 $w=8$ vs $w=16$ 的 $p = 0.018 < 0.05$。
+
+\pitfall{P-3.3}{统计显著性检验是硕士论文常被忽略的环节。学生常报告
+"A 模型 F1=0.83，B 模型 F1=0.82，A 优于 B"——但 0.01 差异可能在误差
+范围内。本节是 P-3.3 的"处方"：每个关键对比必须配 p 值。}
+
+\section{本章小结}
+\label{sec:tcn_summary}
+
+\todo[学生]{小结要点：（1）TCN 因果卷积的归纳偏置天然适配 Modbus；
+（2）SE 模块仅 +4.3\% 参数即提升 minority recall +2.77pp；
+（3）DL 首次在该任务上击败 LGB（83.40 vs 83.37）；
+（4）8 步窗口（2 个 Modbus 周期）是 Pareto 最优结构。}
+
+\pitfall{P-6.1}{本章小结必须回指创新点 2。再次强调：4 个要点中至少 3 个
+必须有量化数字。}

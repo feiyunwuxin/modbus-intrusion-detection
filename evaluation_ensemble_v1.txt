@@ -1,0 +1,61 @@
+================================================================================
+ENSEMBLE REPORT — v1: LGB + TCN v4 + RF (+ optional v3a/v3b/v3c)
+================================================================================
+Base models and their pre-ensemble test metrics @ best val threshold:
+
+  LGB v2      thr=0.64  test F1m=0.8337  Binary-F1=0.7287  Acc=0.8999  PR-AUC=0.8165  ROC-AUC=0.9099
+  RF          thr=0.53  test F1m=0.8330  Binary-F1=0.7358  Acc=0.8895  PR-AUC=0.8363  ROC-AUC=0.9153
+  TCN v4      thr=0.82  test F1m=0.6624  Binary-F1=0.5253  Acc=0.7180  PR-AUC=0.4431  ROC-AUC=0.7488
+  TCN v3a     thr=0.41  test F1m=0.6734  Binary-F1=0.5399  Acc=0.7279  PR-AUC=0.4544  ROC-AUC=0.7514
+  TCN v3b     thr=0.70  test F1m=0.6634  Binary-F1=0.5183  Acc=0.7260  PR-AUC=0.4540  ROC-AUC=0.7524
+  TCN v3c     thr=0.54  test F1m=0.6611  Binary-F1=0.5189  Acc=0.7208  PR-AUC=0.4559  ROC-AUC=0.7503
+
+================================================================================
+METHOD 1 — UNIFORM AVERAGE
+================================================================================
+
+  [LGB+RF+TCN_v4]  thr=0.55  test F1m=0.8302  Binary-F1=0.7381  Acc=0.8802  PR-AUC=0.8403  ROC-AUC=0.9172
+  [LGB+TCN_v4]  thr=0.63  test F1m=0.7995  Binary-F1=0.6891  Acc=0.8604  PR-AUC=0.8017  ROC-AUC=0.8914
+  [LGB+RF+TCN_v4+v3a]  thr=0.65  test F1m=0.8085  Binary-F1=0.7002  Acc=0.8698  PR-AUC=0.8028  ROC-AUC=0.8924
+  [LGB+TCN_v4+v3a+v3b]  thr=0.81  test F1m=0.7936  Binary-F1=0.6743  Acc=0.8626  PR-AUC=0.7666  ROC-AUC=0.8683
+  [ALL_6]  thr=0.77  test F1m=0.7979  Binary-F1=0.6795  Acc=0.8672  PR-AUC=0.7725  ROC-AUC=0.8732
+  [LGB+TCN_v4+v3a+v3b+v3c]  thr=0.85  test F1m=0.7873  Binary-F1=0.6626  Acc=0.8604  PR-AUC=0.7547  ROC-AUC=0.8613
+  [LGB+RF+TCN_v4+v3a+v3c]  thr=0.72  test F1m=0.8019  Binary-F1=0.6875  Acc=0.8679  PR-AUC=0.7827  ROC-AUC=0.8790
+
+================================================================================
+METHOD 2 — WEIGHTED AVERAGE (SLSQP on val)
+================================================================================
+
+  [LGB+RF+TCN_v4]  thr=0.57  test F1m=0.8438  PR-AUC=0.8502
+  weights: LGB v2=0.0993, RF=0.8091, TCN v4=0.0916
+  [LGB+TCN_v4]  thr=0.58  test F1m=0.8359  PR-AUC=0.8476
+  weights: LGB v2=0.8115, TCN v4=0.1885
+  [LGB+RF+TCN_v4+v3a]  thr=0.60  test F1m=0.8403  PR-AUC=0.8521
+  weights: LGB v2=0.2482, RF=0.5861, TCN v4=0.0001, TCN v3a=0.1656
+  [LGB+TCN_v4+v3a+v3b]  thr=0.56  test F1m=0.7974  PR-AUC=0.8041
+  weights: LGB v2=0.5075, TCN v4=0.0917, TCN v3a=0.3912, TCN v3b=0.0097
+  [ALL_6]  thr=0.52  test F1m=0.8368  PR-AUC=0.8480
+  weights: LGB v2=0.2221, RF=0.5244, TCN v4=0.0, TCN v3a=0.1482, TCN v3b=0.0653, TCN v3c=0.0399
+  [LGB+TCN_v4+v3a+v3b+v3c]  thr=0.63  test F1m=0.8051  PR-AUC=0.8015
+  weights: LGB v2=0.4947, TCN v4=0.0894, TCN v3a=0.3813, TCN v3b=0.0094, TCN v3c=0.0252
+  [LGB+RF+TCN_v4+v3a+v3c]  thr=0.51  test F1m=0.8385  PR-AUC=0.8494
+  weights: LGB v2=0.2313, RF=0.5462, TCN v4=0.0, TCN v3a=0.1543, TCN v3c=0.068
+
+================================================================================
+METHOD 3 — STACKING (Logistic Regression, val-fit + 5-fold CV for C)
+================================================================================
+
+  [LGB+RF+TCN_v4]  C=1.0  thr=0.54  test F1m=0.8411  PR-AUC=0.8521  inter=-6.103
+     coefs: {'LGB v2': 3.3785, 'RF': 4.6512, 'TCN v4': 2.0509}
+  [LGB+TCN_v4]  C=5.0  thr=0.37  test F1m=0.8367  PR-AUC=0.8466  inter=-5.769
+     coefs: {'LGB v2': 7.1207, 'TCN v4': 2.1098}
+  [LGB+RF+TCN_v4+v3a]  C=0.5  thr=0.31  test F1m=0.8386  PR-AUC=0.8520  inter=-6.064
+     coefs: {'LGB v2': 3.5226, 'RF': 4.3671, 'TCN v4': 0.6915, 'TCN v3a': 1.4705}
+  [LGB+TCN_v4+v3a+v3b]  C=1.0  thr=0.32  test F1m=0.8382  PR-AUC=0.8365  inter=-5.746
+     coefs: {'LGB v2': 7.0068, 'TCN v4': 1.4221, 'TCN v3a': 1.6061, 'TCN v3b': -0.8528}
+  [ALL_6]  C=5.0  thr=0.55  test F1m=0.8455  PR-AUC=0.8413  inter=-6.190
+     coefs: {'LGB v2': 3.1261, 'RF': 4.9686, 'TCN v4': 2.7388, 'TCN v3a': 1.5288, 'TCN v3b': 0.4395, 'TCN v3c': -2.5509}
+  [LGB+TCN_v4+v3a+v3b+v3c]  C=0.5  thr=0.32  test F1m=0.8372  PR-AUC=0.8297  inter=-5.730
+     coefs: {'LGB v2': 6.9607, 'TCN v4': 2.1776, 'TCN v3a': 1.5652, 'TCN v3b': 0.0546, 'TCN v3c': -1.6087}
+  [LGB+RF+TCN_v4+v3a+v3c]  C=1.0  thr=0.29  test F1m=0.8364  PR-AUC=0.8425  inter=-6.152
+     coefs: {'LGB v2': 3.2865, 'RF': 4.736, 'TCN v4': 2.4336, 'TCN v3a': 1.5499, 'TCN v3c': -1.8415}

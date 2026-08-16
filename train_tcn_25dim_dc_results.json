@@ -1,0 +1,99 @@
+{
+  "baseline_27dim": {
+    "n_features": 27,
+    "n_params": 74969,
+    "best_epoch": 17,
+    "test_macro_f1": 0.8267954843613463,
+    "test_binary_f1": 0.8136234626300851,
+    "test_accuracy": 0.8277972027972028,
+    "test_roc_auc": 0.8609331451424798,
+    "test_pr_auc": 0.8988577654015886
+  },
+  "results_25dim": [
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8185323140814162,
+      "test_binary_f1": 0.806371018113679,
+      "test_accuracy": 0.8193473193473193,
+      "test_roc_auc": 0.8641329571786354,
+      "test_pr_auc": 0.905058791676319
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 7,
+      "test_macro_f1": 0.8010077787731064,
+      "test_binary_f1": 0.780946208684381,
+      "test_accuracy": 0.803030303030303,
+      "test_roc_auc": 0.8533013703994403,
+      "test_pr_auc": 0.9017840844177231
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 10,
+      "test_macro_f1": 0.8264281150879089,
+      "test_binary_f1": 0.8147453920649796,
+      "test_accuracy": 0.8272144522144522,
+      "test_roc_auc": 0.857907165610789,
+      "test_pr_auc": 0.9073414441597363
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 16,
+      "test_macro_f1": 0.8282593047381124,
+      "test_binary_f1": 0.8133971291866029,
+      "test_accuracy": 0.8295454545454546,
+      "test_roc_auc": 0.8644351635404625,
+      "test_pr_auc": 0.9086675184085264
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8295354377498794,
+      "test_binary_f1": 0.815379726723864,
+      "test_accuracy": 0.8307109557109557,
+      "test_roc_auc": 0.8595910083817573,
+      "test_pr_auc": 0.8992438739646624
+    }
+  ],
+  "mean_f1m": 0.8207525900860848,
+  "std_f1m": 0.010587615041365513,
+  "mean_pr_auc": 0.9044191425253935,
+  "std_pr_auc": 0.0034849571426127718,
+  "drop_features": {
+    "6": "deadband",
+    "20": "crc_mean_w"
+  },
+  "keep_idx": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+  ]
+}

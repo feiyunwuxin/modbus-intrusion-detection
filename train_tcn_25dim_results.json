@@ -1,0 +1,99 @@
+{
+  "baseline_27dim": {
+    "n_features": 27,
+    "n_params": 74969,
+    "best_epoch": 17,
+    "test_macro_f1": 0.8267954843613463,
+    "test_binary_f1": 0.8136234626300851,
+    "test_accuracy": 0.8277972027972028,
+    "test_roc_auc": 0.8609331451424798,
+    "test_pr_auc": 0.8988577654015886
+  },
+  "results_25dim": [
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8222434032032206,
+      "test_binary_f1": 0.807741116751269,
+      "test_accuracy": 0.8234265734265734,
+      "test_roc_auc": 0.8594513975554485,
+      "test_pr_auc": 0.9097433749521463
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 14,
+      "test_macro_f1": 0.8145604788949418,
+      "test_binary_f1": 0.8031055900621118,
+      "test_accuracy": 0.8152680652680653,
+      "test_roc_auc": 0.8579807166802589,
+      "test_pr_auc": 0.9061539960319905
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 20,
+      "test_macro_f1": 0.8203184934033442,
+      "test_binary_f1": 0.8030937802126974,
+      "test_accuracy": 0.821969696969697,
+      "test_roc_auc": 0.8668507713498155,
+      "test_pr_auc": 0.9054692322439726
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 2,
+      "test_macro_f1": 0.7391500381958505,
+      "test_binary_f1": 0.7112561174551386,
+      "test_accuracy": 0.7421328671328671,
+      "test_roc_auc": 0.8021712888633125,
+      "test_pr_auc": 0.8623990764825942
+    },
+    {
+      "n_features": 25,
+      "n_params": 74457,
+      "best_epoch": 18,
+      "test_macro_f1": 0.811067993766712,
+      "test_binary_f1": 0.7908646003262643,
+      "test_accuracy": 0.8132284382284383,
+      "test_roc_auc": 0.8522673989992287,
+      "test_pr_auc": 0.8971583145230845
+    }
+  ],
+  "mean_f1m": 0.8014680814928138,
+  "std_f1m": 0.031413563080718986,
+  "mean_pr_auc": 0.8961847988467575,
+  "std_pr_auc": 0.01738875125172237,
+  "drop_features": {
+    "25": "length_nunique_w",
+    "26": "unusual_count_w"
+  },
+  "keep_idx": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ]
+}

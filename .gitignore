@@ -1,0 +1,74 @@
+# ============================================================
+# SCADA 入侵检测项目 .gitignore
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# --- Claude Code 配置 ---
+.claude/
+
+# --- 第三方源码(整个 repo 不应入版本) ---
+netron-main/
+tflite-micro/
+
+# --- PyTorch 模型权重 (大,二进制,通常不提交) ---
+*.pt
+*.pth
+
+# --- sklearn 模型 (二进制,joblib) ---
+*.joblib
+
+# --- 原始数据集 (有 csv 转换脚本,不必入库) ---
+IanArffDataset.arff
+IanArffDataset.csv
+
+# --- 大型数据文件 ---
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.parquet
+
+# --- 临时工作脚本 ---
+_worker_*.py
+_worker_*.log
+_worker_retrain*.py
+_worker_*.log
+
+# --- 临时预测 / 元数据 ---
+predictions_*.csv
+processed_meta_*.json
+*_extracted.npz
+
+# --- 日志 ---
+*.log
+*.tmp
+
+# --- 系统 ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- IDE ---
+.idea/
+.vscode/
+*.iml
+
+# ============================================================
+# 例外(以下文件即使匹配上面的规则也要提交):
+# ============================================================
+# - ONNX 备份(跨平台部署用): !*.onnx
+# - 模型权重 .h(部署用):     !*.h
+# - 推理引擎 .c:             !*.c
+# - 报告/日志 .md:           !*.md
+# - 训练/量化脚本 .py:       !*.py(但 _worker_*.py 仍被排除)

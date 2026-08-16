@@ -1,0 +1,33 @@
+========================================================================
+EVALUATION REPORT — TCN v4_se_ensemble5 (5-seed ensemble)
+========================================================================
+Architecture: 5 × TCN+SE (B=128, ep=40), probability-averaged
+Seeds: [42, 123, 456, 789, 1024]
+Per-model params: 72,921
+Total ensemble params (no sharing): 364,605
+Train time (all 5 models): 612.7s
+Features per step: 19  |  Window: 16
+Tuned threshold: 0.33
+
+Per-seed summary:
+  seed=42: best_val_ep=39, val_f1m=0.8648, test_f1m@0.5=0.8450, test_pr_auc=0.8961
+  seed=123: best_val_ep=39, val_f1m=0.8804, test_f1m@0.5=0.8593, test_pr_auc=0.9163
+  seed=456: best_val_ep=39, val_f1m=0.8796, test_f1m@0.5=0.8522, test_pr_auc=0.9197
+  seed=789: best_val_ep=36, val_f1m=0.8698, test_f1m@0.5=0.8485, test_pr_auc=0.9099
+  seed=1024: best_val_ep=37, val_f1m=0.8851, test_f1m@0.5=0.8607, test_pr_auc=0.9227
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.8815  Binary-F1=0.8661  Acc=0.8834  ROC-AUC=0.8972  PR-AUC=0.9310
+Confusion matrix: [[869, 3], [197, 647]]
+
+------------------------------------------------------------------------
+[val@0.33]  thr=0.33  Macro-F1=0.8819  Binary-F1=0.8684  Acc=0.8834  ROC-AUC=0.8972  PR-AUC=0.9310
+Confusion matrix: [[856, 16], [184, 660]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.8542  Binary-F1=0.8461  Acc=0.8546  ROC-AUC=0.8894  PR-AUC=0.9137
+Confusion matrix: [[1561, 66], [433, 1372]]
+
+------------------------------------------------------------------------
+[test@0.33]  thr=0.33  Macro-F1=0.8560  Binary-F1=0.8522  Acc=0.8561  ROC-AUC=0.8894  PR-AUC=0.9137
+Confusion matrix: [[1514, 113], [381, 1424]]

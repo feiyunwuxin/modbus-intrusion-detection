@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "ch": 8,
+      "n_weights": 2048,
+      "n_bias": 125,
+      "n_layers": 15,
+      "weight_bytes": 2048,
+      "bias_bytes": 125,
+      "scale_bytes": 500,
+      "zp_bytes": 125,
+      "io_params": 10,
+      "meta_bytes": 180,
+      "header": 16,
+      "flash_bytes": 3004,
+      "ram_with_weights_in_ram": 7114,
+      "ram_no_weights_in_ram": 4941,
+      "act_buffer_int8": 128,
+      "sigmoid_buf_fp32": 16
+    },
+    {
+      "ch": 16,
+      "n_weights": 5984,
+      "n_bias": 205,
+      "n_layers": 15,
+      "weight_bytes": 5984,
+      "bias_bytes": 205,
+      "scale_bytes": 820,
+      "zp_bytes": 205,
+      "io_params": 10,
+      "meta_bytes": 180,
+      "header": 16,
+      "flash_bytes": 7420,
+      "ram_with_weights_in_ram": 11658,
+      "ram_no_weights_in_ram": 5469,
+      "act_buffer_int8": 256,
+      "sigmoid_buf_fp32": 16
+    },
+    {
+      "ch": 32,
+      "n_weights": 19616,
+      "n_bias": 365,
+      "n_layers": 15,
+      "weight_bytes": 19616,
+      "bias_bytes": 365,
+      "scale_bytes": 1460,
+      "zp_bytes": 365,
+      "io_params": 10,
+      "meta_bytes": 180,
+      "header": 16,
+      "flash_bytes": 22012,
+      "ram_with_weights_in_ram": 26506,
+      "ram_no_weights_in_ram": 6525,
+      "act_buffer_int8": 512,
+      "sigmoid_buf_fp32": 16
+    }
+  ],
+  "n_features": 19,
+  "window": 16,
+  "se_reduction": 8
+}

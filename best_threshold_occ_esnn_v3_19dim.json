@@ -1,0 +1,7 @@
+{
+  "best_threshold": 0.14734471699505142,
+  "val_macro_f1_at_best": 0.6209935897435898,
+  "n_neurons": 1,
+  "sim_threshold": 0.5,
+  "metric": "macro_f1"
+}

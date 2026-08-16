@@ -1,0 +1,270 @@
+% ============================================================================
+%  面向 SCADA 工控系统的轻量化入侵检测方法研究
+%  硕士论文模板 - 教学诊断版（含 \pitfall{} 与 \todo{} 标注）
+%
+%  本模板面向指导老师：在学生易错位置预埋诊断标记。
+%  - \pitfall{...}    红色警示框，描述"学生常犯错误"，老师可直接对照评阅
+%  - \todo[owner]{...} 黄色待办框，标记需学生补充的内容
+%  - \grade[level]{...} 老师评分用，level=A/B/C/D
+%
+%  编译: xelatex main -> biber main -> xelatex main -> xelatex main
+%  编译开关: \finaltrue  = 最终版(隐藏所有警示);
+%           \finalfalse = 草稿版(显示警示,默认)
+% ============================================================================
+
+\documentclass[12pt,a4paper,oneside,openany]{ctexart}
+
+\newif\iffinal
+\finalfalse   % 草稿模式，老师可改为 \finaltrue 看最终版样式
+
+% ---------- 数学与符号 ----------
+\usepackage{amsmath,amssymb,amsthm,amsfonts,bm}
+\usepackage{mathrsfs}
+
+% ---------- 图形与表格 ----------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{makecell}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+% ---------- 代码与算法 ----------
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{float}
+
+% ---------- 引用与链接 ----------
+\usepackage[colorlinks=true,
+            linkcolor=black,
+            citecolor=blue,
+            urlcolor=blue,
+            bookmarksdepth=4]{hyperref}
+
+% ---------- 参考文献（BibLaTeX + GB/T 7714） ----------
+\usepackage[backend=biber, style=gb7714-2015, gbpub=false, gbnamefmt=lowercase]{biblatex}
+\addbibresource{references/refs.bib}
+
+% ---------- 页面布局 ----------
+\usepackage{geometry}
+\geometry{a4paper,left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm,
+          headheight=15pt,headsep=0.4cm,footskip=0.8cm}
+
+% ---------- 页眉页脚 ----------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\leftmark}
+\fancyhead[R]{\small\rightmark}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- 章节标题格式 ----------
+\ctexset{
+  chapter={
+    name={第,章}, number=\chinese{chapter},
+    format={\centering\heiti\zihao{2}},
+    nameformat={\heiti\zihao{2}}, titleformat={\heiti\zihao{2}},
+    beforeskip={1.0ex}, afterskip={1.5ex}, pagestyle=fancy
+  },
+  section={
+    format={\heiti\zihao{3}}, number=\chinese{section},
+    beforeskip={0.8ex}, afterskip={0.4ex}
+  },
+  subsection={
+    format={\heiti\zihao{4}}, number=\arabic{subsection},
+    beforeskip={0.6ex}, afterskip={0.3ex}
+  }
+}
+
+% ---------- 定理环境 ----------
+\newtheoremstyle{mystyle}{1.5ex}{1.5ex}{\kaishu}{}{\heiti}{：}{0.5em}{}
+\theoremstyle{mystyle}
+\newtheorem{definition}{定义}[chapter]
+\newtheorem{theorem}{定理}[chapter]
+\newtheorem{lemma}{引理}[chapter]
+\newtheorem{proposition}{命题}[chapter]
+\newtheorem{corollary}{推论}[chapter]
+\newtheorem{example}{例}[chapter]
+\renewcommand{\proofname}{证明}
+
+% ---------- 列表 ----------
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=*}
+
+% ---------- 代码样式 ----------
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+\definecolor{codekw}{rgb}{0.0,0.0,0.8}
+\definecolor{codecomment}{rgb}{0.25,0.5,0.35}
+\definecolor{codestring}{rgb}{0.6,0.1,0.1}
+\lstset{
+  basicstyle=\ttfamily\small, backgroundcolor=\color{codebg},
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecomment}\itshape,
+  stringstyle=\color{codestring}, numbers=left,
+  numberstyle=\tiny\color{gray}, numbersep=8pt,
+  frame=single, framerule=0.4pt, rulecolor=\color{gray!50},
+  breaklines=true, showstringspaces=false, tabsize=2, captionpos=b
+}
+
+% ============================================================================
+%                    *** 教学诊断宏（核心） ***
+% ============================================================================
+% 这是模板的灵魂：老师通过这些宏命令精准定位学生问题
+%
+% \pitfall{标题}{描述}
+%   红色警示框，描述"学生常犯错误"
+%
+% \todo[负责人]{描述}
+%   黄色待办框，标记需要补充的内容
+%
+% \grade[等级]{评语}
+%   老师评分块（草稿版不显示）
+% ============================================================================
+
+% --- Pitfall 宏（学生常犯错误） ---
+\newcommand{\pitfall}[2]{%
+  \iffinal
+    % 最终版隐藏
+  \else
+    \begin{tcolorbox}[
+      enhanced, breakable,
+      colback=red!5!white, colframe=red!75!black,
+      title={\textbf{⚠️ 学生常见错误 [#1]}},
+      fonttitle=\bfseries\heiti\zihao{-5},
+      boxrule=0.6pt, arc=2pt, left=6pt, right=6pt,
+      top=4pt, bottom=4pt,
+      fontupper=\kaishu\zihao{-5}
+    ]
+    #2
+    \end{tcolorbox}
+  \fi
+}
+
+% --- Todo 宏（待补充内容） ---
+\newcommand{\todo}[2][学生]{%
+  \iffinal
+  \else
+    \begin{tcolorbox}[
+      enhanced, breakable,
+      colback=yellow!10!white, colframe=orange!80!black,
+      title={\textbf{📝 待补充（#1）}},
+      fonttitle=\bfseries\heiti\zihao{-5},
+      boxrule=0.6pt, arc=2pt, left=6pt, right=6pt,
+      top=4pt, bottom=4pt,
+      fontupper=\kaishu\zihao{-5}
+    ]
+    #2
+    \end{tcolorbox}
+  \fi
+}
+
+% --- Grade 宏（老师评分批注） ---
+\newcommand{\grade}[2][B]{%
+  \iffinal
+  \else
+    \begin{tcolorbox}[
+      enhanced, breakable,
+      colback=blue!5!white, colframe=blue!60!black,
+      title={\textbf{✏️ 老师评语 [等级：#1]}},
+      fonttitle=\bfseries\heiti\zihao{-5},
+      boxrule=0.6pt, arc=2pt, left=6pt, right=6pt,
+      top=4pt, bottom=4pt,
+      fontupper=\kaishu\zihao{-5}
+    ]
+    #2
+    \end{tcolorbox}
+  \fi
+}
+
+% --- 优秀示例标记 ---
+\newcommand{\good}[1]{%
+  \iffinal
+  \else
+    \textcolor{green!50!black}{\textbf{[✓ 范例]}} #1
+  \fi
+}
+
+% ---------- 常用宏 ----------
+\newcommand{\figref}[1]{图~\ref{#1}}
+\newcommand{\tabref}[1]{表~\ref{#1}}
+\newcommand{\eqref}[1]{式~(\ref{#1})}
+\newcommand{\chapref}[1]{第~\ref{#1}~章}
+\newcommand{\secref}[1]{第~\ref{#1}~节}
+\newcommand{\Fone}{F_1}
+\newcommand{\MacroFone}{F_1^{\text{macro}}}
+\newcommand{\WeightedFone}{F_1^{\text{weighted}}}
+\newcommand{\PRAUC}{\text{PR-AUC}}
+\newcommand{\ROCAUC}{\text{ROC-AUC}}
+
+% ---------- 标题元信息 ----------
+\title{
+  \vspace{-1cm}
+  \heiti\zihao{2}面向 SCADA 工控系统的\\
+  \vspace{0.3cm}
+  轻量化入侵检测方法研究\\[0.5cm]
+  \fangsong\zihao{4}——基于时序卷积网络与极限压缩量化
+}
+\author{}
+\date{}
+
+% ============================================================================
+\begin{document}
+
+% ---------- 封面 ----------
+\input{chapters/cover}
+
+% ---------- 诚信声明 ----------
+\input{chapters/declaration}
+
+% ---------- 中文摘要 ----------
+\input{chapters/abstract_zh}
+
+% ---------- 英文摘要 ----------
+\input{chapters/abstract_en}
+
+% ---------- 目录 ----------
+\tableofcontents
+\thispagestyle{fancy}
+
+% ---------- 图目录 ----------
+\listoffigures
+\addcontentsline{toc}{chapter}{图目录}
+
+% ---------- 表目录 ----------
+\listoftables
+\addcontentsline{toc}{chapter}{表目录}
+
+% ---------- 主体内容 ----------
+\mainmatter
+\input{chapters/chapter1}
+\input{chapters/chapter2}
+\input{chapters/chapter3}
+\input{chapters/chapter4}
+\input{chapters/chapter5}
+\input{chapters/chapter6}
+
+% ---------- 参考文献 ----------
+\printbibliography[heading=bibintoc,title={参考文献}]
+
+% ---------- 致谢 ----------
+\input{chapters/acknowledgment}
+
+% ---------- 攻读学位期间发表的论文与科研成果 ----------
+\input{chapters/publications}
+
+% ---------- 附录 ----------
+\appendix
+\input{chapters/appendix_a}
+
+\end{document}

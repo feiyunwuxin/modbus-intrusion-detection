@@ -1,0 +1,60 @@
+========================================================================
+EVALUATION REPORT — LSTM Binary (v2, sliding window=8, BiLSTM)
+========================================================================
+Window: 8 rows per cycle  |  Features per step: 44 (16 raw + 28 one-hot function)
+Architecture: 1-layer BiLSTM, hidden=64, dropout=0.3
+Train cycles: 24,029  |  Val cycles: 3,432  |  Test cycles: 6,865
+Model params: 60,481  |  Best epoch: 30  |  Best val Macro-F1: 0.8392
+Tuned threshold (chosen on val, optimizing Macro-F1): 0.49
+
+------------------------------------------------------------------------
+[val@0.5]  thr=0.50  Macro-F1=0.8392  Binary-F1=0.8086  Acc=0.8450  ROC-AUC=0.8616  PR-AUC=0.8957
+              precision    recall  f1-score   support
+
+           0     0.7890    0.9689    0.8697      1833
+           1     0.9517    0.7029    0.8086      1599
+
+    accuracy                         0.8450      3432
+   macro avg     0.8704    0.8359    0.8392      3432
+weighted avg     0.8648    0.8450    0.8413      3432
+
+Confusion matrix: [[1776, 57], [475, 1124]]
+
+------------------------------------------------------------------------
+[val@0.49]  thr=0.49  Macro-F1=0.8396  Binary-F1=0.8095  Acc=0.8453  ROC-AUC=0.8616  PR-AUC=0.8957
+              precision    recall  f1-score   support
+
+           0     0.7901    0.9673    0.8698      1833
+           1     0.9495    0.7054    0.8095      1599
+
+    accuracy                         0.8453      3432
+   macro avg     0.8698    0.8364    0.8396      3432
+weighted avg     0.8644    0.8453    0.8417      3432
+
+Confusion matrix: [[1773, 60], [471, 1128]]
+
+------------------------------------------------------------------------
+[test@0.5]  thr=0.50  Macro-F1=0.8136  Binary-F1=0.7882  Acc=0.8170  ROC-AUC=0.8367  PR-AUC=0.8873
+              precision    recall  f1-score   support
+
+           0     0.7494    0.9528    0.8390      3434
+           1     0.9352    0.6811    0.7882      3431
+
+    accuracy                         0.8170      6865
+   macro avg     0.8423    0.8170    0.8136      6865
+weighted avg     0.8423    0.8170    0.8136      6865
+
+Confusion matrix: [[3272, 162], [1094, 2337]]
+
+------------------------------------------------------------------------
+[test@0.49]  thr=0.49  Macro-F1=0.8144  Binary-F1=0.7895  Acc=0.8178  ROC-AUC=0.8367  PR-AUC=0.8873
+              precision    recall  f1-score   support
+
+           0     0.7507    0.9517    0.8393      3434
+           1     0.9339    0.6838    0.7895      3431
+
+    accuracy                         0.8178      6865
+   macro avg     0.8423    0.8177    0.8144      6865
+weighted avg     0.8423    0.8178    0.8144      6865
+
+Confusion matrix: [[3268, 166], [1085, 2346]]

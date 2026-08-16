@@ -1,0 +1,5 @@
+Config,Epochs,Best val ep,Best val f1m,Final val f1m,Final val AUC,Final loss,Test f1m,Test PR-AUC,Params,Best thr
+"17-dim v1  (one-hot, 44 dims)",35,32,0.8523,0.8473,0.8697,0.3255,0.834,0.9025,79321,0.48
+"17-dim v1b (no one-hot, 17 dims)",27,20,0.8153,0.8118,0.8265,0.3733,0.8002,0.8968,72409,0.51
+"19-dim v3  (SCADA row, 19 dims)",35,35,0.8592,0.8592,0.8695,0.3144,0.8444,0.8892,72921,0.39
+"27-dim v2  (SCADA + window-agg, 27 dims)",35,35,0.8594,0.8594,0.876,0.3346,0.8367,0.899,74969,0.5

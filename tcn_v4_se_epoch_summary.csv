@@ -1,0 +1,3 @@
+config,epochs,scheduler,best_val_epoch,best_val_f1m,test_macro_f1,test_pr_auc,test_binary_f1,train_time_s
+Original (35ep + ReduceLROnPlateau),35,ReduceLROnPlateau,35,0.8523,0.8443832978715788,0.8891750089226933,0.8346799254195152,59.20284175872803
+New (50ep + CosineAnnealingWarmRestarts),50,CosineAnnealingWarmRestarts,50,0.8617244157937147,0.8422136137244051,0.8925907268746017,0.8338461538461538,94.98391103744507

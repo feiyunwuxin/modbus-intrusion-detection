@@ -1,0 +1,154 @@
+{
+  "config": {
+    "data": "27-dim SCADA v2, window=16",
+    "model": "TCN(3 blocks, ch=64, k=3, dilations=[1,2,4])",
+    "hparams": {
+      "LR": 0.0005,
+      "WD": 1e-05,
+      "dropout": 0.3,
+      "batch": 512,
+      "epochs": 20,
+      "patience": 5
+    },
+    "seeds": [
+      42,
+      123,
+      456,
+      789,
+      1024
+    ]
+  },
+  "with_se": {
+    "runs": [
+      {
+        "n_features": 27,
+        "n_params": 74969,
+        "best_epoch": 17,
+        "train_time_s": 43.1,
+        "test_macro_f1": 0.8267954843613463,
+        "test_binary_f1": 0.8136234626300851,
+        "test_accuracy": 0.8277972027972028,
+        "test_roc_auc": 0.8609331451424798,
+        "test_pr_auc": 0.8988577654015886
+      },
+      {
+        "n_features": 27,
+        "n_params": 74969,
+        "best_epoch": 20,
+        "train_time_s": 50.8,
+        "test_macro_f1": 0.8187966333958112,
+        "test_binary_f1": 0.8011620400258231,
+        "test_accuracy": 0.8205128205128205,
+        "test_roc_auc": 0.8687624181276146,
+        "test_pr_auc": 0.9134304911668052
+      },
+      {
+        "n_features": 27,
+        "n_params": 74969,
+        "best_epoch": 17,
+        "train_time_s": 59.8,
+        "test_macro_f1": 0.8187902905105677,
+        "test_binary_f1": 0.8026862807803006,
+        "test_accuracy": 0.8202214452214452,
+        "test_roc_auc": 0.8563295632734994,
+        "test_pr_auc": 0.9064117536896399
+      },
+      {
+        "n_features": 27,
+        "n_params": 74969,
+        "best_epoch": 17,
+        "train_time_s": 58.3,
+        "test_macro_f1": 0.8256610589257494,
+        "test_binary_f1": 0.810828025477707,
+        "test_accuracy": 0.8269230769230769,
+        "test_roc_auc": 0.8690826717425985,
+        "test_pr_auc": 0.905821030595639
+      },
+      {
+        "n_features": 27,
+        "n_params": 74969,
+        "best_epoch": 12,
+        "train_time_s": 55.8,
+        "test_macro_f1": 0.8125213371952174,
+        "test_binary_f1": 0.7937843962447394,
+        "test_accuracy": 0.8143939393939394,
+        "test_roc_auc": 0.8567012345342702,
+        "test_pr_auc": 0.9012842069918217
+      }
+    ],
+    "mean_f1m": 0.8205129608777384,
+    "std_f1m": 0.005210612960798316,
+    "mean_pr_auc": 0.9051610495690989,
+    "std_pr_auc": 0.005002895156922287,
+    "params": 74969
+  },
+  "without_se": {
+    "runs": [
+      {
+        "n_features": 27,
+        "n_params": 71681,
+        "best_epoch": 6,
+        "train_time_s": 33.3,
+        "test_macro_f1": 0.7633539275308481,
+        "test_binary_f1": 0.728946471189908,
+        "test_accuracy": 0.7683566433566433,
+        "test_roc_auc": 0.8384815109296548,
+        "test_pr_auc": 0.8919062557800688
+      },
+      {
+        "n_features": 27,
+        "n_params": 71681,
+        "best_epoch": 9,
+        "train_time_s": 43.8,
+        "test_macro_f1": 0.7786136118527425,
+        "test_binary_f1": 0.7428769979152189,
+        "test_accuracy": 0.7843822843822844,
+        "test_roc_auc": 0.8510034102498183,
+        "test_pr_auc": 0.9001830481014211
+      },
+      {
+        "n_features": 27,
+        "n_params": 71681,
+        "best_epoch": 11,
+        "train_time_s": 47.8,
+        "test_macro_f1": 0.7508205390189817,
+        "test_binary_f1": 0.7047891350964975,
+        "test_accuracy": 0.7593240093240093,
+        "test_roc_auc": 0.8537910298341526,
+        "test_pr_auc": 0.9026891737088123
+      },
+      {
+        "n_features": 27,
+        "n_params": 71681,
+        "best_epoch": 15,
+        "train_time_s": 62.7,
+        "test_macro_f1": 0.8000931966449207,
+        "test_binary_f1": 0.7758620689655172,
+        "test_accuracy": 0.803030303030303,
+        "test_roc_auc": 0.8609942674432661,
+        "test_pr_auc": 0.9083613016982597
+      },
+      {
+        "n_features": 27,
+        "n_params": 71681,
+        "best_epoch": 1,
+        "train_time_s": 20.4,
+        "test_macro_f1": 0.7128902946530529,
+        "test_binary_f1": 0.669639794168096,
+        "test_accuracy": 0.7194055944055944,
+        "test_roc_auc": 0.7691286411610172,
+        "test_pr_auc": 0.8339718559068617
+      }
+    ],
+    "mean_f1m": 0.7611543139401091,
+    "std_f1m": 0.029196247812729576,
+    "mean_pr_auc": 0.8874223270390849,
+    "std_pr_auc": 0.027244859149043604,
+    "params": 71681
+  },
+  "delta_se_vs_nose": {
+    "delta_f1m_mean": 0.05935864693762927,
+    "delta_pr_auc_mean": 0.017738722530014073,
+    "delta_f1m_std": -0.02398563485193126
+  }
+}

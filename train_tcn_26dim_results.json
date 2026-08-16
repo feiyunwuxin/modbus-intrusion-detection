@@ -1,0 +1,98 @@
+{
+  "baseline_27dim": {
+    "n_features": 27,
+    "n_params": 74969,
+    "best_epoch": 17,
+    "test_macro_f1": 0.8267954843613463,
+    "test_binary_f1": 0.8136234626300851,
+    "test_accuracy": 0.8277972027972028,
+    "test_roc_auc": 0.8609331451424798,
+    "test_pr_auc": 0.8988577654015886
+  },
+  "results_26dim": [
+    {
+      "n_features": 26,
+      "n_params": 74713,
+      "best_epoch": 19,
+      "test_macro_f1": 0.8357552236284975,
+      "test_binary_f1": 0.8244131455399061,
+      "test_accuracy": 0.8365384615384616,
+      "test_roc_auc": 0.8649634713380676,
+      "test_pr_auc": 0.8907025124974194
+    },
+    {
+      "n_features": 26,
+      "n_params": 74713,
+      "best_epoch": 9,
+      "test_macro_f1": 0.8014035533561479,
+      "test_binary_f1": 0.780456026058632,
+      "test_accuracy": 0.8036130536130536,
+      "test_roc_auc": 0.8580014880471,
+      "test_pr_auc": 0.9013948710946642
+    },
+    {
+      "n_features": 26,
+      "n_params": 74713,
+      "best_epoch": 16,
+      "test_macro_f1": 0.8215982197446947,
+      "test_binary_f1": 0.8085507701980509,
+      "test_accuracy": 0.8225524475524476,
+      "test_roc_auc": 0.8589775720315248,
+      "test_pr_auc": 0.9034096095154007
+    },
+    {
+      "n_features": 26,
+      "n_params": 74713,
+      "best_epoch": 18,
+      "test_macro_f1": 0.8153607560437199,
+      "test_binary_f1": 0.799489958559133,
+      "test_accuracy": 0.8167249417249417,
+      "test_roc_auc": 0.8560864361271957,
+      "test_pr_auc": 0.9021649623348574
+    },
+    {
+      "n_features": 26,
+      "n_params": 74713,
+      "best_epoch": 10,
+      "test_macro_f1": 0.8070791585273178,
+      "test_binary_f1": 0.7938692524241476,
+      "test_accuracy": 0.807983682983683,
+      "test_roc_auc": 0.8562008489019268,
+      "test_pr_auc": 0.9009785640242747
+    }
+  ],
+  "mean_f1m": 0.8162393822600755,
+  "std_f1m": 0.011952980428602994,
+  "mean_pr_auc": 0.8997301038933234,
+  "std_pr_auc": 0.004589004384348382,
+  "drop_idx": 6,
+  "drop_feature": "deadband",
+  "keep_idx": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+  ]
+}
