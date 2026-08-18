@@ -1,0 +1,235 @@
+{
+  "model": "TCN+SE 23-dim",
+  "tag": "v4_se_23dim_b64_ch32_do01_window16",
+  "n_features": 23,
+  "window": 16,
+  "channels": 32,
+  "dropout": 0.1,
+  "opset": 13,
+  "n_seeds": 5,
+  "per_seed": [
+    {
+      "seed": 42,
+      "ok": true,
+      "pt_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_b64_ch32_do01_window16_s42.pt",
+      "onnx_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_ch32_s42.onnx",
+      "n_params": 20877,
+      "onnx_size_kb": 87.9,
+      "export_time_s": 0.34,
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "verify": {
+        "skipped": false,
+        "n_samples": 200,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "torch_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "onnx_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "all_match_1e-5": true
+      },
+      "onnxsim": {
+        "applied": false,
+        "reason": "onnxsim not installed"
+      },
+      "test_metrics": {
+        "test_macro_f1": 0.8728200483646091,
+        "test_binary_f1": 0.8685955394816154,
+        "test_accuracy": 0.872960372960373,
+        "test_roc_auc": 0.8803124898909843,
+        "test_pr_auc": 0.9045763178054005
+      }
+    },
+    {
+      "seed": 123,
+      "ok": true,
+      "pt_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_b64_ch32_do01_window16_s123.pt",
+      "onnx_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_ch32_s123.onnx",
+      "n_params": 20877,
+      "onnx_size_kb": 87.9,
+      "export_time_s": 0.13,
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "verify": {
+        "skipped": false,
+        "n_samples": 200,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "torch_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "onnx_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "all_match_1e-5": true
+      },
+      "onnxsim": {
+        "applied": false,
+        "reason": "onnxsim not installed"
+      },
+      "test_metrics": {
+        "test_macro_f1": 0.8766283326286896,
+        "test_binary_f1": 0.872781954887218,
+        "test_accuracy": 0.8767482517482518,
+        "test_roc_auc": 0.9073542556614743,
+        "test_pr_auc": 0.9210923182685982
+      }
+    },
+    {
+      "seed": 456,
+      "ok": true,
+      "pt_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_b64_ch32_do01_window16_s456.pt",
+      "onnx_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_ch32_s456.onnx",
+      "n_params": 20877,
+      "onnx_size_kb": 87.9,
+      "export_time_s": 0.15,
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "verify": {
+        "skipped": false,
+        "n_samples": 200,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "torch_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "onnx_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "all_match_1e-5": true
+      },
+      "onnxsim": {
+        "applied": false,
+        "reason": "onnxsim not installed"
+      },
+      "test_metrics": {
+        "test_macro_f1": 0.8548791372712045,
+        "test_binary_f1": 0.8533568904593639,
+        "test_accuracy": 0.8548951048951049,
+        "test_roc_auc": 0.8816675661917062,
+        "test_pr_auc": 0.8950289722743535
+      }
+    },
+    {
+      "seed": 789,
+      "ok": true,
+      "pt_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_b64_ch32_do01_window16_s789.pt",
+      "onnx_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_ch32_s789.onnx",
+      "n_params": 20877,
+      "onnx_size_kb": 87.9,
+      "export_time_s": 0.15,
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "verify": {
+        "skipped": false,
+        "n_samples": 200,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "torch_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "onnx_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "all_match_1e-5": true
+      },
+      "onnxsim": {
+        "applied": false,
+        "reason": "onnxsim not installed"
+      },
+      "test_metrics": {
+        "test_macro_f1": 0.8593362249118377,
+        "test_binary_f1": 0.8537621359223301,
+        "test_accuracy": 0.8595571095571095,
+        "test_roc_auc": 0.9000105559405258,
+        "test_pr_auc": 0.9337205864944488
+      }
+    },
+    {
+      "seed": 1024,
+      "ok": true,
+      "pt_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_b64_ch32_do01_window16_s1024.pt",
+      "onnx_path": "C:\\work\\Claude\\Issue/model_v4_se_23dim_ch32_s1024.onnx",
+      "n_params": 20877,
+      "onnx_size_kb": 87.9,
+      "export_time_s": 0.15,
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "verify": {
+        "skipped": false,
+        "n_samples": 200,
+        "max_abs_diff": 0.0,
+        "mean_abs_diff": 0.0,
+        "torch_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "onnx_first_3": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "all_match_1e-5": true
+      },
+      "onnxsim": {
+        "applied": false,
+        "reason": "onnxsim not installed"
+      },
+      "test_metrics": {
+        "test_macro_f1": 0.8610026454314409,
+        "test_binary_f1": 0.8597471331961188,
+        "test_accuracy": 0.861013986013986,
+        "test_roc_auc": 0.895406633557335,
+        "test_pr_auc": 0.910354188462025
+      }
+    }
+  ],
+  "ensemble": {
+    "ensemble_size": 5,
+    "n_samples": 2000,
+    "prob_mean": 0.5226299166679382,
+    "prob_median": 0.2889639139175415,
+    "prob_high_risk_count": 850
+  },
+  "deployment_paths": {
+    "stm32cube_ai": "STM32CubeMX → X-CUBE-AI → Analyze 选 .onnx → Generate C",
+    "onnxruntime": "import onnxruntime; ort.InferenceSession(path, providers=['CPUExecutionProvider'])",
+    "tflite": "onnx-tf → TFLite (INT8 需 calib data); apt for mobile / edge TPU",
+    "torch_jit": "torch.onnx.export 已经保留 torch 兼容,可 torch.jit.load 重载"
+  }
+}
