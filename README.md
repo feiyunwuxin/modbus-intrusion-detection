@@ -88,6 +88,21 @@ python arff_modbus_simulator.py client --port 5020 --burst --n 50
 python modbus_scada_server.py demo --port 5020
 ```
 
+### 🖥️ GUI 串口工具 (可视化)
+
+```cmd
+REM Windows 推荐: 双击启动
+serial_tool_gui.bat
+
+REM 或命令行
+python serial_tool_gui.py
+```
+
+**依赖**: `pip install pyserial` (首次运行 bat 会自动检查并安装)
+
+**功能**: 选择串口/波特率收发 HEX/ASCII,一键启动 ARFF Server,内置 Modbus TCP 客户端 (FC=3/6/16)。
+详见下方章节 5。
+
 ---
 
 ## 📂 文件结构
@@ -96,12 +111,14 @@ python modbus_scada_server.py demo --port 5020
 C:\work\Claude\Issue\
 ├── 🐍 Python 核心
 │   ├── arff_modbus_simulator.py   # ⭐ ARFF 数据回放 Modbus 服务器 (新主路径)
+│   ├── serial_tool_gui.py         # 🖥️ GUI 串口工具 + Modbus 客户端 + ARFF 联动
 │   ├── modbus_scada_server.py     # 自仿真 Modbus 服务器 (兼容/教学, 600 行)
 │   ├── attack_injector.py         # 7 类攻击注入器 (937 行)
 │   └── arff_to_csv.py             # ARFF→CSV 转换工具
 │
 ├── 🪟 Windows 启动器 (.bat)
 │   ├── modbus_menu.bat            # ★ 推荐入口: 菜单式
+│   ├── serial_tool_gui.bat        # 🖥️ 一键启动 GUI 串口工具 (双击)
 │   ├── start_server.bat           # 启动服务器
 │   ├── start_client.bat           # 客户端测试
 │   └── start_demo.bat             # 一键演示
@@ -375,6 +392,93 @@ start_client.bat 127.0.0.1 5020 - 25         REM 写 setpoint=25
 start_demo.bat           REM 端口 5020
 start_demo.bat 5021      REM 端口 5021
 ```
+
+#### serial_tool_gui.bat 用法
+```cmd
+serial_tool_gui.bat      REM 双击启动,自动检查 + 安装 pyserial
+```
+
+---
+
+### 5. 🖥️ `serial_tool_gui.py` — GUI 串口 + Modbus 工具 (tkinter)
+
+#### 设计动机
+- 调试 MCU 串口输出时,不想每次都用命令行
+- 启动 ARFF Server 经常忘命令行参数
+- 想可视化看 Modbus 寄存器值随时间变化
+- 一站式: 串口收发 + ARFF Server 控制 + Modbus TCP 客户端
+
+#### 启动
+```cmd
+serial_tool_gui.bat      REM Windows 双击
+python serial_tool_gui.py REM 命令行
+```
+
+#### 依赖
+```bash
+pip install pyserial      # 唯一外部依赖 (bat 自动检查)
+```
+
+#### 5 个功能区
+
+```
+┌─ 串口设置 ───────────────────────────────────────────────────┐
+│ COM: [COM3 ▼]  波特: [115200 ▼]  数据位: [8▼]  停止: [1▼]   │
+│ 校验: [None ▼]  [连接] [断开] [刷新端口]                     │
+│ 显示: [✓] HEX  [✓] ASCII  [✓] 自动滚动                       │
+└──────────────────────────────────────────────────────────────┘
+┌─ Modbus / ARFF 联动 ─────────────────────────────────────────┐
+│ ARFF Server: [● 未启动] [启动] [停止]   端口: 5020 速率: 100x │
+│ Modbus 客户端: IP [127.0.0.1] Port [5020] [连接] [断开]       │
+│ FC [3▼] 起始 [0] 数量 [25] Unit [4] [发送请求]               │
+└──────────────────────────────────────────────────────────────┘
+┌─ 接收区 (HEX/ASCII) ─────────────────────────────────────────┐
+│ [REQ ] 00 01 00 00 00 06 04 03 00 00 00 19                  │
+│ [RESP] 00 01 00 00 00 13 04 03 10 00 0A 00 73 ...           │
+│ → 寄存器: [10, 115, 20, 50, 1, 0, 0, 1, 0, 0, 0, 124, ...] │
+└──────────────────────────────────────────────────────────────┘
+┌─ 发送区 (HEX 字符串) ────────────────────────────────────────┐
+│ [AA 01 02 03 ...] [发送] [清空]                              │
+│ [✓] 自动发送  间隔 [1000] ms                                 │
+└──────────────────────────────────────────────────────────────┘
+┌ 状态栏 ─────────────────────────────────────────────────────┐
+│ 串口: COM3 @ 115200 | Modbus: 127.0.0.1:5020 | RX: 1024 ...  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### 典型使用场景
+
+**场景 1: 调试 MCU 串口输出**
+```
+1. 选 COM 口 (MCU 插上 USB 后下拉会自动出现)
+2. 波特率选 115200
+3. 点 [连接]
+4. 接收区实时显示 MCU 输出 (HEX + ASCII)
+```
+
+**场景 2: ARFF Server + Modbus 客户端联动**
+```
+1. 点 [启动] → 弹出新窗口运行 arff_modbus_simulator.py start
+2. Modbus 客户端区填 IP/Port (默认 127.0.0.1:5020) → [连接]
+3. 选 FC=3,起始=0,数量=25 → [发送请求]
+4. 接收区显示 Modbus 响应 + 解析后的 25 个寄存器值
+```
+
+**场景 3: 自动周期发送**
+```
+1. 在发送区写 HEX 字符串 (如 AA 01 00 00 00 01 5A)
+2. 勾 [自动发送], 间隔填 100 (ms)
+3. 点 [发送] 开始循环发送
+4. 用于压力测试 MCU 串口接收
+```
+
+#### 验证 (2026-09-06)
+- ✅ tkinter 实例化无错 (920x760)
+- ✅ 串口扫描 3 个端口 (COM2 蓝牙 + COM5/6 ELTIMA 虚拟)
+- ✅ 波特率 11 个选项 (1200-921600)
+- ✅ ARFF Server 子进程启动/停止
+- ✅ Modbus FC=3 响应解析 (寄存器数组显示)
+- ✅ HEX/ASCII 双视图 + 自动滚动
 
 ---
 
