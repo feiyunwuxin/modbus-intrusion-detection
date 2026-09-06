@@ -323,6 +323,20 @@ class SerialToolApp:
         if not port_str or port_str.startswith("("):
             messagebox.showwarning("提示", "请先选择有效串口")
             return
+
+        # 检查串口是否真实存在
+        available = [p.device for p in serial.tools.list_ports.comports()]
+        if port_str not in available:
+            messagebox.showerror("串口不存在",
+                                f"{port_str} 不在系统可用串口列表中\n\n"
+                                f"当前可用: {', '.join(available) if available else '(无)'}\n\n"
+                                f"解决:\n"
+                                f"  1. 检查 USB 是否插好\n"
+                                f"  2. 设备管理器查看端口号是否变化\n"
+                                f"  3. 点击 [刷新端口] 重新扫描")
+            self.err_count += 1
+            return
+
         try:
             self.ser = serial.Serial(
                 port=port_str,
@@ -333,6 +347,34 @@ class SerialToolApp:
                 stopbits=float(self.stop_bits_var.get()),
                 timeout=0.1,
             )
+        except serial.SerialException as e:
+            # 解析常见错误并给出解决建议
+            err = str(e)
+            if "PermissionError" in err or "Access is denied" in err:
+                msg = (f"{port_str} 被其他程序占用!\n\n"
+                       f"常见占用者:\n"
+                       f"  • Arduino IDE 串口监视器 (最常见)\n"
+                       f"  • PlatformIO 串口监视器\n"
+                       f"  • PuTTY / XCOM / 串口调试助手\n"
+                       f"  • STM32CubeIDE / Keil 调试器\n"
+                       f"  • 上次未关闭的串口工具\n\n"
+                       f"解决步骤:\n"
+                       f"  1. 关闭 Arduino IDE 等工具的串口监视器\n"
+                       f"  2. 重新插入 USB 线\n"
+                       f"  3. 再次点击 [连接]\n\n"
+                       f"原始错误: {err}")
+            elif "FileNotFoundError" in err or "cannot find" in err.lower():
+                msg = (f"{port_str} 已被系统移除\n\n"
+                       f"可能原因: USB 设备刚拔出,或驱动异常\n\n"
+                       f"解决:\n"
+                       f"  1. 重新插入 USB\n"
+                       f"  2. 点击 [刷新端口]\n\n"
+                       f"原始错误: {err}")
+            else:
+                msg = f"无法打开 {port_str}:\n{err}"
+            messagebox.showerror("连接失败", msg)
+            self.err_count += 1
+            return
         except Exception as e:
             messagebox.showerror("连接失败", f"无法打开 {port_str}:\n{e}")
             self.err_count += 1
