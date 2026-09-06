@@ -1,13 +1,17 @@
 # Modbus SCADA 仿真 + 攻击注入 + MCU 部署
 
 > PC 端完整 SCADA 仿真栈 — 用于气管道入侵检测模型的训练、测试、部署验证
+>
+> ⭐ **新主路径**:`arff_modbus_simulator.py` — 直接回放 IanArffDataset.arff 真实数据 (274k 行,7 类攻击真实分布)
+>
+> ℹ️ **兼容路径**:`modbus_scada_server.py` — 自仿真工艺 + 注入式攻击 (适合协议教学,无需 ARFF)
 
 ---
 
 ## 🎯 项目目标
 
 为 **TCN+SE 23-dim 入侵检测模型**(详见项目历史: [[project-2026-07-26-daily-report]], [[project-tcn-v4-se]])提供:
-1. **真实 Modbus TCP 仿真服务器** — 完整模拟 IanArffDataset 气管道 SCADA 工艺
+1. ⭐ **ARFF 数据回放模拟器** — 直接从 IanArffDataset.arff 流式回放真实 SCADA Modbus 流量 (推荐)
 2. **7 类攻击注入器** — 复现 NMRI/CMRI/MSCI/MPCI/MFCI/DoS/Recon
 3. **MCU 推理接口** — 输出 (8, 23) 窗口 JSONL,直接对接 STM32H743 部署
 4. **PC 端 bit-perfect 验证** — 验证 C 推理代码与 PyTorch Python 一致
@@ -47,10 +51,26 @@ REM 3. 选 [3] 客户端测试
 REM 4. 完成!
 ```
 
-### 命令行用户
+### 命令行用户 — ARFF 真实数据回放 ⭐ 推荐
 
 ```bash
-# 终端 1: 启动服务器
+# 终端 1: 启动 ARFF 数据回放服务器 (默认 100x 压缩)
+python arff_modbus_simulator.py start --port 5020 --rate 100x
+
+# 终端 2: 客户端测试 — 读 25 个寄存器,看到真实压力/CRC/攻击分布
+python arff_modbus_simulator.py client --port 5020 --read 25 --n 30
+
+# 把 ARFF 导出为 JSONL (无需启动服务器)
+python arff_modbus_simulator.py dump --n 1000 --out scada_replay.jsonl
+
+# 把 ARFF 行翻译成 Modbus 二进制帧 (debug 用)
+python arff_modbus_simulator.py dump-frames --n 10
+```
+
+### 命令行用户 — 兼容路径 (工艺仿真)
+
+```bash
+# 终端 1: 启动自仿真服务器
 python modbus_scada_server.py start --port 5020
 
 # 终端 2: 客户端测试
@@ -60,8 +80,12 @@ python modbus_scada_server.py client --port 5020 --read 5
 ### 一键演示 (无需多终端)
 
 ```bash
+# ARFF 回放 demo (新)
+python arff_modbus_simulator.py start --port 5020 --rate 0  # burst
+python arff_modbus_simulator.py client --port 5020 --burst --n 50
+
+# 工艺仿真 demo (旧)
 python modbus_scada_server.py demo --port 5020
-# 自动: 启动服务器 + 3 次正常读 + 3 类攻击 + 最终状态
 ```
 
 ---
@@ -71,7 +95,8 @@ python modbus_scada_server.py demo --port 5020
 ```
 C:\work\Claude\Issue\
 ├── 🐍 Python 核心
-│   ├── modbus_scada_server.py     # Modbus TCP 服务器 + 客户端 (600 行)
+│   ├── arff_modbus_simulator.py   # ⭐ ARFF 数据回放 Modbus 服务器 (新主路径)
+│   ├── modbus_scada_server.py     # 自仿真 Modbus 服务器 (兼容/教学, 600 行)
 │   ├── attack_injector.py         # 7 类攻击注入器 (937 行)
 │   └── arff_to_csv.py             # ARFF→CSV 转换工具
 │
@@ -108,7 +133,83 @@ C:\work\Claude\Issue\
 
 ## 🔧 详细使用
 
-### 1. `modbus_scada_server.py` — Modbus TCP 服务器
+### 1. ⭐ `arff_modbus_simulator.py` — ARFF 数据回放 (推荐主路径)
+
+#### 设计动机
+- **真实数据驱动**:直接读取 IanArffDataset.arff (274,629 行,7 类攻击真实分布)
+- **协议级兼容**:与 modbus_scada_server.py 同一寄存器布局 (setpoint=0, pressure_x100=20, crc_rate=21, ...)
+- **节奏可控**:`--rate 1x` 实时回放 / `100x` 压缩 / `0` burst
+- **内存高效**:流式读取 CSV,内存峰值 < 1MB
+
+#### 启动服务器
+```bash
+# 默认 (100x 压缩, 循环回放)
+python arff_modbus_simulator.py start --port 5020
+
+# 实时回放 (按 ARFF time 字段真实间隔)
+python arff_modbus_simulator.py start --port 5020 --rate 1x
+
+# Burst 模式 (最快速度,忽略时间戳)
+python arff_modbus_simulator.py start --port 5020 --rate 0
+
+# 一次性播放 (到末尾停止)
+python arff_modbus_simulator.py start --port 5020 --no-loop
+```
+
+#### 客户端测试
+```bash
+# 读 25 个寄存器 (覆盖所有字段)
+python arff_modbus_simulator.py client --port 5020 --read 25 --n 30
+
+# burst 模式快速抓 1000 个样本
+python arff_modbus_simulator.py client --port 5020 --read 8 --burst --n 1000
+
+# 远程连接
+python arff_modbus_simulator.py client --host 192.168.1.100 --port 5020 --read 25
+```
+
+#### 数据导出 (无需启动服务器)
+```bash
+# ARFF → JSONL (含 regs 字段,直接做特征工程)
+python arff_modbus_simulator.py dump --n 1000 --out scada_replay.jsonl
+
+# ARFF → Modbus 二进制帧 (debug / Wireshark)
+python arff_modbus_simulator.py dump-frames --n 10 --out frames.bin
+```
+
+#### ARFF → Modbus 字段映射
+
+| ARFF 列 idx | 字段 | Modbus 寄存器 | 缩放 |
+|---|---|---|---|
+| 0 | address | (Unit ID) | =4 |
+| 1 | function | (FC) | 3/6/16/43/171 |
+| 2 | length | (Payload 字节) | - |
+| 3 | setpoint | Holding 0 | ×1 |
+| 4 | gain | Holding 1 | ×1 |
+| 5 | reset rate | Holding 2 | ×100 |
+| 6 | deadband | Holding 3 | ×100 |
+| 7 | cycle time | Holding 4 | ×1 |
+| 8 | rate | Holding 5 | ×100 |
+| 9 | system mode | Holding 6 | - |
+| 10 | control scheme | Holding 7 | - |
+| 11 | pump | Holding 8 | 0/1 |
+| 12 | solenoid | Holding 9 | 0/1 |
+| 13 | pressure measurement | Holding 20 | ×100 |
+| 14 | crc rate | Holding 21 | - |
+| 15 | command response | Holding 22 | 0/1 |
+| 16 | time | (回放节奏) | Unix s |
+| 17/18/19 | result | (攻击标签) | Normal/NMRI/... |
+
+#### 验证结果 (2026-09-06)
+- ✅ 寄存器值 100% 对齐 (压力 124/123 是 1.23958 浮点 round 误差)
+- ✅ 攻击标签完整传递 (NMRI/CMRI/MSCI/MPCI/MFCI/DoS/Recon 7 类)
+- ✅ Illegal FC=43/171 → Modbus Exception 0x83/0x01
+- ✅ FC=3/6/16 协议级兼容
+- ✅ 230+ req/s (burst 模式)
+
+---
+
+### 2. `modbus_scada_server.py` — 自仿真 Modbus 服务器 (兼容/教学)
 
 #### 启动服务器
 ```bash
@@ -184,7 +285,7 @@ client.close()
 
 ---
 
-### 2. `attack_injector.py` — 攻击注入器
+### 3. `attack_injector.py` — 攻击注入器
 
 #### 7 类攻击 (与 IanArffDataset categorized result 对齐)
 
@@ -234,7 +335,7 @@ python attack_injector.py infer \
 
 ---
 
-### 3. Windows .bat 启动器
+### 4. Windows .bat 启动器
 
 #### modbus_menu.bat (推荐入口)
 
