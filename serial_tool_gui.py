@@ -272,14 +272,22 @@ class SerialToolApp:
         self.rx_text.tag_config("rx_info", foreground="#808080")
 
         # === 第 4 区: 发送区 ===
-        tx_frame = ttk.LabelFrame(main, text=" 发送区 (HEX 字符串, 如 AA 01 02 03) ", padding=4)
-        tx_frame.pack(fill=tk.X, pady=(0, 6))
-        self.tx_text = tk.Text(tx_frame, height=3, font=("Consolas", 9),
+        self.tx_frame = ttk.LabelFrame(main, text=" 发送区 (HEX 字符串, 如 AA 01 02 03) ", padding=4)
+        self.tx_frame.pack(fill=tk.X, pady=(0, 6))
+        self.tx_text = tk.Text(self.tx_frame, height=3, font=("Consolas", 9),
                                 bg="#2d2d2d", fg="#d4d4d4", insertbackground="white")
         self.tx_text.pack(fill=tk.X, expand=True)
 
-        tx_btn_frame = ttk.Frame(tx_frame)
+        tx_btn_frame = ttk.Frame(self.tx_frame)
         tx_btn_frame.pack(fill=tk.X, pady=(4, 0))
+
+        # 发送模式单选 (HEX / ASCII)
+        self.tx_mode_var = tk.StringVar(value="HEX")
+        ttk.Radiobutton(tx_btn_frame, text="HEX", variable=self.tx_mode_var,
+                        value="HEX", command=self._on_tx_mode_change).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Radiobutton(tx_btn_frame, text="ASCII", variable=self.tx_mode_var,
+                        value="ASCII", command=self._on_tx_mode_change).pack(side=tk.LEFT, padx=(0, 12))
+
         ttk.Button(tx_btn_frame, text="发送", width=8, command=self._on_send).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(tx_btn_frame, text="清空发送区", width=10,
                    command=lambda: self.tx_text.delete("1.0", tk.END)).pack(side=tk.LEFT, padx=(0, 12))
@@ -569,21 +577,41 @@ class SerialToolApp:
         if not self.ser or not self.ser.is_open:
             messagebox.showwarning("提示", "请先连接串口")
             return
-        text = self.tx_text.get("1.0", tk.END).strip()
-        if not text:
+        text = self.tx_text.get("1.0", tk.END)
+        # 保留末尾换行符 (ASCII 模式发送多行命令时有用)
+        if not text or text == "\n":
             return
+        mode = self.tx_mode_var.get()
         try:
-            data = hex_str_to_bytes(text)
+            if mode == "HEX":
+                # HEX 模式: 去掉空白, 解析为字节
+                data = hex_str_to_bytes(text.strip())
+            else:
+                # ASCII 模式: 直接编码 (latin-1 是单字节无歧义编码, 调试首选)
+                data = text.encode("latin-1", errors="replace")
         except ValueError as e:
             messagebox.showerror("HEX 解析错误", str(e))
             return
         try:
             self.ser.write(data)
             self.tx_count += len(data)
-            self._rx_append(f"[TX  ] {bytes_to_hex_str(data)}\n", "rx_serial")
+            if mode == "HEX":
+                self._rx_append(f"[TX HEX  ] {bytes_to_hex_str(data)}\n", "rx_serial")
+            else:
+                # ASCII 模式: 同时显示 HEX 和 ASCII 便于核对
+                self._rx_append(f"[TX ASCII] {bytes_to_ascii_str(data)}\n", "rx_serial")
+                self._rx_append(f"           {bytes_to_hex_str(data)}\n", "rx_serial")
         except Exception as e:
             self._rx_append(f"[TX ERR] {e}\n", "rx_err")
             self.err_count += 1
+
+    def _on_tx_mode_change(self):
+        """发送模式切换: 更新 LabelFrame 标题提示输入格式."""
+        mode = self.tx_mode_var.get()
+        if mode == "HEX":
+            self.tx_frame.config(text=" 发送区 (HEX 字符串, 如 AA 01 02 03) ")
+        else:
+            self.tx_frame.config(text=" 发送区 (ASCII 文本, 直接输入字符) ")
 
     def _toggle_auto_send(self):
         if self.auto_send_var.get():
