@@ -31,7 +31,7 @@ import struct
 import socket
 import threading
 import subprocess
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 
 # ───────────────────────────────────────────────────────────────────
 # 依赖检查
@@ -50,6 +50,16 @@ try:
 except ImportError:
     # 不立即退出, 让 GUI 起来后再提示
     serial = None
+
+try:
+    import matplotlib
+    matplotlib.use("TkAgg")  # 强制使用 TkAgg 后端,避免与 tkinter 冲突
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+except ImportError:
+    matplotlib = None
+    Figure = None
+    FigureCanvasTkAgg = None
 
 # ───────────────────────────────────────────────────────────────────
 # 常量
@@ -260,8 +270,8 @@ class SerialToolApp:
 
         # === 第 3 区: 接收区 ===
         rx_frame = ttk.LabelFrame(main, text=" 接收区 (串口 + Modbus) ", padding=4)
-        rx_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 6))
-        self.rx_text = scrolledtext.ScrolledText(rx_frame, wrap=tk.NONE, height=12,
+        rx_frame.pack(fill=tk.X, expand=False, pady=(0, 6))
+        self.rx_text = scrolledtext.ScrolledText(rx_frame, wrap=tk.NONE, height=6,
                                                   font=("Consolas", 9), bg="#1e1e1e",
                                                   fg="#d4d4d4", insertbackground="white")
         self.rx_text.pack(fill=tk.BOTH, expand=True)
@@ -270,6 +280,59 @@ class SerialToolApp:
         self.rx_text.tag_config("rx_mb_resp", foreground="#b5cea8")
         self.rx_text.tag_config("rx_err", foreground="#f48771")
         self.rx_text.tag_config("rx_info", foreground="#808080")
+
+        # === 第 4 区: Modbus 寄存器曲线 (matplotlib) ===
+        plot_frame = ttk.LabelFrame(main, text=" Modbus 寄存器曲线 ", padding=4)
+        plot_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 6))
+
+        # 通道选择行
+        plot_ctrl = ttk.Frame(plot_frame)
+        plot_ctrl.pack(fill=tk.X, pady=(0, 4))
+        ttk.Label(plot_ctrl, text="通道:").pack(side=tk.LEFT, padx=(0, 4))
+        # 常用 8 个寄存器 (setpoint/gain/reset_rate/deadband/cycle_time/rate/system_mode/control_scheme)
+        # + 4 个传感器 (pressure_x100/crc_rate/cmd_response/flow_x100)
+        self.plot_channels = {
+            0: ("setpoint", tk.BooleanVar(value=True)),
+            1: ("gain", tk.BooleanVar(value=False)),
+            20: ("pressure×100", tk.BooleanVar(value=True)),
+            21: ("crc_rate", tk.BooleanVar(value=False)),
+            22: ("cmd_resp", tk.BooleanVar(value=False)),
+        }
+        for idx, (name, var) in self.plot_channels.items():
+            ttk.Checkbutton(plot_ctrl, text=f"[{idx}] {name}", variable=var,
+                            command=self._update_plot_visibility).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(plot_ctrl, text="清空", width=6,
+                   command=self._clear_plot).pack(side=tk.LEFT, padx=(4, 4))
+        self.plot_paused_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(plot_ctrl, text="暂停", variable=self.plot_paused_var).pack(side=tk.LEFT, padx=(0, 8))
+        self.plot_info_var = tk.StringVar(value="点: 0 / 缓存: 200")
+        ttk.Label(plot_ctrl, textvariable=self.plot_info_var, foreground="grey").pack(side=tk.RIGHT)
+
+        # matplotlib 画布
+        if matplotlib is not None:
+            self.plot_fig = Figure(figsize=(8, 2.5), dpi=100, facecolor="#2d2d2d")
+            self.plot_ax = self.plot_fig.add_subplot(111)
+            self.plot_ax.set_facecolor("#1e1e1e")
+            self.plot_ax.set_xlabel("请求序号", color="#d4d4d4", fontsize=9)
+            self.plot_ax.set_ylabel("寄存器值", color="#d4d4d4", fontsize=9)
+            self.plot_ax.tick_params(colors="#d4d4d4", labelsize=8)
+            for spine in self.plot_ax.spines.values():
+                spine.set_color("#555555")
+            self.plot_ax.grid(True, alpha=0.3, color="#555555")
+            self.plot_fig.tight_layout()
+            self.plot_canvas = FigureCanvasTkAgg(self.plot_fig, master=plot_frame)
+            self.plot_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            # 数据缓存
+            self.plot_data: Dict[int, List[Tuple[int, int]]] = {idx: [] for idx in self.plot_channels}
+            self.plot_lines: Dict[int, "matplotlib.lines.Line2D"] = {}
+            self.plot_max_points = 200
+            # _init_plot_lines 会同时初始化 self.plot_legend
+            self._init_plot_lines()
+        else:
+            ttk.Label(plot_frame,
+                      text="(matplotlib 未安装, 无法显示曲线)\n安装: pip install matplotlib",
+                      foreground="grey", justify=tk.CENTER).pack(fill=tk.BOTH, expand=True)
+            self.plot_fig = None
 
         # === 第 4 区: 发送区 ===
         self.tx_frame = ttk.LabelFrame(main, text=" 发送区 (HEX 字符串, 如 AA 01 02 03) ", padding=4)
@@ -558,6 +621,8 @@ class SerialToolApp:
                                                       MBAP_HEADER_LEN + 2 + i * 2 + 2])[0]
                         regs.append(v)
                     self._rx_append(f"  → 寄存器: {regs}\n", "rx_mb_resp")
+                    # 把这次请求的寄存器值喂给曲线图 (内部会检查暂停/None)
+                    self._on_plot_update(regs)
                 elif resp_fc == FC_WRITE_SINGLE:
                     addr, val = struct.unpack(">HH", resp[MBAP_HEADER_LEN + 1:
                                                           MBAP_HEADER_LEN + 5])
@@ -649,6 +714,87 @@ class SerialToolApp:
         except queue.Empty:
             pass
         self.root.after(100, self._poll_rx_queue)
+
+    # ────────────────────────────────────────────────────────────
+    # Modbus 寄存器曲线 (matplotlib)
+    # ────────────────────────────────────────────────────────────
+    def _init_plot_lines(self):
+        """初始化每条通道的 Line2D, 默认隐藏 (visible=False)."""
+        if self.plot_fig is None:
+            return
+        # 通道颜色循环
+        colors = ["#569cd6", "#ce9178", "#b5cea8", "#dcdcaa", "#c586c0",
+                  "#9cdcfe", "#f48771", "#808080"]
+        for i, idx in enumerate(self.plot_channels.keys()):
+            color = colors[i % len(colors)]
+            line, = self.plot_ax.plot([], [], color=color, linewidth=1.5,
+                                       label=f"[{idx}] {self.plot_channels[idx][0]}")
+            self.plot_lines[idx] = line
+        # 缓存 legend handle 避免多次调用 _update_plot_visibility 时叠加
+        self.plot_legend = self.plot_ax.legend(loc="upper right", fontsize=8,
+                                                facecolor="#2d2d2d",
+                                                edgecolor="#555555",
+                                                labelcolor="#d4d4d4")
+        self.plot_canvas.draw_idle()
+
+    def _update_plot_visibility(self):
+        """根据复选框状态切换曲线显示."""
+        if self.plot_fig is None:
+            return
+        for idx, line in self.plot_lines.items():
+            line.set_visible(self.plot_channels[idx][1].get())
+        # 先移除旧 legend, 避免多次调用叠加 (matplotlib ax.legend 不会自动 remove)
+        if self.plot_legend is not None:
+            try:
+                self.plot_legend.remove()
+            except Exception:
+                pass
+            self.plot_legend = self.plot_ax.legend(loc="upper right", fontsize=8,
+                                                    facecolor="#2d2d2d",
+                                                    edgecolor="#555555",
+                                                    labelcolor="#d4d4d4")
+        self.plot_canvas.draw_idle()
+
+    def _on_plot_update(self, regs: List[int]):
+        """Modbus 请求成功后调用, 把寄存器值加入各通道数据."""
+        if self.plot_fig is None or self.plot_paused_var.get():
+            return
+        # 当前请求序号作为 X
+        if not hasattr(self, "_plot_x_counter"):
+            self._plot_x_counter = 0
+        self._plot_x_counter += 1
+        x = self._plot_x_counter
+        for idx in self.plot_channels:
+            if idx < len(regs):
+                self.plot_data[idx].append((x, regs[idx]))
+                # 限制缓存
+                if len(self.plot_data[idx]) > self.plot_max_points:
+                    self.plot_data[idx].pop(0)
+        # 重绘
+        for idx, line in self.plot_lines.items():
+            if self.plot_data[idx]:
+                xs, ys = zip(*self.plot_data[idx])
+                line.set_data(xs, ys)
+        # 自动缩放
+        self.plot_ax.relim()
+        self.plot_ax.autoscale_view()
+        # 更新信息
+        max_pts = max((len(d) for d in self.plot_data.values()), default=0)
+        self.plot_info_var.set(f"点: {max_pts} / 缓存: {self.plot_max_points} | 序号: {x}")
+        self.plot_canvas.draw_idle()
+
+    def _clear_plot(self):
+        """清空所有曲线数据."""
+        if self.plot_fig is None:
+            return
+        for idx in self.plot_data:
+            self.plot_data[idx].clear()
+            self.plot_lines[idx].set_data([], [])
+        self._plot_x_counter = 0
+        self.plot_ax.relim()
+        self.plot_ax.autoscale_view()
+        self.plot_info_var.set("点: 0 / 缓存: 200 | (已清空)")
+        self.plot_canvas.draw_idle()
 
     def _append_data(self, data: bytes, tag: str):
         if self.show_hex.get():

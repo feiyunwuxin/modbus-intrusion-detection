@@ -51,6 +51,19 @@ if errorlevel 1 (
     )
 )
 
+REM 检查 matplotlib (曲线图功能依赖)
+python -c "import matplotlib" > nul 2>&1
+if errorlevel 1 (
+    echo [提示] matplotlib 未安装,正在安装...
+    pip install matplotlib
+    if errorlevel 1 (
+        echo [错误] matplotlib 安装失败,曲线图功能不可用
+        echo 手动安装: pip install matplotlib
+        pause
+        exit /b 1
+    )
+)
+
 REM 启动 GUI
 echo 启动 GUI...
 echo.
