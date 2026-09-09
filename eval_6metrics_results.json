@@ -1,0 +1,134 @@
+{
+  "per_seed": {
+    "42": {
+      "metrics": {
+        "Accuracy": 0.8715034965034965,
+        "Precision": 0.9504623513870541,
+        "Recall": 0.7972299168975069,
+        "F1-Score": 0.8671286532087978
+      },
+      "pt_file_size_bytes": 85092,
+      "pt_file_size_kb": 83.1,
+      "onnx_file_size_bytes": 90014,
+      "onnx_file_size_kb": 87.9,
+      "quant_data_size_bytes": 26084,
+      "quant_data_size_kb": 25.47,
+      "quant_file_size_kb": 152.59,
+      "n_params": 21267,
+      "quant_n_params": 20825,
+      "infer_time_pt_ms": 0.7457094998881075,
+      "infer_time_onnx_ms": 0.05935649997809378,
+      "infer_time_onnx_p95_ms": 0.07890500046414672,
+      "throughput_per_s": 16847.35455037042
+    },
+    "123": {
+      "metrics": {
+        "Accuracy": 0.8784965034965035,
+        "Precision": 0.9535947712418301,
+        "Recall": 0.8083102493074792,
+        "F1-Score": 0.8749625187406297
+      },
+      "pt_file_size_bytes": 85092,
+      "pt_file_size_kb": 83.1,
+      "onnx_file_size_bytes": 90014,
+      "onnx_file_size_kb": 87.9,
+      "quant_data_size_bytes": 26084,
+      "quant_data_size_kb": 25.47,
+      "quant_file_size_kb": 152.58,
+      "n_params": 21267,
+      "quant_n_params": 20825,
+      "infer_time_pt_ms": 0.798689499943066,
+      "infer_time_onnx_ms": 0.07129250002435583,
+      "infer_time_onnx_p95_ms": 0.08082999975158596,
+      "throughput_per_s": 14026.720898528843
+    },
+    "456": {
+      "metrics": {
+        "Accuracy": 0.8650932400932401,
+        "Precision": 0.9491298527443106,
+        "Recall": 0.785595567867036,
+        "F1-Score": 0.859654440739618
+      },
+      "pt_file_size_bytes": 85092,
+      "pt_file_size_kb": 83.1,
+      "onnx_file_size_bytes": 90014,
+      "onnx_file_size_kb": 87.9,
+      "quant_data_size_bytes": 26084,
+      "quant_data_size_kb": 25.47,
+      "quant_file_size_kb": 152.6,
+      "n_params": 21267,
+      "quant_n_params": 20825,
+      "infer_time_pt_ms": 0.9935104999749456,
+      "infer_time_onnx_ms": 0.07698299998082803,
+      "infer_time_onnx_p95_ms": 0.0944500003242865,
+      "throughput_per_s": 12989.880886027326
+    },
+    "789": {
+      "metrics": {
+        "Accuracy": 0.8569347319347319,
+        "Precision": 0.9620253164556962,
+        "Recall": 0.7578947368421053,
+        "F1-Score": 0.847846296870158
+      },
+      "pt_file_size_bytes": 85092,
+      "pt_file_size_kb": 83.1,
+      "onnx_file_size_bytes": 90014,
+      "onnx_file_size_kb": 87.9,
+      "quant_data_size_bytes": 26084,
+      "quant_data_size_kb": 25.47,
+      "quant_file_size_kb": 152.56,
+      "n_params": 21267,
+      "quant_n_params": 20825,
+      "infer_time_pt_ms": 0.7023134998962632,
+      "infer_time_onnx_ms": 0.05025350005780638,
+      "infer_time_onnx_p95_ms": 0.051205000636400655,
+      "throughput_per_s": 19899.111481781456
+    },
+    "1024": {
+      "metrics": {
+        "Accuracy": 0.8630536130536131,
+        "Precision": 0.9359895493141738,
+        "Recall": 0.7939058171745152,
+        "F1-Score": 0.8591127098321343
+      },
+      "pt_file_size_bytes": 85092,
+      "pt_file_size_kb": 83.1,
+      "onnx_file_size_bytes": 90014,
+      "onnx_file_size_kb": 87.9,
+      "quant_data_size_bytes": 26084,
+      "quant_data_size_kb": 25.47,
+      "quant_file_size_kb": 152.57,
+      "n_params": 21267,
+      "quant_n_params": 20825,
+      "infer_time_pt_ms": 0.8635785001024487,
+      "infer_time_onnx_ms": 0.06432749999476073,
+      "infer_time_onnx_p95_ms": 0.07873999902585636,
+      "throughput_per_s": 15545.451013663625
+    }
+  },
+  "ensemble": {
+    "metrics_t05": {
+      "Accuracy": 0.8761655011655012,
+      "Precision": 0.9593874833555259,
+      "Recall": 0.7983379501385042,
+      "F1-Score": 0.8714847293619595
+    },
+    "metrics_t047": {
+      "Accuracy": 0.8782051282051282,
+      "Precision": 0.9571522742254449,
+      "Recall": 0.804432132963989,
+      "F1-Score": 0.8741721854304636
+    },
+    "infer_time_5models_ms": 0.268385000017588,
+    "infer_time_per_model_ms": 0.053677000003517605,
+    "total_onnx_size_kb": 439.52,
+    "avg_single_onnx_size_kb": 87.9
+  },
+  "model_files": {},
+  "quantized": {
+    "avg_data_size_kb": 25.47,
+    "total_5model_data_kb": 127.36,
+    "avg_n_params": 20825.0,
+    "compression_ratio_vs_fp32_onnx": 3.45
+  }
+}

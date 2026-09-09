@@ -1,0 +1,19 @@
+{
+  "platform": "STM32F407",
+  "cpu": "Cortex-M4 @ 168 MHz",
+  "fpu": "Yes (HW float)",
+  "voltage_v": 3.3,
+  "active_current_ma": 50,
+  "sleep_current_ma": 0.01,
+  "inference_single_ms": 0.9,
+  "inference_5seed_ms": 7.5,
+  "flash_kb": 30,
+  "ram_kb": 86,
+  "model_size_int8_kb": 25.5,
+  "energy_per_infer_mj": 0.1485,
+  "energy_per_infer_uj": 148.5,
+  "throughput_single_per_s": 1111.111111111111,
+  "throughput_5seed_per_s": 133.33333333333334,
+  "energy_efficiency_samples_per_s_per_mA": 22.22222222222222,
+  "joules_per_infer": 0.0001485
+}
