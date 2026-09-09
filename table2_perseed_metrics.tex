@@ -1,0 +1,36 @@
+% =====================================================================
+% Table 2: Per-seed detailed metrics + ensemble
+% =====================================================================
+
+\begin{table}[htbp]
+\centering
+\caption{Per-seed detailed classification metrics of the TCN+SE
+23-dim 5-seed ensemble on the SCADA test set ($n=3{,}432$).
+The ensemble row reports the probability-averaged 5-model inference at
+both the default threshold ($\tau=0.5$) and the tuned threshold
+($\tau^{*}=0.47$). Confusion matrices are reported as
+$[\text{TN}, \text{FP}; \text{FN}, \text{TP}]$ with class label 1 denoting Attack.}
+\label{tab:per-seed}
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.05}
+\scriptsize
+\begin{tabular}{r c c c c c c c}
+\hline\hline
+\textbf{Seed} & \textbf{F1m} & \textbf{BinF1} & \textbf{Acc} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Att.~R/P} & \textbf{Nor.~R/P} \\
+\hline
+42      & 0.8728 & 0.8686 & 0.8730 & 0.8803 & 0.9046 & 0.7983 / 0.9524 & 0.9557 / 0.8103 \\
+123     & \textbf{0.8766} & \textbf{0.8728} & 0.8767 & \textbf{0.9074} & 0.9211 & 0.8039 / 0.9546 & 0.9576 / 0.8149 \\
+456     & 0.8549 & 0.8534 & 0.8549 & 0.8817 & 0.8950 & 0.8028 / 0.9107 & 0.9127 / 0.8066 \\
+789     & 0.8593 & 0.8538 & 0.8596 & 0.9000 & \textbf{0.9337} & 0.7795 / 0.9437 & 0.9484 / 0.7950 \\
+1024    & 0.8610 & 0.8597 & 0.8610 & 0.8954 & 0.9104 & 0.8100 / 0.9160 & 0.9176 / 0.8132 \\
+\hline
+\multicolumn{8}{l}{\textit{5-seed ensemble (probability-averaged)}} \\
+$\tau=0.5$   & \textbf{0.8775} & 0.8737 & \textbf{0.8776} & 0.9048 & \textbf{0.9363} & 0.8050 / 0.9553 & 0.9582 / 0.8158 \\
+$\tau^*=0.47$ & \textbf{0.8799} & \textbf{0.8766} & \textbf{0.8800} & 0.9048 & 0.9363 & 0.8105 / 0.9543 & 0.9570 / 0.8199 \\
+\hline
+\multicolumn{8}{l}{\textit{Confusion matrices (rows: $\tau=0.5$ / $\tau^*=0.47$):}} \\
+Ensemble $\tau=0.5$  & \multicolumn{7}{l}{$[[1559,\ 68],\ [352,\ 1453]]$} \\
+Ensemble $\tau^*=0.47$ & \multicolumn{7}{l}{$[[1557,\ 70],\ [342,\ 1463]]$} \\
+\hline\hline
+\end{tabular}
+\end{table}

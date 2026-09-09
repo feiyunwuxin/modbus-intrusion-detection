@@ -1,0 +1,39 @@
+% =====================================================================
+% Table 3: Operational / business metrics
+% =====================================================================
+
+\begin{table}[htbp]
+\centering
+\caption{Operational metrics derived from the 5-seed ensemble predictions
+on the SCADA test set ($n=3{,}432$).
+\emph{Miss rate} = 1 $-$ Attack Recall (proportion of attacks missed),
+\emph{False alarm rate} = 1 $-$ Attack Precision (proportion of alarms that are
+false). The tuned threshold ($\tau^*=0.47$) provides the best
+Macro-F1 trade-off; for a deployment scenario with higher penalty on missed
+attacks, $\tau$ should be lowered further (see Section~\ref{sec:thr-analysis}).}
+\label{tab:ops-metrics}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.15}
+\small
+\begin{tabular}{l c c}
+\hline\hline
+\textbf{Operational Metric} & $\boldsymbol{\tau=0.5}$ & $\boldsymbol{\tau^*=0.47}$ \\
+\hline
+Attack Recall (detection rate)    & 0.8050 & 0.8105 \\
+Attack Precision (alarm fidelity) & 0.9553 & 0.9543 \\
+Normal Recall (no false alarm)    & 0.9582 & 0.9570 \\
+Normal Precision                  & 0.8158 & 0.8199 \\
+\hline
+Miss rate ($1 - \text{Att.~R}$)                       & 0.1950 & 0.1895 \\
+False alarm rate ($1 - \text{Att.~P}$)                 & 0.0447 & 0.0457 \\
+Matthews Correlation Coefficient (MCC)                 & 0.7671 & 0.7709 \\
+Bookmaker Informedness (BM)                           & 0.7632 & 0.7675 \\
+\hline
+\multicolumn{3}{l}{\textit{Confusion matrix (Normal / Attack):}} \\
+True Negatives  (TN)             & 1559 & 1557 \\
+False Positives (FP)             & 68   & 70   \\
+False Negatives (FN)             & 352  & 342  \\
+True Positives  (TP)             & 1453 & 1463 \\
+\hline\hline
+\end{tabular}
+\end{table}

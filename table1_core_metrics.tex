@@ -1,0 +1,44 @@
+% =====================================================================
+% Table 1: Core metrics of current model vs prior best
+% Style: IEEE / ACM double-column
+% Caption: 5 个核心分类指标在当前最佳模型与历史冠军上的对比
+% =====================================================================
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of core classification metrics on the SCADA Gas-Pipeline test set.
+The current best model is the 5-seed probability-averaged ensemble of
+TCN+SE (23 features, 32 channels, dropout 0.1).
+The best threshold ($\tau^*=0.47$) is selected by grid search on the
+validation set to maximize Macro-F1.
+Metrics are reported at the default threshold ($\tau=0.5$) for reproducibility.
+\textbf{Bold} marks the best value in each column.}
+\label{tab:core-metrics}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\footnotesize
+\begin{tabular}{l c c c c c}
+\hline\hline
+\textbf{Model} & \textbf{F1m} & \textbf{BinF1} & \textbf{Acc} & \textbf{ROC-AUC} & \textbf{PR-AUC} \\
+\hline
+\multicolumn{6}{l}{\textit{Current best (5-seed ensemble)}} \\
+\quad 23-dim, $\tau=0.5$              & \textbf{0.8775} & \textbf{0.8737} & \textbf{0.8776} & 0.9048 & \textbf{0.9363} \\
+\quad 23-dim, $\tau^{*}=0.47$         & \textbf{0.8799} & \textbf{0.8766} & \textbf{0.8800} & 0.9048 & \textbf{0.9363} \\
+\hline
+\multicolumn{6}{l}{\textit{Single-seed mean (5 seeds, $\tau=0.5$)}} \\
+\quad Mean $\pm$ std                  & 0.8649 $\pm$ 0.0077 & 0.8616 $\pm$ 0.0074 & 0.8650 $\pm$ 0.0077 & 0.8930 $\pm$ 0.0110 & 0.9130 $\pm$ 0.0138 \\
+\quad Best single (seed 123)          & 0.8766 & 0.8728 & 0.8767 & \textbf{0.9074} & 0.9211 \\
+\hline
+\multicolumn{6}{l}{\textit{Prior best (cross-model leaderboard)}} \\
+\quad TCN+SE ch=64 5-seed ensemble \cite{leaderboard2026}  & 0.8735 & 0.8711 & 0.8735 & 0.9067 & 0.9269 \\
+\quad ENSEMBLE\_v4 stacking (10 models)                    & 0.8481 & 0.7577 & 0.9018 & 0.9248 & 0.8473 \\
+\quad TCN+SE single (ch=64, B=64)                           & 0.8732 & 0.8654 & 0.8736 & 0.9021 & 0.9159 \\
+\quad CNN-LSTM single (window=8)                            & 0.8296 & 0.8071 & 0.8326 & ---     & ---     \\
+\quad LGB baseline (19-dim)                                & 0.7630 & 0.6500 & 0.7810 & ---     & ---     \\
+\hline
+\multicolumn{6}{l}{\textit{Degenerate baselines (sanity check)}} \\
+\quad Always predict Normal                              & 0.3900 & 0.0000 & 0.4740 & 0.5000 & 0.5260 \\
+\quad Always predict Attack                              & 0.1500 & 0.3500 & 0.5260 & 0.5000 & 0.5260 \\
+\hline\hline
+\end{tabular}
+\end{table}
