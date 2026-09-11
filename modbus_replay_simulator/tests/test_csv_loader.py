@@ -1,6 +1,5 @@
 import os
 import tempfile
-import pandas as pd
 import pytest
 from modbus_replay.csv_loader import load_rows, RowCount
 
@@ -36,7 +35,10 @@ def test_load_rows_returns_list_of_dicts():
         out = load_rows(path)
         assert len(out) == 2
         assert out[0]["address"] == 4
+        # typing policy: numeric cols (numeric_cols set) land as float
+        assert isinstance(out[0]["address"], float)
         assert out[0]["command response"] == 1
+        assert isinstance(out[0]["command response"], int)
         assert out[0]["pressure measurement"] == "?"   # NOT converted to NaN
         assert out[1]["pressure measurement"] == pytest.approx(0.689655)
     finally:

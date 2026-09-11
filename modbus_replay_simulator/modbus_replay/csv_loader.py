@@ -9,6 +9,7 @@ and encode it as zero-equivalent values.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 import pandas as pd
@@ -43,14 +44,12 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
         raise ValueError(f"CSV missing required columns: {sorted(missing)}")
 
     # Convert the columns that are known to be numeric to float/int.
-    # We keep them as float for `?` detection (NaN) but preserve strings
-    # by re-checking.
-    numeric_cols = {
+    # `numeric_cols` and `float_cols` both route to float() because int()
+    # would reject values like "4.0" that appear in some rows.
+    float_cols = {
         "address", "function", "length",
         "system mode", "control scheme", "pump", "solenoid",
         "crc rate",
-    }
-    float_cols = {
         "setpoint", "gain", "reset rate", "deadband",
         "cycle time", "rate",
         "pressure measurement",
@@ -62,14 +61,14 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
         row: dict[str, Any] = {}
         for col in REQUIRED_COLUMNS:
             v = raw[col]
-            if v == "?" or v is None:
+            if v is None or (isinstance(v, float) and math.isnan(v)) or v == "?":
                 row[col] = "?"   # sentinel
             elif col in int_cols:
                 try:
                     row[col] = int(v)
                 except ValueError:
                     row[col] = float(v)
-            elif col in float_cols or col in numeric_cols:
+            elif col in float_cols:
                 try:
                     row[col] = float(v)
                 except ValueError:
