@@ -131,3 +131,19 @@ def test_serial_worker_serial_open_failure_emits_error(qapp, monkeypatch):
     QTimer.singleShot(2000, _loop.quit)
     _loop.exec()
     assert "error" in states
+
+
+def test_serial_worker_emits_stopped_state_on_user_stop(qapp):
+    rows = [_row(1000 + i * 0.001) for i in range(100)]  # tight spacing
+    fake = FakeSerial()
+    worker = SerialWorker(
+        rows=rows, port="COM_FAKE", baudrate=115200,
+        databits=8, parity="N", stopbits=1,
+        loop_mode=False, serial_factory=lambda: fake,
+    )
+    states = []
+    worker.state_changed.connect(lambda s: states.append(s))
+    QTimer.singleShot(50, worker.stop)
+    worker.start()
+    _wait_for(worker.finished_run, timeout=3000)
+    assert "stopped" in states

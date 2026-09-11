@@ -85,6 +85,14 @@ class SerialWorker(QThread):
             self._pause_cond.notify_all()
         self.log_message.emit("INFO", "stop requested")
 
+    @property
+    def is_paused(self) -> bool:
+        return self._paused
+
+    @property
+    def is_stopping(self) -> bool:
+        return self._stopping
+
     # ------------------------------------------------------------------
     def run(self):
         try:
@@ -161,8 +169,12 @@ class SerialWorker(QThread):
             self.log_message.emit("ERROR", f"run failed: {e}")
             self.state_changed.emit("error")
         else:
-            self.log_message.emit("INFO", "run finished")
-            self.state_changed.emit("finished")
+            if self._stopping:
+                self.log_message.emit("INFO", "run stopped")
+                self.state_changed.emit("stopped")
+            else:
+                self.log_message.emit("INFO", "run finished")
+                self.state_changed.emit("finished")
         finally:
             try:
                 if self._serial is not None:
