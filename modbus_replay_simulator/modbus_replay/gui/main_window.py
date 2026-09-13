@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -29,6 +30,7 @@ from modbus_replay.gui.widgets import (
     LogPanel,
     PortSelector,
     ProgressPanel,
+    RxPanel,
 )
 from modbus_replay.serial_worker import SerialWorker
 
@@ -48,6 +50,10 @@ class MainWindow(QMainWindow):
         # a long replay. None when the port is not currently held by
         # this window.
         self._probe_serial = None
+        # Background reader — polls the probe handle while it's open and
+        # forwards received bytes to the RxPanel. None when no probe is
+        # active.
+        self._rx_reader = None
         self._build_ui()
         self._wire()
 
@@ -91,12 +97,14 @@ class MainWindow(QMainWindow):
         ctrl_row.addStretch(1)
         layout.addLayout(ctrl_row)
 
-        # Progress + log
+        # Progress + log + rx
         self.progress_panel = ProgressPanel()
         layout.addWidget(self.progress_panel)
 
         self.log_panel = LogPanel()
+        self.rx_panel = RxPanel()
         layout.addWidget(self.log_panel, stretch=1)
+        layout.addWidget(self.rx_panel, stretch=1)
 
         # Initial control state.
         # - Open:    enabled (user can probe the port immediately)
@@ -169,11 +177,23 @@ class MainWindow(QMainWindow):
         self.open_btn.setEnabled(False)
         self.close_btn.setEnabled(True)
 
+        # Start the background reader so the RxPanel updates as data
+        # arrives from the MCU.
+        self._rx_reader = _SerialReader(self._probe_serial)
+        self._rx_reader.data_received.connect(self.rx_panel.append_bytes)
+        self._rx_reader.start()
+
     def _on_close_port(self) -> None:
-        """Close the probe handle (no-op if not currently open)."""
+        """close the probe handle (no-op if not currently open)."""
         if self._probe_serial is None:
             self.log_panel.append("INFO", "port already closed (probe)")
             return
+        # Stop the reader first so it does not try to read from a closed
+        # handle and emit an error.
+        if self._rx_reader is not None:
+            self._rx_reader.stop()
+            self._rx_reader.wait(1000)
+            self._rx_reader = None
         try:
             self._probe_serial.close()
         except Exception as e:
@@ -282,6 +302,11 @@ class MainWindow(QMainWindow):
         if self._worker is not None and self._worker.isRunning():
             self._worker.stop()
             self._worker.wait(2000)
+        # Stop the diagnostic RX reader if running.
+        if self._rx_reader is not None:
+            self._rx_reader.stop()
+            self._rx_reader.wait(1000)
+            self._rx_reader = None
         # Also release the diagnostic probe handle if the user opened
         # one and forgot to close it.
         if self._probe_serial is not None:
@@ -300,3 +325,42 @@ def main() -> int:
     win = MainWindow()
     win.show()
     return app.exec_()
+
+
+
+class _SerialReader(QThread):
+    """Background reader that polls a pyserial.Serial handle and
+    forwards every chunk of received bytes to the GUI.
+
+    Designed to be cheap: it sleeps for ``POLL_INTERVAL_MS`` between
+    polls and only emits when ``in_waiting`` is non-zero. ``stop()``
+    flips the loop flag and ``wait()`` joins the thread.
+
+    A ``serial_factory`` callable is accepted for testability — the
+    production code uses the live probe handle, tests inject a fake.
+    """
+
+    data_received = pyqtSignal(bytes)
+    POLL_INTERVAL_MS = 100
+
+    def __init__(self, serial_handle, parent=None):
+        super().__init__(parent)
+        self._serial = serial_handle
+        self._stopping = False
+
+    def stop(self):
+        self._stopping = True
+
+    def run(self):
+        while not self._stopping:
+            try:
+                n = self._serial.in_waiting
+                if n:
+                    chunk = self._serial.read(n)
+                    if chunk:
+                        self.data_received.emit(chunk)
+                else:
+                    self.msleep(self.POLL_INTERVAL_MS)
+            except Exception:
+                # Port closed under us or read error — exit cleanly.
+                return

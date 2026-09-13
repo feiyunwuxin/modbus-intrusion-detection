@@ -75,8 +75,8 @@ detection rules.
 | **COM** dropdown | Select the serial port; **🔄 刷新** rescans |
 | **Baud / Data / Parity / Stop** | Five serial parameters (default 115200 8N1) |
 | **📂 选择 CSV…** | Pick the source CSV (defaults to `IanArffDataset.csv`) |
-| **📡 打开串口** | Probe-open the selected port with a dedicated `pyserial.Serial` handle (independent from the replay worker). Logs `opened COMx @ baud D P S (probe)` on success. |
-| **🔌 关闭串口** | Release the probe handle. No-op (with INFO log) if the port is not currently open. |
+| **📡 打开串口** | Probe-open the selected port with a dedicated `pyserial.Serial` handle (independent from the replay worker) AND start the background RX reader that feeds the receive panel. Logs `opened COMx @ baud D P S (probe)` on success. |
+| **🔌 关闭串口** | Stop the RX reader and release the probe handle. No-op (with INFO log) if the port is not currently open. |
 | **▶ 开始** | Build a SerialWorker thread and start pacing |
 | **⏸ 暂停 / ▶ 继续** | Toggle worker pause/resume (label flips) |
 | **⏹ 停止** | Set `_stopping`; the loop exits at the next checkpoint |
@@ -91,16 +91,27 @@ each replay run opens its own port via `SerialWorker`.
 The progress bar shows row position; the elapsed/ETA label ticks every
 500 ms once the first frame has been sent.
 
+## Receive window
+
+Once **📡 打开串口** opens the probe handle, a background
+`_SerialReader(QThread)` polls `serial.in_waiting` every 100 ms and
+forwards every chunk of received bytes to the bottom panel as
+`hex+ASCII` blocks (toggle to `hex` or `ASCII` via the dropdown).
+Timestamps are millisecond-precision; the byte counter accumulates
+across the lifetime of the probe handle and resets on **🗑 清空**.
+The reader stops automatically when **🔌 关闭串口** is clicked, when
+the window closes, and before the probe handle is released.
+
 ## Tests
 
 ```bash
 pytest -v
 ```
 
-48 unit tests cover the seven modules (csv_loader, frame_format,
+61 unit tests cover the eight modules (csv_loader, frame_format,
 replay_engine, serial_worker, gui.widgets, gui.main_window,
-integration_loopback). End-to-end hardware validation is the manual
-checklist in `docs/MANUAL_VALIDATION.md` (Task 10).
+gui.rx_panel, integration_loopback). End-to-end hardware validation
+is the manual checklist in `docs/MANUAL_VALIDATION.md` (Task 10).
 
 ## License
 

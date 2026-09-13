@@ -315,3 +315,115 @@ class LogPanel(QWidget):
         cursor.movePosition(cursor.End)
         self.text_edit.setTextCursor(cursor)
         self.text_edit.ensureCursorVisible()
+
+
+# ---------------------------------------------------------------------------
+# RxPanel — receives bytes from the serial port and renders them as
+# hex+ASCII with timestamps. Used to inspect what the MCU sends back.
+# ---------------------------------------------------------------------------
+
+
+def _format_hex_ascii(data: bytes) -> str:
+    """Render bytes as ``HH HH HH | ccc`` (hex on left, ASCII on right).
+
+    Each 16-byte row is laid out as a fixed-width block. Non-printable
+    ASCII bytes are rendered as ``.``.
+    """
+    lines = []
+    for offset in range(0, len(data), 16):
+        chunk = data[offset:offset + 16]
+        hex_part = " ".join(f"{b:02x}" for b in chunk)
+        # Pad hex part to 16*3-1 = 47 chars for aligned ASCII column.
+        hex_part = hex_part.ljust(16 * 3 - 1)
+        ascii_part = "".join(
+            chr(b) if 32 <= b < 127 else "." for b in chunk
+        )
+        lines.append(f"{offset:04x}  {hex_part}  |{ascii_part}|")
+    return "\n".join(lines)
+
+
+def _format_hex_only(data: bytes) -> str:
+    """Render bytes as space-separated hex pairs, no offsets or ASCII."""
+    return " ".join(f"{b:02x}" for b in data)
+
+
+def _format_ascii_only(data: bytes) -> str:
+    """Render bytes as ASCII (non-printable as ``.``)."""
+    return "".join(chr(b) if 32 <= b < 127 else "." for b in data)
+
+
+class RxPanel(QWidget):
+    """Hex+ASCII receive viewer with a clear button.
+
+    Use :meth:`append_bytes` from any thread (safe across thread
+    boundaries because the underlying QTextEdit accepts append() via
+    Qt's queued connection when wired through a signal).
+    """
+
+    # Emitted when the user clicks the 🗑 clear button.
+    cleared = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        outer = QVBoxLayout(self)
+
+        # Toolbar row: clear button + format combo + byte counter
+        toolbar = QHBoxLayout()
+        self.clear_btn = QPushButton("\U0001f5d1 清空")
+        self.clear_btn.clicked.connect(self._on_clear)
+        self.format_combo = QComboBox()
+        self.format_combo.addItems(["hex+ASCII", "hex", "ASCII"])
+        self.byte_count_label = QLabel("0 bytes")
+        toolbar.addWidget(self.clear_btn)
+        toolbar.addWidget(QLabel("格式:"))
+        toolbar.addWidget(self.format_combo)
+        toolbar.addStretch(1)
+        toolbar.addWidget(self.byte_count_label)
+        outer.addLayout(toolbar)
+
+        # Read-only, monospace text view
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        font = self.text_edit.font()
+        font.setFamily("Consolas, Courier New, monospace")
+        self.text_edit.setFont(font)
+        outer.addWidget(self.text_edit, stretch=1)
+
+        self._byte_count = 0
+
+    def _on_clear(self) -> None:
+        self.text_edit.clear()
+        self._byte_count = 0
+        self.byte_count_label.setText("0 bytes")
+        self.cleared.emit()
+
+    def append_bytes(self, data: bytes) -> None:
+        """Append one chunk of received bytes.
+
+        Each call renders as a single block, prefixed by a timestamp and
+        bracketed by blank lines so bursts from the MCU stay grouped.
+        """
+        if not data:
+            return
+        ts = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]  # ms
+        fmt = self.format_combo.currentText()
+        if fmt == "hex":
+            body = _format_hex_only(data)
+        elif fmt == "ASCII":
+            body = _format_ascii_only(data)
+        else:
+            body = _format_hex_ascii(data)
+        # ``append`` inserts a new paragraph — keeps each chunk visually
+        # grouped without manually inserting newlines.
+        self.text_edit.append(f"[{ts}] RX ({len(data)} B):\n{body}")
+        self._byte_count += len(data)
+        self.byte_count_label.setText(f"{self._byte_count} bytes")
+
+        # Auto-scroll to the latest block.
+        cursor = self.text_edit.textCursor()
+        cursor.movePosition(cursor.End)
+        self.text_edit.setTextCursor(cursor)
+        self.text_edit.ensureCursorVisible()
