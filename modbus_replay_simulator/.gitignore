@@ -6,3 +6,9 @@ __pycache__/
 build/
 dist/
 *.log
+
+# IDE
+.idea/
+.vscode/
+*.qmlc
+*.user
