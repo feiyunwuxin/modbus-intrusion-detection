@@ -81,6 +81,7 @@ detection rules.
 | **⏸ 暂停 / ▶ 继续** | Toggle worker pause/resume (label flips) |
 | **⏹ 停止** | Set `_stopping`; the loop exits at the next checkpoint |
 | **循环播放** | Replay the CSV from the top after the last row |
+| **📋 详细日志** | When checked, the worker emits one `TX` log line per frame sent, e.g. `[TX] row=42 t=2100ms addr=4 fc=3 resp hex=01 03 08 00 00 00 00 00`. Off by default — 274k lines per run would flood the panel. Enable for hardware debugging only. |
 
 The probe handle (`_probe_serial`) is released automatically when the
 window closes, even if the user opened it and forgot to click
@@ -96,7 +97,7 @@ The progress bar shows row position; the elapsed/ETA label ticks every
 pytest -v
 ```
 
-45 unit tests cover the seven modules (csv_loader, frame_format,
+48 unit tests cover the seven modules (csv_loader, frame_format,
 replay_engine, serial_worker, gui.widgets, gui.main_window,
 integration_loopback). End-to-end hardware validation is the manual
 checklist in `docs/MANUAL_VALIDATION.md` (Task 10).

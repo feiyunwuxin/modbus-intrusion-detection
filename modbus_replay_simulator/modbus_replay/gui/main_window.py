@@ -80,12 +80,14 @@ class MainWindow(QMainWindow):
         self.pause_btn = QPushButton("⏸ 暂停")
         self.stop_btn = QPushButton("⏹ 停止")
         self.loop_chk = QCheckBox("循环播放")
+        self.verbose_chk = QCheckBox("📋 详细日志")
         ctrl_row.addWidget(self.open_btn)
         ctrl_row.addWidget(self.close_btn)
         ctrl_row.addWidget(self.start_btn)
         ctrl_row.addWidget(self.pause_btn)
         ctrl_row.addWidget(self.stop_btn)
         ctrl_row.addWidget(self.loop_chk)
+        ctrl_row.addWidget(self.verbose_chk)
         ctrl_row.addStretch(1)
         layout.addLayout(ctrl_row)
 
@@ -211,6 +213,7 @@ class MainWindow(QMainWindow):
             parity=params["parity"],
             stopbits=params["stopbits"],
             loop_mode=self.loop_chk.isChecked(),
+            verbose_tx=self.verbose_chk.isChecked(),
         )
         self._worker.progress.connect(self._on_progress)
         self._worker.state_changed.connect(self._on_state)
@@ -269,6 +272,7 @@ class MainWindow(QMainWindow):
         self.csv_edit.setEnabled(not running)
         self.csv_btn.setEnabled(not running)
         self.loop_chk.setEnabled(not running)
+        self.verbose_chk.setEnabled(not running)
 
     # ------------------------------------------------------------------
     # Lifecycle

@@ -147,3 +147,53 @@ def test_serial_worker_emits_stopped_state_on_user_stop(qapp):
     worker.start()
     _wait_for(worker.finished_run, timeout=3000)
     assert "stopped" in states
+
+
+def test_serial_worker_verbose_tx_emits_per_frame_log(qapp):
+    """verbose_tx=True emits one TX log_message per successfully written frame."""
+    rows = [_row(1000 + i * 0.001) for i in range(5)]
+    fake = FakeSerial()
+    worker = SerialWorker(
+        rows=rows, port="COM_FAKE", baudrate=115200,
+        databits=8, parity="N", stopbits=1,
+        loop_mode=False, verbose_tx=True,
+        serial_factory=lambda: fake,
+    )
+    tx_logs = []
+    worker.log_message.connect(lambda level, msg: tx_logs.append((level, msg)))
+    worker.start()
+    _wait_for(worker.finished_run, timeout=3000)
+    worker.wait(2000)
+
+    # All 5 frames should produce a TX log
+    tx_only = [(lvl, msg) for lvl, msg in tx_logs if lvl == "TX"]
+    assert len(tx_only) == 5
+    # Each line includes row index, time offset, addr, fc, dir, and 8-byte hex head
+    for i, (_, msg) in enumerate(tx_only):
+        assert f"row={i}" in msg
+        assert "addr=" in msg and "fc=" in msg
+        assert "hex=" in msg
+        # 8 bytes joined by spaces -> 8 hex pairs separated by 7 spaces
+        hex_part = msg.split("hex=")[1]
+        assert len(hex_part.split()) == 8
+
+
+def test_serial_worker_verbose_tx_default_is_off(qapp):
+    """Default verbose_tx=False must NOT emit per-frame TX logs (avoids
+    flooding the log panel on a 274k-row run)."""
+    rows = [_row(1000 + i * 0.001) for i in range(5)]
+    fake = FakeSerial()
+    worker = SerialWorker(
+        rows=rows, port="COM_FAKE", baudrate=115200,
+        databits=8, parity="N", stopbits=1,
+        loop_mode=False, serial_factory=lambda: fake,
+    )
+    # explicit default check
+    assert worker._verbose_tx is False
+    tx_logs = []
+    worker.log_message.connect(lambda level, msg: tx_logs.append((level, msg)))
+    worker.start()
+    _wait_for(worker.finished_run, timeout=3000)
+    worker.wait(2000)
+    tx_only = [(lvl, msg) for lvl, msg in tx_logs if lvl == "TX"]
+    assert tx_only == []

@@ -35,6 +35,7 @@ class SerialWorker(QThread):
                  parity: str,
                  stopbits: int,
                  loop_mode: bool,
+                 verbose_tx: bool = False,
                  serial_factory: Optional[Callable[[], object]] = None,
                  parent=None):
         super().__init__(parent)
@@ -45,6 +46,10 @@ class SerialWorker(QThread):
         self._parity = parity
         self._stopbits = stopbits
         self._loop_mode = loop_mode
+        # When True, emit a log_message per successfully written frame so
+        # the GUI can show what each TX actually contained. Off by default
+        # because 274k lines per run is too noisy for the log panel.
+        self._verbose_tx = verbose_tx
         self._serial_factory = serial_factory or self._default_serial_factory
 
         self._paused = False
@@ -158,6 +163,23 @@ class SerialWorker(QThread):
                     fc = frame[1]
                     direction = frame[3]
                     self.progress.emit(i, total_rows, addr, fc, direction)
+
+                    # Optional verbose TX log — one line per frame with
+                    # row index, protocol header, ms offset, and the first
+                    # 8 bytes as hex. Useful for hardware debugging; off
+                    # by default because it floods the log panel on full
+                    # 274k-row runs.
+                    if self._verbose_tx:
+                        t_ms = int(round(
+                            (float(self._rows[i]["time"]) - base_time) * 1000
+                        ))
+                        hex_head = " ".join(f"{b:02x}" for b in frame[:8])
+                        d = "resp" if direction else "cmd"
+                        self.log_message.emit(
+                            "TX",
+                            f"row={i} t={t_ms}ms addr={addr} fc={fc} "
+                            f"{d} hex={hex_head}",
+                        )
 
                 if self._stopping:
                     break
