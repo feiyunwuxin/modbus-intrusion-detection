@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 pytest.importorskip("PyQt5")
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
 from modbus_replay.gui.main_window import MainWindow
@@ -55,18 +54,28 @@ def test_main_window_csv_missing_emits_error(qapp, tmp_path, monkeypatch):
 
 
 def test_main_window_csv_present_no_port(qapp, tmp_path):
-    """CSV exists but no COM port -> second error branch."""
+    """CSV exists but no COM port -> second error branch.
+
+    The CSV header must use the same column names as ``REQUIRED_COLUMNS``
+    in ``csv_loader.py`` (space-separated), otherwise ``load_rows`` will
+    raise ValueError and route us into the wrong branch. We also
+    explicitly clear the PortSelector combo so the test does not depend
+    on whether the host happens to have any serial devices.
+    """
     csv = tmp_path / "tiny.csv"
     csv.write_text(
-        "time,address,function,length,setpoint,gain,reset,deadband,cycle,"
-        "rate,system_mode,control_scheme,pump,solenoid,pressure,response,"
-        "crc_rate\n"
-        "1000,1,3,8,0,0,0,0,0,0.0,0,0,0,0,0.0,0,0\n",
+        "address,function,length,setpoint,gain,reset rate,deadband,"
+        "cycle time,rate,system mode,control scheme,pump,solenoid,"
+        "pressure measurement,crc rate,command response,time\n"
+        "1,3,8,0,0,0,0,0,0.0,0,0,0,0,0.0,0,0,1000\n",
         encoding="utf-8",
     )
     win = MainWindow()
     win.csv_edit.setText(str(csv))
-    # No port selected on an empty system: PortSelector currentText() == "".
+    # Force the "no port selected" branch regardless of host hardware.
+    win.port_selector.port_combo.clear()
     win._on_start()
     text = win.log_panel.text_edit.toPlainText()
     assert "ERROR" in text
+    # Must specifically be the no-port branch, not the load-failed branch.
+    assert "no COM port" in text

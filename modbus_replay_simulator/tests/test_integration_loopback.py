@@ -128,7 +128,7 @@ def test_nan_fields_round_trip_as_quiet_nan():
     assert decoded["gain"] == 0
 
 
-def test_synthetic_dataset_size_matches_real_one():
+def test_real_dataset_row_count():
     """Guard against shipping a truncated IanArffDataset.csv.
 
     Skipped if the real dataset is not present at the expected path.

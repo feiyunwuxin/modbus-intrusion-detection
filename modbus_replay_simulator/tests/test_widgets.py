@@ -44,6 +44,18 @@ def test_port_selector_emits_params_changed(qapp):
     sel.set_baudrate(9600)
     assert captured, "params_changed signal was not emitted"
     assert captured[-1]["baudrate"] == 9600
+    # Exactly one emission on a real change (not two — guards against a
+    # previous double-emit bug where both setCurrentText's signal and an
+    # explicit _emit_params call fired).
+    assert len(captured) == 1
+
+
+def test_port_selector_set_baudrate_no_change_emits_nothing(qapp):
+    sel = PortSelector()
+    captured = []
+    sel.params_changed.connect(lambda p: captured.append(p))
+    sel.set_baudrate(115200)  # already the default
+    assert captured == []
 
 
 def test_progress_panel_renders_values(qapp):

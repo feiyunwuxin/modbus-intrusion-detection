@@ -89,10 +89,10 @@ The progress bar shows row position; the elapsed/ETA label ticks every
 pytest -v
 ```
 
-35 unit tests cover the four leaf modules (frame_format, csv_loader,
-replay_engine, serial_worker) plus the GUI widgets and MainWindow
-assembly. End-to-end hardware validation is the manual checklist in
-`docs/MANUAL_VALIDATION.md` (Task 10).
+40 unit tests cover the seven modules (csv_loader, frame_format,
+replay_engine, serial_worker, gui.widgets, gui.main_window,
+integration_loopback). End-to-end hardware validation is the manual
+checklist in `docs/MANUAL_VALIDATION.md` (Task 10).
 
 ## License
 

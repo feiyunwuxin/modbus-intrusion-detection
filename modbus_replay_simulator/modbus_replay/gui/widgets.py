@@ -13,9 +13,10 @@ into the MainWindow by Task 7:
 * :class:`LogPanel` — read-only QTextEdit that prefixes each entry
   with a timestamp and a level tag.
 
-PyQt5 is imported lazily by callers (the tests already guard with
-``pytest.importorskip("PyQt5")``) so this module is import-safe even
-when the GUI stack is not installed.
+PyQt5 is imported at module top. Callers that want graceful failure
+on systems without the GUI stack should guard with
+``pytest.importorskip("PyQt5")`` (as the test modules do) before
+importing anything from this file.
 """
 from __future__ import annotations
 
@@ -162,17 +163,16 @@ class PortSelector(QWidget):
     def set_baudrate(self, value: int) -> None:
         """Programmatically change the baud selection.
 
-        ``params_changed`` is emitted exactly once (not twice — Qt does
-        not re-emit when the value is unchanged).
+        ``params_changed`` is emitted at most once (zero times if the
+        value is unchanged; one time otherwise, via the connected
+        ``currentTextChanged`` → ``_emit_params`` wiring).
         """
         text = str(value)
         if self.baud_combo.currentText() == text:
             return
+        # setCurrentText emits currentTextChanged → _emit_params on a
+        # real change; do NOT also call _emit_params here (double emit).
         self.baud_combo.setCurrentText(text)
-        # setCurrentText triggers _emit_params via currentTextChanged
-        # when the value actually changes; emit explicitly so callers
-        # always observe the update.
-        self._emit_params()
 
     def _emit_params(self, *_args) -> None:
         self.params_changed.emit(self.current_params())
@@ -302,6 +302,16 @@ class LogPanel(QWidget):
         layout.addWidget(self.text_edit)
 
     def append(self, level: str, message: str) -> None:
-        """Append one log line, e.g. ``[12:34:56] [INFO] hello``."""
+        """Append one log line, e.g. ``[12:34:56] [INFO] hello``.
+
+        Auto-scrolls to the bottom so the most recent entry is always
+        visible without manual scrolling during long runs.
+        """
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         self.text_edit.append(f"[{ts}] [{level}] {message}")
+        # Move cursor to end and ensure it's visible — without this the
+        # QTextEdit stays at the top during long multi-hour replays.
+        cursor = self.text_edit.textCursor()
+        cursor.movePosition(cursor.End)
+        self.text_edit.setTextCursor(cursor)
+        self.text_edit.ensureCursorVisible()
