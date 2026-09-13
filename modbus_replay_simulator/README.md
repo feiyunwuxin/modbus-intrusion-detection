@@ -75,10 +75,17 @@ detection rules.
 | **COM** dropdown | Select the serial port; **🔄 刷新** rescans |
 | **Baud / Data / Parity / Stop** | Five serial parameters (default 115200 8N1) |
 | **📂 选择 CSV…** | Pick the source CSV (defaults to `IanArffDataset.csv`) |
+| **📡 打开串口** | Probe-open the selected port with a dedicated `pyserial.Serial` handle (independent from the replay worker). Logs `opened COMx @ baud D P S (probe)` on success. |
+| **🔌 关闭串口** | Release the probe handle. No-op (with INFO log) if the port is not currently open. |
 | **▶ 开始** | Build a SerialWorker thread and start pacing |
 | **⏸ 暂停 / ▶ 继续** | Toggle worker pause/resume (label flips) |
 | **⏹ 停止** | Set `_stopping`; the loop exits at the next checkpoint |
 | **循环播放** | Replay the CSV from the top after the last row |
+
+The probe handle (`_probe_serial`) is released automatically when the
+window closes, even if the user opened it and forgot to click
+**🔌 关闭串口**. The probe is **not** shared with the replay worker —
+each replay run opens its own port via `SerialWorker`.
 
 The progress bar shows row position; the elapsed/ETA label ticks every
 500 ms once the first frame has been sent.
@@ -89,7 +96,7 @@ The progress bar shows row position; the elapsed/ETA label ticks every
 pytest -v
 ```
 
-40 unit tests cover the seven modules (csv_loader, frame_format,
+45 unit tests cover the seven modules (csv_loader, frame_format,
 replay_engine, serial_worker, gui.widgets, gui.main_window,
 integration_loopback). End-to-end hardware validation is the manual
 checklist in `docs/MANUAL_VALIDATION.md` (Task 10).
