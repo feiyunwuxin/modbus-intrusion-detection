@@ -1,0 +1,11 @@
+=== [16:47:37] Starting XGBoost training (5 seeds) ===
+=== XGBoost 23-dim ¡Á window=16 (flattened 368 features) ¡Á 5 seeds ===
+  Hyperparams: n=300, lr=0.05, max_depth=5, gamma=0.1, reg_alpha=0.1
+  seed=42: F1m=0.8085  best_iter=299  time=2.5s
+  seed=123: F1m=0.8160  best_iter=284  time=2.3s
+  seed=456: F1m=0.8093  best_iter=286  time=2.4s
+  seed=789: F1m=0.8040  best_iter=201  time=1.8s
+  seed=1024: F1m=0.8058  best_iter=280  time=2.4s
+
+[saved meta] processed_meta_xgb_23dim_w16.json
+=== [16:47:53] Done ===

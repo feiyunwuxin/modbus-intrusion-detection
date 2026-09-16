@@ -1,0 +1,35 @@
+{
+  "task": "Stack12 (11 original + XGBoost) M3 + threshold tuning",
+  "eval_protocol": "5-fold StratifiedKFold (CV-honest)",
+  "n_archs": 12,
+  "n_seeds": 5,
+  "n_folds": 5,
+  "m3_fold_C": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "best_threshold": 0.35500000000000004,
+  "best_metrics": {
+    "threshold": 0.35500000000000004,
+    "Accuracy": 0.8901515151515151,
+    "Precision": 0.9353658536585366,
+    "Recall": 0.8498614958448754,
+    "F1-Score": 0.8905660377358491
+  },
+  "thr_0.5_metrics": {
+    "threshold": 0.5000000000000002,
+    "Accuracy": 0.8866550116550117,
+    "Precision": 0.9481012658227848,
+    "Recall": 0.8299168975069252,
+    "F1-Score": 0.8850812407680946
+  },
+  "delta_vs_stack11_pp": 0.016603773584911163,
+  "reference": {
+    "stack11_m3_thr_0.5_f1": 0.8861,
+    "stack11_m3_thr_0.390_f1": 0.8904,
+    "stack12_m3_best_f1": 0.8905660377358491
+  }
+}
