@@ -1,0 +1,51 @@
+=== Cross-Architecture 5-Arch ¡Á 5-Seed ¡Á 4-Metric Evaluation ===
+
+
+=== TCN+SE (v4_se_23dim_b64_ch32_do01_window16) ===
+  seed   42: Acc=0.8674  P=0.9423  R=0.7967  F1=0.8634
+  seed  123: Acc=0.8738  P=0.9586  R=0.7945  F1=0.8688
+  seed  456: Acc=0.8715  P=0.9411  R=0.8061  F1=0.8684
+  seed  789: Acc=0.8700  P=0.9398  R=0.8044  F1=0.8669
+  seed 1024: Acc=0.8505  P=0.9492  R=0.7562  F1=0.8418
+  5-seed prob_mean: Acc=0.8744  P=0.9532  R=0.8006  F1=0.8702
+  5-seed majority : Acc=0.8715  P=0.9505  R=0.7972  F1=0.8671
+
+=== TCN (no SE) (tcn_23dim_w16) ===
+  seed   42: Acc=0.8779  P=0.9553  R=0.8055  F1=0.8741
+  seed  123: Acc=0.8802  P=0.9573  R=0.8083  F1=0.8765
+  seed  456: Acc=0.8741  P=0.9387  R=0.8139  F1=0.8718
+  seed  789: Acc=0.8715  P=0.9541  R=0.7939  F1=0.8666
+  seed 1024: Acc=0.8770  P=0.9511  R=0.8078  F1=0.8736
+  5-seed prob_mean: Acc=0.8829  P=0.9582  R=0.8127  F1=0.8795
+  5-seed majority : Acc=0.8808  P=0.9580  R=0.8089  F1=0.8771
+
+=== BiLSTM (lstm_23dim_w16) ===
+  seed   42: Acc=0.8464  P=0.9545  R=0.7435  F1=0.8359
+  seed  123: Acc=0.8339  P=0.9433  R=0.7280  F1=0.8218
+  seed  456: Acc=0.8389  P=0.9563  R=0.7269  F1=0.8259
+  seed  789: Acc=0.8517  P=0.9513  R=0.7568  F1=0.8429
+  seed 1024: Acc=0.7995  P=0.8849  R=0.7114  F1=0.7887
+  5-seed prob_mean: Acc=0.8456  P=0.9570  R=0.7396  F1=0.8344
+  5-seed majority : Acc=0.8438  P=0.9581  R=0.7352  F1=0.8320
+
+=== BiGRU (gru_23dim_w16) ===
+  seed   42: Acc=0.8511  P=0.9378  R=0.7679  F1=0.8443
+  seed  123: Acc=0.8301  P=0.8973  R=0.7645  F1=0.8256
+  seed  456: Acc=0.8266  P=0.8898  R=0.7651  F1=0.8228
+  seed  789: Acc=0.8395  P=0.9644  R=0.7213  F1=0.8254
+  seed 1024: Acc=0.8476  P=0.9533  R=0.7468  F1=0.8375
+  5-seed prob_mean: Acc=0.8476  P=0.9458  R=0.7535  F1=0.8387
+  5-seed majority : Acc=0.8473  P=0.9476  R=0.7512  F1=0.8381
+
+=== CNN-LSTM (cnnlstm_23dim_w16) ===
+  seed   42: Acc=0.8357  P=0.9593  R=0.7180  F1=0.8213
+  seed  123: Acc=0.8395  P=0.9597  R=0.7252  F1=0.8261
+  seed  456: Acc=0.8494  P=0.9237  R=0.7778  F1=0.8445
+  seed  789: Acc=0.8578  P=0.9458  R=0.7740  F1=0.8513
+  seed 1024: Acc=0.8176  P=0.9208  R=0.7147  F1=0.8047
+  5-seed prob_mean: Acc=0.8499  P=0.9587  R=0.7468  F1=0.8396
+  5-seed majority : Acc=0.8432  P=0.9594  R=0.7330  F1=0.8310
+
+[saved] D:\workspace\claude\Issue\Issue\cross_arch_5seed_4metrics.json
+[saved] D:\workspace\claude\Issue\Issue\cross_arch_5seed_4metrics_per_seed.csv
+[saved] D:\workspace\claude\Issue\Issue\CROSS_ARCH_LEADERBOARD_4METRICS.md
