@@ -9,12 +9,14 @@ and data loader from _common_train.py. Trains 20 epochs with:
 Outputs 3 prediction CSVs per seed (raw / SWA / EMA) + meta JSON.
 """
 import os
+import csv
 import time
 import copy
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score
 
 from _common_train import load_data_23dim_w16, save_meta_json, BASE_PATH, SEEDS
 from train_tcn_23dim_w16_5seed import TCNClassifier
@@ -60,8 +62,6 @@ def bn_re_update(model, train_loader):
 
 def train_one_seed_swa_ema(seed):
     """Train one seed, evaluate 3 views, save CSVs. Returns metrics dict."""
-    from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score
-
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -117,7 +117,7 @@ def train_one_seed_swa_ema(seed):
         # EMA update
         cur_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         if ema_state is None:
-            ema_state = cur_state
+            ema_state = {k: v.clone() for k, v in cur_state.items()}
         else:
             for k in ema_state.keys():
                 ema_state[k] = EMA_DECAY * cur_state[k] + (1 - EMA_DECAY) * ema_state[k]
@@ -164,7 +164,6 @@ def train_one_seed_swa_ema(seed):
     # Save 3 prediction CSVs
     for view, probs in [("raw", raw_prob), ("swa", swa_prob), ("ema", ema_prob)]:
         with open(os.path.join(BASE_PATH, f"predictions_test_tcn_{view}_s{seed}.csv"), "w", newline="") as f:
-            import csv
             w = csv.writer(f)
             w.writerow(["y_true", "prob_attack"])
             for y, p in zip(test_lbl.tolist(), probs.tolist()):
@@ -195,13 +194,16 @@ def main():
           f"  SWA start epoch: {SWA_START_EPOCH}, EMA decay: {EMA_DECAY}\n")
     results = []
     for seed in SEEDS:
-        results.append(train_one_seed_swa_ema(seed))
+        r = train_one_seed_swa_ema(seed)
+        # flatten for save_meta_json: use 'raw' view as primary macro_f1
+        r["test_macro_f1"] = r["raw"]["test_macro_f1"]
+        results.append(r)
 
     save_meta_json(results, os.path.join(BASE_PATH, f"processed_meta_{TAG_PREFIX}.json"),
                    model_name="TCN + SWA + EMA", tag=TAG_PREFIX,
                    config={"epochs": EPOCHS, "swa_start_epoch": SWA_START_EPOCH,
                            "ema_decay": EMA_DECAY, "batch": BATCH, "lr": LR, "wd": WD,
-                           "patience": PATIENCE, "n_archs": 3,
+                           "patience": PATIENCE, "n_views": 3,
                            "n_params_input": 23, "window": 16})
     print(f"\n[saved meta] processed_meta_{TAG_PREFIX}.json")
 
