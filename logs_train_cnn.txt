@@ -1,0 +1,18 @@
+=== Pure CNN 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8311  BestEp=8/13  Params=9,729  TrainT=12.0s
+
+--- seed=123 ---
+  F1m=0.8342  BestEp=10/15  Params=9,729  TrainT=14.4s
+
+--- seed=456 ---
+  F1m=0.8056  BestEp=11/16  Params=9,729  TrainT=19.8s
+
+--- seed=789 ---
+  F1m=0.8370  BestEp=9/14  Params=9,729  TrainT=17.2s
+
+--- seed=1024 ---
+  F1m=0.8447  BestEp=17/20  Params=9,729  TrainT=25.2s
+
+[saved meta] processed_meta_cnn_23dim_w16.json

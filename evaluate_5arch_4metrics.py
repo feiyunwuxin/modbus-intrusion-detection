@@ -15,11 +15,17 @@ import numpy as np
 
 BASE = r"D:\workspace\claude\Issue\Issue"
 ARCHS = [
+    # Original 5-arch cross-arch (2026-09-16)
     ("tcn_se",  "TCN+SE", "v4_se_23dim_b64_ch32_do01_window16"),
     ("tcn",     "TCN (no SE)", "tcn_23dim_w16"),
     ("lstm",    "BiLSTM",  "lstm_23dim_w16"),
     ("gru",     "BiGRU",   "gru_23dim_w16"),
     ("cnnlstm", "CNN-LSTM","cnnlstm_23dim_w16"),
+    # v2 expansion (2026-09-16 + later): pure CNN + scaled hidden/channels
+    ("cnn",     "Pure CNN",       "cnn_23dim_w16"),
+    ("lstm_v2", "BiLSTM (h128)",  "lstm_23dim_w16_h128"),
+    ("gru_v2",  "BiGRU (h128)",   "gru_23dim_w16_h128"),
+    ("cnnlstm_v2", "CNN-LSTM (ch256,h128)", "cnnlstm_23dim_w16_ch256"),
 ]
 SEEDS = [42, 123, 456, 789, 1024]
 THR = 0.5
