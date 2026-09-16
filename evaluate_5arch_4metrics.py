@@ -26,6 +26,9 @@ ARCHS = [
     ("lstm_v2", "BiLSTM (h128)",  "lstm_23dim_w16_h128"),
     ("gru_v2",  "BiGRU (h128)",   "gru_23dim_w16_h128"),
     ("cnnlstm_v2", "CNN-LSTM (ch256,h128)", "cnnlstm_23dim_w16_ch256"),
+    # Classical ML (2026-09-16, for Stack11 meta-learner)
+    ("lgb",     "LightGBM",       "lgb_23dim_w16"),
+    ("rf",      "Random Forest",  "rf_23dim_w16"),
 ]
 SEEDS = [42, 123, 456, 789, 1024]
 THR = 0.5
