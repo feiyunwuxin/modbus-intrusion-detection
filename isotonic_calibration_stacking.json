@@ -1,0 +1,51 @@
+{
+  "task": "Cross-validated isotonic calibration on M3 stacking OOF",
+  "protocol": "5-fold outer CV for both M3 stacking AND isotonic (nested)",
+  "raw_best_threshold": 0.39000000000000007,
+  "raw_best_metrics": {
+    "threshold": 0.39000000000000007,
+    "Accuracy": 0.8904428904428905,
+    "Precision": 0.9396923076923077,
+    "Recall": 0.845983379501385,
+    "F1-Score": 0.8903790087463557
+  },
+  "raw_thr_0.5_metrics": {
+    "threshold": 0.5000000000000002,
+    "Accuracy": 0.8875291375291375,
+    "Precision": 0.9481996209728364,
+    "Recall": 0.8315789473684211,
+    "F1-Score": 0.8860684769775679
+  },
+  "cal_best_threshold": 0.32,
+  "cal_best_metrics": {
+    "threshold": 0.32,
+    "Accuracy": 0.8886946386946387,
+    "Precision": 0.9319975713418336,
+    "Recall": 0.850415512465374,
+    "F1-Score": 0.8893395133256083
+  },
+  "cal_thr_0.5_metrics": {
+    "threshold": 0.5000000000000002,
+    "Accuracy": 0.888986013986014,
+    "Precision": 0.938964241676942,
+    "Recall": 0.8437673130193906,
+    "F1-Score": 0.8888240443536621
+  },
+  "delta_f1_pp": -0.10394954207473273,
+  "winner": "raw",
+  "m3_fold_C": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "n_archs": 11,
+  "n_seeds": 5,
+  "n_folds": 5,
+  "reference": {
+    "tcn_baseline_f1": 0.8795,
+    "m3_stacking_thr_0.5_f1": 0.8861,
+    "m3_stacking_best_thr_f1": 0.8903790087463557
+  }
+}
