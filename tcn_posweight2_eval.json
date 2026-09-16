@@ -1,0 +1,56 @@
+{
+  "task": "TCN baseline + pos_weight=2.0, 5-seed ensemble + threshold sweep",
+  "n_seeds": 5,
+  "test_n": 3432,
+  "per_seed_at_0.5": {
+    "42": {
+      "Accuracy": 0.8723776223776224,
+      "Precision": 0.9435431537962362,
+      "Recall": 0.8055401662049861,
+      "F1-Score": 0.8690974297668859
+    },
+    "123": {
+      "Accuracy": 0.8656759906759907,
+      "Precision": 0.9559023066485753,
+      "Recall": 0.7806094182825485,
+      "F1-Score": 0.8594083562061604
+    },
+    "456": {
+      "Accuracy": 0.8793706293706294,
+      "Precision": 0.9466923570969814,
+      "Recall": 0.8166204986149584,
+      "F1-Score": 0.8768590124925639
+    },
+    "789": {
+      "Accuracy": 0.8668414918414918,
+      "Precision": 0.954177897574124,
+      "Recall": 0.7844875346260388,
+      "F1-Score": 0.8610519914867741
+    },
+    "1024": {
+      "Accuracy": 0.8583916083916084,
+      "Precision": 0.9296416938110749,
+      "Recall": 0.7905817174515235,
+      "F1-Score": 0.8544910179640719
+    }
+  },
+  "mean_per_seed_f1_at_0.5": 0.8641815615832913,
+  "ensemble_at_0.5": {
+    "threshold": 0.5,
+    "Accuracy": 0.8758741258741258,
+    "Precision": 0.9503592423252776,
+    "Recall": 0.8060941828254847,
+    "F1-Score": 0.8723021582733813
+  },
+  "ensemble_best_threshold": {
+    "threshold": 0.38,
+    "Accuracy": 0.8782051282051282,
+    "Precision": 0.9337085678549093,
+    "Recall": 0.8271468144044322,
+    "F1-Score": 0.8772032902467685
+  },
+  "baseline_f1": 0.8795,
+  "stacking_f1": 0.8904,
+  "delta_vs_baseline_pp": -0.2296709753231485,
+  "verdict": "POS_WEIGHT HURTS"
+}
