@@ -8,8 +8,7 @@
     list_available_models: 扫描目录下可用模型文件
 """
 from .inference import FEATURE_COLUMNS, extract_features
-# TODO(ids): uncomment when model_loader is implemented in a later task
-# from .model_loader import ModelWrapper, load_model, list_available_models
+from .model_loader import ModelWrapper, load_model, list_available_models
 
 __all__ = [
     "FEATURE_COLUMNS",
