@@ -131,7 +131,7 @@ class IDsPanel(ttk.Frame):
             self.wrapper = wrapper
             name = Path(path).name
             self.status_var.set(f"已加载 {name} ({wrapper.input_features} features)")
-        except (FileNotFoundError, ValueError, RuntimeError) as e:
+        except (FileNotFoundError, ValueError, RuntimeError, AttributeError) as e:
             self.wrapper = None
             self.status_var.set(f"加载失败: {e}")
             messagebox.showerror("模型加载失败", str(e))
