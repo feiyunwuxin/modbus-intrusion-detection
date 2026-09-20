@@ -443,7 +443,14 @@ def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
         return _self_test()
     root = tk.Tk()
-    initial = sys.argv[1] if len(sys.argv) > 1 else None
+    # 优先级：CLI 参数 > 同目录默认 CSV
+    initial = None
+    if len(sys.argv) > 1:
+        initial = sys.argv[1]
+    else:
+        default = Path(__file__).parent / "IanArffDataset.csv"
+        if default.exists():
+            initial = str(default)
     app = ModbusSimulatorApp(root, initial_file=initial)
     root.mainloop()
     return 0
