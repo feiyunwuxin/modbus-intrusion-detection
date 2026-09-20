@@ -198,6 +198,112 @@ class TestLoadTorch(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_load_torch_nested_state_dict_unwraps(self):
+        """嵌套 dict 格式 {"state_dict": {...}, "best_threshold": ...} 应解包加载。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import numpy as np
+        import torch.nn as nn
+
+        class _NestedFNN(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.net = nn.Sequential(
+                    nn.Linear(17, 8),
+                    nn.ReLU(),
+                    nn.Linear(8, 2),
+                )
+
+            def forward(self, x):
+                return self.net(x)
+
+        model = _NestedFNN()
+        wrapped = {
+            "state_dict": model.state_dict(),
+            "model_name": "test",
+            "best_threshold": 0.5,
+        }
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(wrapped, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path)
+            self.assertEqual(wrapper.input_features, 17)
+            features = np.zeros(17, dtype=np.float32)
+            label, prob = wrapper.infer(features)
+            self.assertIn(label, (0, 1))
+        finally:
+            os.unlink(path)
+
+    def test_load_torch_lstm_state_dict_rejected_cleanly(self):
+        """含 LSTM 层的 state_dict 应抛 ValueError（友好），而非 AttributeError。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        # 构造 LSTM 风格 state_dict（key 含 lstm.*）
+        import torch.nn as nn
+        lstm = nn.LSTM(input_size=17, hidden_size=8, batch_first=True)
+        fake_state = {
+            "lstm.weight_ih_l0": torch.randn(32, 17),
+            "lstm.weight_hh_l0": torch.randn(32, 8),
+            "lstm.bias_ih_l0": torch.zeros(32),
+            "lstm.bias_hh_l0": torch.zeros(32),
+        }
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(fake_state, f.name)
+            path = f.name
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                load_model(path)
+            msg = str(ctx.exception)
+            # 必须包含 3D/LSTM 关键词，不能是 AttributeError
+            self.assertNotIn("AttributeError", msg)
+            self.assertNotIn("modules", msg)
+            self.assertTrue(
+                any(tok in msg for tok in ("LSTM", "3D", "窗口")),
+                f"错误消息应提示 3D 窗口，实际: {msg}",
+            )
+        finally:
+            os.unlink(path)
+
+    def test_load_torch_fnn_state_dict_reconstructs(self):
+        """Linear+BN+ReLU Sequential 模式应能从 state_dict 重建并推理。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import numpy as np
+        import torch.nn as nn
+
+        class _FNN(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.net = nn.Sequential(
+                    nn.Linear(17, 32),
+                    nn.BatchNorm1d(32),
+                    nn.ReLU(),
+                    nn.Linear(32, 16),
+                    nn.BatchNorm1d(16),
+                    nn.ReLU(),
+                    nn.Linear(16, 1),
+                )
+
+            def forward(self, x):
+                return self.net(x)
+
+        model = _FNN()
+        model.eval()
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save({"state_dict": model.state_dict()}, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path)
+            self.assertEqual(wrapper.input_features, 17)
+            features = np.zeros(17, dtype=np.float32)
+            label, prob = wrapper.infer(features)
+            self.assertIn(label, (0, 1))
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+        finally:
+            os.unlink(path)
+
 
 if __name__ == "__main__":
     unittest.main()
