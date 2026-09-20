@@ -7,7 +7,9 @@ CLI 模式:
 import csv
 import struct
 import sys
+import tkinter as tk
 from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 from typing import List
 
 
@@ -173,10 +175,125 @@ def _self_test() -> int:
     return 0
 
 
+class ModbusSimulatorApp:
+    """Modbus 主从通信模拟器 GUI。"""
+
+    COLOR_MASTER = "#0066CC"
+    COLOR_SLAVE = "#CC0033"
+
+    def __init__(self, root: tk.Tk, initial_file: str | None = None):
+        self.root = root
+        self.root.title("Modbus 模拟器")
+        self.root.geometry("900x650")
+
+        self.records: list[dict] = []
+        self.index: int = 0
+        self.current_file: str | None = None
+        self._auto_after_id: str | None = None
+        self._auto_enabled: bool = False
+        self._last_valid_interval: int = 500
+
+        self._build_ui()
+
+        if initial_file:
+            self._load_file(initial_file)
+
+    def _build_ui(self) -> None:
+        """构建完整 UI。"""
+        self._build_top_bar()
+        self._build_control_bar()
+        self._build_log_area()
+        self._build_detail_panel()
+
+    def _build_top_bar(self) -> None:
+        frame = ttk.Frame(self.root, padding=5)
+        frame.pack(fill="x")
+        ttk.Label(frame, text="Modbus 模拟器", font=("Microsoft YaHei", 12, "bold")).pack(side="left")
+        ttk.Label(frame, text="    记录总数:").pack(side="left")
+        self.total_label = ttk.Label(frame, text="0")
+        self.total_label.pack(side="left")
+        # 第二行
+        file_frame = ttk.Frame(self.root, padding=(5, 0, 5, 5))
+        file_frame.pack(fill="x")
+        ttk.Label(file_frame, text="当前文件:").pack(side="left")
+        self.file_label = ttk.Label(file_frame, text="未加载文件", foreground="gray")
+        self.file_label.pack(side="left", padx=(0, 10))
+        ttk.Button(file_frame, text="打开文件...", command=self._on_open_file).pack(side="left")
+
+    def _build_control_bar(self) -> None:
+        frame = ttk.Frame(self.root, padding=(5, 0, 5, 5))
+        frame.pack(fill="x")
+        ttk.Label(frame, text="已发送:").pack(side="left")
+        self.sent_label = ttk.Label(frame, text="0")
+        self.sent_label.pack(side="left", padx=(0, 10))
+        ttk.Button(frame, text="发送下一条", command=self._on_send_next).pack(side="left", padx=(0, 5))
+        ttk.Button(frame, text="重置", command=self._on_reset).pack(side="left", padx=(0, 15))
+        # 自动发送
+        self.auto_btn = ttk.Button(frame, text="自动发送: 关", command=self._on_toggle_auto)
+        self.auto_btn.pack(side="left", padx=(0, 10))
+        ttk.Label(frame, text="间隔:").pack(side="left")
+        self.interval_var = tk.StringVar(value="500")
+        self.interval_spin = ttk.Spinbox(
+            frame, from_=1, to=10000, width=6, textvariable=self.interval_var,
+            command=self._on_interval_change
+        )
+        self.interval_spin.pack(side="left", padx=(0, 3))
+        ttk.Label(frame, text="ms (1-10000)").pack(side="left")
+
+    def _build_log_area(self) -> None:
+        frame = ttk.LabelFrame(self.root, text="通信日志", padding=5)
+        frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.log_text = tk.Text(
+            frame, wrap="none", font=("Consolas", 10),
+            state="disabled", bg="#1E1E1E", fg="#E0E0E0"
+        )
+        scrollbar_y = ttk.Scrollbar(frame, orient="vertical", command=self.log_text.yview)
+        scrollbar_x = ttk.Scrollbar(frame, orient="horizontal", command=self.log_text.xview)
+        self.log_text.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+        self.log_text.grid(row=0, column=0, sticky="nsew")
+        scrollbar_y.grid(row=0, column=1, sticky="ns")
+        scrollbar_x.grid(row=1, column=0, sticky="ew")
+        frame.rowconfigure(0, weight=1)
+        frame.columnconfigure(0, weight=1)
+        # 配置 M/S 标签颜色 tag
+        self.log_text.tag_configure("M", foreground=self.COLOR_MASTER)
+        self.log_text.tag_configure("S", foreground=self.COLOR_SLAVE)
+        self.log_text.tag_configure("timestamp", foreground="#888888")
+
+    def _build_detail_panel(self) -> None:
+        frame = ttk.LabelFrame(self.root, text="当前帧详情", padding=5)
+        frame.pack(fill="x", padx=5, pady=(0, 5))
+        self.detail_text = tk.Text(frame, height=3, font=("Consolas", 9), state="disabled",
+                                    bg="#F5F5F5")
+        self.detail_text.pack(fill="x")
+
+    # ---- 占位方法（后续任务实现） ----
+    def _on_open_file(self) -> None:
+        pass
+
+    def _on_send_next(self) -> None:
+        pass
+
+    def _on_reset(self) -> None:
+        pass
+
+    def _on_toggle_auto(self) -> None:
+        pass
+
+    def _on_interval_change(self) -> None:
+        pass
+
+    def _load_file(self, path: str) -> None:
+        pass
+
+
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
         return _self_test()
-    print("GUI mode not yet implemented")
+    root = tk.Tk()
+    initial = sys.argv[1] if len(sys.argv) > 1 else None
+    app = ModbusSimulatorApp(root, initial_file=initial)
+    root.mainloop()
     return 0
 
 
