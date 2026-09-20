@@ -154,10 +154,28 @@ def load_records(path: str) -> list[dict]:
     return records
 
 
+def _self_test() -> int:
+    """打印前 5 条记录的 hex 帧用于验证。"""
+    default_csv = Path(__file__).parent / "IanArffDataset.csv"
+    if not default_csv.exists():
+        print(f"ERROR: 默认数据文件不存在: {default_csv}")
+        return 1
+    records = load_records(str(default_csv))
+    print(f"Loaded {len(records)} records from {default_csv.name}")
+    print("-" * 60)
+    for i, rec in enumerate(records[:5]):
+        frame = build_frame(rec)
+        hex_str = frame_to_hex(frame)
+        tag = "M" if rec["command"] == 1 else "S"
+        print(f"[{i+1}] [{tag}] {hex_str}")
+    print("-" * 60)
+    print(f"Frame length: {len(build_frame(records[0]))} bytes")
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--self-test":
-        print("Self-test mode not yet implemented")
-        return 1
+        return _self_test()
     print("GUI mode not yet implemented")
     return 0
 
