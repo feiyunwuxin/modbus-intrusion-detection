@@ -6,6 +6,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ids import FEATURE_COLUMNS, extract_features, load_model, list_available_models, ModelWrapper
 
+try:
+    import torch
+    import torch.nn as nn
+
+    class _TinyTorchModel(nn.Module):
+        """模块级定义，避免 torch.save 无法 pickle 局部类。"""
+
+        def __init__(self, in_features: int = 17):
+            super().__init__()
+            self.fc = nn.Linear(in_features, 2)
+
+        def forward(self, x):
+            return self.fc(x)
+except ImportError:
+    _TinyTorchModel = None
+
 
 _FULL_ROW = {
     "address": 4, "function": 3, "length": 16,
@@ -138,6 +154,49 @@ class TestLoadSklearn(unittest.TestCase):
             self.assertIn("model_b.pt", names)
             self.assertNotIn("other.txt", names)
             self.assertNotIn("model_no_ext", names)
+
+
+class TestLoadTorch(unittest.TestCase):
+    def _make_dummy_torch(self, in_features: int = 17) -> str:
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        model = _TinyTorchModel(in_features)
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(model, f.name)
+            return f.name
+
+    def test_load_torch_returns_wrapper(self):
+        path = self._make_dummy_torch(17)
+        try:
+            from ids import load_model
+            wrapper = load_model(path)
+            self.assertEqual(wrapper.input_features, 17)
+        finally:
+            os.unlink(path)
+
+    def test_load_torch_infer(self):
+        import numpy as np
+        path = self._make_dummy_torch(17)
+        try:
+            from ids import load_model
+            wrapper = load_model(path)
+            features = np.zeros(17, dtype=np.float32)
+            label, prob = wrapper.infer(features)
+            self.assertIn(label, (0, 1))
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+        finally:
+            os.unlink(path)
+
+    def test_load_torch_wrong_features_raises(self):
+        path = self._make_dummy_torch(5)
+        try:
+            from ids import load_model
+            with self.assertRaises(ValueError) as ctx:
+                load_model(path)
+            self.assertIn("17", str(ctx.exception))
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":

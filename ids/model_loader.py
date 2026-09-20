@@ -56,6 +56,34 @@ class _SklearnWrapper:
         return label, prob_attack
 
 
+class _TorchWrapper:
+    """PyTorch 模型包装（仅支持 Linear 输入）。"""
+
+    def __init__(self, model, n_features: int):
+        self._model = model
+        self._n = n_features
+
+    @property
+    def input_features(self) -> int:
+        return self._n
+
+    def infer(self, features) -> tuple[int, float]:
+        import numpy as np
+        import torch
+        x = torch.as_tensor(np.asarray(features, dtype=np.float32)).unsqueeze(0)
+        self._model.eval()
+        with torch.no_grad():
+            logits = self._model(x)
+        if logits.dim() == 2 and logits.shape[-1] >= 2:
+            probs = torch.softmax(logits, dim=-1)[0]
+            prob_attack = float(probs[-1])
+        else:
+            # 单输出 sigmoid
+            prob_attack = float(torch.sigmoid(logits).flatten()[0])
+        label = 1 if prob_attack >= 0.5 else 0
+        return label, prob_attack
+
+
 def load_model(path: str) -> ModelWrapper:
     """按扩展名加载模型。
 
@@ -91,9 +119,30 @@ def _load_sklearn(p: Path) -> ModelWrapper:
     return _SklearnWrapper(model, 17)
 
 
+def _detect_torch_input_features(model) -> int | None:
+    """从 PyTorch 模型探测第一个 Linear 层的 in_features。"""
+    import torch.nn as nn
+    for module in model.modules():
+        if isinstance(module, nn.Linear):
+            return module.in_features
+    return None
+
+
 def _load_torch(p: Path) -> ModelWrapper:
-    """占位实现，Task 3 替换。"""
-    raise NotImplementedError("PyTorch 加载在 Task 3 实现")
+    try:
+        import torch
+    except ImportError as e:
+        raise RuntimeError(
+            "torch 未安装，无法加载 .pt 模型。请运行: pip install torch"
+        ) from e
+    model = torch.load(p, map_location="cpu", weights_only=False)
+    n = _detect_torch_input_features(model)
+    if n != 17:
+        raise ValueError(
+            f"模型输入特征数为 {n}，但 IDS 仅支持 17 特征。"
+            "3D 窗口模型（如 TCN/LSTM）请选择其他模型。"
+        )
+    return _TorchWrapper(model, 17)
 
 
 def list_available_models(directory: str) -> list[str]:
