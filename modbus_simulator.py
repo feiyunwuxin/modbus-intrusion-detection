@@ -4,8 +4,10 @@ CLI 模式:
     python modbus_simulator.py [data_file]   # 启动 GUI
     python modbus_simulator.py --self-test   # 自检模式
 """
+import csv
 import struct
 import sys
+from pathlib import Path
 from typing import List
 
 
@@ -54,6 +56,102 @@ def build_frame(record: dict) -> List[int]:
 def frame_to_hex(frame: List[int]) -> str:
     """将字节列表格式化为 'XX XX ... XX'。"""
     return " ".join(f"{b:02X}" for b in frame)
+
+
+REQUIRED_COLUMNS = ("address", "function", "length", "crc", "command", "time")
+
+
+def _coerce_number(value):
+    """将字符串转为数字（保留浮点精度给原值）；空值返回 0。"""
+    if value is None or value == "":
+        return 0
+    try:
+        if "." in str(value):
+            return float(value)
+        return int(value)
+    except (TypeError, ValueError):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0
+
+
+def _normalize_row(row: dict) -> dict:
+    """标准化一行记录：所有数值字段转为数字（必需列强制转，其它列若可转也转）。"""
+    out = {}
+    for k, v in row.items():
+        if k in REQUIRED_COLUMNS:
+            out[k] = _coerce_number(v)
+        else:
+            # 其它列：尝试转数字；不能转则保留原值
+            try:
+                if v is None or v == "":
+                    out[k] = v
+                elif "." in str(v):
+                    out[k] = float(v)
+                else:
+                    out[k] = int(v)
+            except (TypeError, ValueError):
+                out[k] = v
+    return out
+
+
+def _load_csv(path: Path) -> list[dict]:
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+    return [_normalize_row(r) for r in rows]
+
+
+def _load_xlsx(path: Path) -> list[dict]:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as e:
+        raise RuntimeError(
+            "openpyxl 未安装，无法读取 .xlsx 文件。请运行: pip install openpyxl"
+        ) from e
+    wb = load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header = next(rows_iter)
+    except StopIteration:
+        return []
+    header = [str(h) for h in header]
+    records = []
+    for row in rows_iter:
+        if row is None or all(c is None for c in row):
+            continue
+        record = {header[i]: row[i] for i in range(len(header)) if i < len(row)}
+        records.append(_normalize_row(record))
+    wb.close()
+    return records
+
+
+def load_records(path: str) -> list[dict]:
+    """加载 CSV 或 XLSX 数据文件，返回标准化记录列表。
+
+    Raises:
+        FileNotFoundError: 文件不存在
+        ValueError: 缺少必需列
+        RuntimeError: openpyxl 未安装（仅 xlsx 时）
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"文件不存在: {path}")
+    ext = p.suffix.lower()
+    if ext == ".csv":
+        records = _load_csv(p)
+    elif ext == ".xlsx":
+        records = _load_xlsx(p)
+    else:
+        raise ValueError(f"不支持的文件格式: {ext}（仅支持 .csv / .xlsx）")
+    # 校验必需列
+    if records:
+        missing = [c for c in REQUIRED_COLUMNS if c not in records[0]]
+        if missing:
+            raise ValueError(f"文件缺少必需列: {', '.join(missing)}")
+    return records
 
 
 def main() -> int:
