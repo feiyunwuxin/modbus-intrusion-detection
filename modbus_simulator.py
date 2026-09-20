@@ -269,13 +269,30 @@ class ModbusSimulatorApp:
 
     # ---- 占位方法（后续任务实现） ----
     def _on_open_file(self) -> None:
-        pass
+        path = filedialog.askopenfilename(
+            title="选择数据文件",
+            filetypes=[
+                ("数据文件", "*.xlsx *.csv"),
+                ("Excel", "*.xlsx"),
+                ("CSV", "*.csv"),
+            ],
+        )
+        if not path:
+            return  # 用户取消
+        self._stop_auto()  # 切换文件前关闭自动发送
+        self._load_file(path)
 
     def _on_send_next(self) -> None:
         pass
 
-    def _on_reset(self) -> None:
-        pass
+    def _on_reset(self, clear_log: bool = True) -> None:
+        """重置索引和日志（可不清空日志，用于加载新文件时）。"""
+        self._stop_auto()
+        self.index = 0
+        self.sent_label.configure(text="0")
+        if clear_log:
+            self._clear_log()
+        self._clear_detail()
 
     def _on_toggle_auto(self) -> None:
         pass
@@ -283,8 +300,51 @@ class ModbusSimulatorApp:
     def _on_interval_change(self) -> None:
         pass
 
+    def _stop_auto(self) -> None:
+        """停止自动发送。"""
+        if self._auto_after_id is not None:
+            try:
+                self.root.after_cancel(self._auto_after_id)
+            except Exception:
+                pass
+            self._auto_after_id = None
+        if self._auto_enabled:
+            self._auto_enabled = False
+            self.auto_btn.configure(text="自动发送: 关")
+
+    def _clear_log(self) -> None:
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", "end")
+        self.log_text.configure(state="disabled")
+
+    def _clear_detail(self) -> None:
+        self.detail_text.configure(state="normal")
+        self.detail_text.delete("1.0", "end")
+        self.detail_text.configure(state="disabled")
+
     def _load_file(self, path: str) -> None:
-        pass
+        """加载数据文件，更新 UI 状态。失败时弹窗并保持当前状态。"""
+        try:
+            records = load_records(path)
+        except FileNotFoundError:
+            messagebox.showerror("加载失败", f"文件不存在:\n{path}")
+            return
+        except RuntimeError as e:
+            messagebox.showinfo("缺少依赖", str(e))
+            return
+        except ValueError as e:
+            messagebox.showerror("加载失败", str(e))
+            return
+        except Exception as e:
+            messagebox.showerror("加载失败", f"未知错误: {e}")
+            return
+        # 成功：更新状态
+        self.records = records
+        self.index = 0
+        self.current_file = path
+        self._on_reset(clear_log=False)
+        self.file_label.configure(text=path, foreground="black")
+        self.total_label.configure(text=str(len(records)))
 
 
 def main() -> int:
