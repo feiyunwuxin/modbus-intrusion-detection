@@ -283,7 +283,52 @@ class ModbusSimulatorApp:
         self._load_file(path)
 
     def _on_send_next(self) -> None:
-        pass
+        """发送当前索引对应的记录，索引 +1。"""
+        if not self.records:
+            messagebox.showinfo("提示", "请先加载数据文件")
+            return
+        if self.index >= len(self.records):
+            return  # 已在末尾
+        record = self.records[self.index]
+        frame = build_frame(record)
+        hex_str = frame_to_hex(frame)
+        tag = "M" if record["command"] == 1 else "S"
+        self._append_log(tag, hex_str)
+        self._update_detail(record, hex_str)
+        self.index += 1
+        self.sent_label.configure(text=str(self.index))
+
+    def _append_log(self, tag: str, hex_str: str) -> None:
+        """追加一条日志行：[HH:MM:SS] [M/S] HEX"""
+        from datetime import datetime
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = f"[{ts}] [{tag}] {hex_str}\n"
+        self.log_text.configure(state="normal")
+        # 先写时间戳（灰色），再写 M/S 标签（颜色），再写 hex（默认色）
+        self.log_text.insert("end", f"[{ts}] ", "timestamp")
+        self.log_text.insert("end", f"[{tag}] ", tag)
+        self.log_text.insert("end", f"{hex_str}\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def _update_detail(self, record: dict, hex_str: str) -> None:
+        """更新详情面板。"""
+        from datetime import datetime
+        try:
+            ts_str = datetime.fromtimestamp(int(record["time"])).strftime("%Y-%m-%d %H:%M:%S")
+        except (ValueError, OSError):
+            ts_str = str(record["time"])
+        cmd = int(record["command"])
+        role = "Master" if cmd == 1 else "Slave"
+        detail = (
+            f"address={record['address']}  function={record['function']}  "
+            f"length={record['length']}  crc={record['crc']}\n"
+            f"command={cmd} [{role}]  time={ts_str} ({record['time']})"
+        )
+        self.detail_text.configure(state="normal")
+        self.detail_text.delete("1.0", "end")
+        self.detail_text.insert("1.0", detail)
+        self.detail_text.configure(state="disabled")
 
     def _on_reset(self, clear_log: bool = True) -> None:
         """重置索引和日志（可不清空日志，用于加载新文件时）。"""
