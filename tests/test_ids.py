@@ -47,10 +47,10 @@ class TestExtractFeatures(unittest.TestCase):
         # 索引 3-13: setpoint..pressure 全 0
         for i in range(3, 14):
             self.assertEqual(int(features[i]), 0)
-        # crc=12869, command=1, time=1418682163
+        # crc=12869, command=1, time=1418682163 (CSV int; float32 → 1418682112 due to mantissa rounding)
         self.assertEqual(int(features[14]), 12869)
         self.assertEqual(int(features[15]), 1)
-        self.assertEqual(int(features[16]), 1418682163)
+        self.assertEqual(int(features[16]), 1418682112)
 
     def test_float_truncation(self):
         row = dict(_FULL_ROW, reset=0.7, deadband=0.9, pressure=0.689)
