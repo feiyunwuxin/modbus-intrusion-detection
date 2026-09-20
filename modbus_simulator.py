@@ -340,10 +340,57 @@ class ModbusSimulatorApp:
         self._clear_detail()
 
     def _on_toggle_auto(self) -> None:
-        pass
+        if not self.records:
+            messagebox.showinfo("提示", "请先加载数据文件")
+            return
+        if self._auto_enabled:
+            self._stop_auto()
+        else:
+            self._start_auto()
+
+    def _start_auto(self) -> None:
+        interval = self._validate_interval()
+        self._auto_enabled = True
+        self.auto_btn.configure(text="自动发送: 开")
+        self._schedule_next_tick(interval)
+
+    def _schedule_next_tick(self, interval_ms: int) -> None:
+        if not self._auto_enabled:
+            return
+        self._auto_after_id = self.root.after(interval_ms, self._auto_tick)
+
+    def _auto_tick(self) -> None:
+        """自动发送 tick：发一条 + 调度下一条。"""
+        if not self._auto_enabled:
+            return
+        if self.index >= len(self.records):
+            self._stop_auto()
+            return
+        self._on_send_next()
+        interval = self._validate_interval()
+        self._schedule_next_tick(interval)
+
+    def _validate_interval(self) -> int:
+        """读取并校验间隔输入，返回合法值（非法回退到上次合法值）。"""
+        try:
+            v = int(self.interval_var.get())
+            if 1 <= v <= 10000:
+                self._last_valid_interval = v
+                return v
+        except ValueError:
+            pass
+        # 回退
+        self.interval_var.set(str(self._last_valid_interval))
+        return self._last_valid_interval
 
     def _on_interval_change(self) -> None:
-        pass
+        """Spinbox 值变更：实时校验，更新最后合法值（不影响正在运行的 after）。"""
+        try:
+            v = int(self.interval_var.get())
+            if 1 <= v <= 10000:
+                self._last_valid_interval = v
+        except ValueError:
+            pass
 
     def _stop_auto(self) -> None:
         """停止自动发送。"""
