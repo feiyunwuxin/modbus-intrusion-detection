@@ -200,20 +200,19 @@ class ModbusSimulatorApp:
 
     def _build_ui(self) -> None:
         """构建左右两栏：左侧 Modbus 模拟器，右侧 IDS 面板。"""
-        # 左侧：原 Modbus 区域（top + control + log + detail）
-        left = ttk.Frame(self.root, padding=5)
-        # PanedWindow 让用户拖动分割条
+        # PanedWindow 让用户拖动分割条；先建好，paned 再作为子组件的 parent
         paned = ttk.PanedWindow(self.root, orient="horizontal")
         paned.pack(fill="both", expand=True)
+        # 左侧：原 Modbus 区域（top + control + log + detail）
+        left = ttk.Frame(paned, padding=5)
         paned.add(left, weight=3)
-        # 左侧内部布局
         self._build_top_bar(left)
         self._build_control_bar(left)
         self._build_log_area(left)
         self._build_detail_panel(left)
         # 右侧：IDS 面板
         from ids_panel import IDsPanel
-        self.ids_panel = IDsPanel(self.root, app=self)
+        self.ids_panel = IDsPanel(paned, app=self)
         paned.add(self.ids_panel, weight=2)
 
     def _build_top_bar(self, parent) -> None:
