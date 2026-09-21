@@ -36,6 +36,7 @@ class IDsPanel(ttk.Frame):
         self._app = app  # ModbusSimulatorApp reference (for stats etc.)
         self.wrapper: ModelWrapper | None = None
         self.threshold: float = 0.5
+        self.window_size: int = 1  # 1=单帧；>1=3D 窗口 (LSTM/CNN1d)
         self._stats = {"total": 0, "normal": 0, "attack": 0, "correct": 0}
         self._build_ui()
         self._refresh_models()
@@ -76,6 +77,17 @@ class IDsPanel(ttk.Frame):
         self.threshold_scale.grid(row=2, column=1, sticky="ew", padx=(5, 5), pady=(5, 0))
         self.threshold_label = ttk.Label(frame, text="0.50")
         self.threshold_label.grid(row=2, column=2, pady=(5, 0))
+        # 窗口大小 (1=单帧；>1=3D 窗口模型所需，如 BiLSTM/Conv1d)
+        ttk.Label(frame, text="窗口:").grid(row=3, column=0, sticky="w", pady=(5, 0))
+        self.window_size_var = tk.IntVar(value=16)
+        self.window_size_spin = ttk.Spinbox(
+            frame, from_=1, to=64, increment=1, textvariable=self.window_size_var,
+            width=8, command=self._on_window_size_change,
+        )
+        self.window_size_spin.grid(row=3, column=1, sticky="w", padx=(5, 5), pady=(5, 0))
+        ttk.Label(frame, text="(1=单帧；16=BiLSTM 默认)").grid(
+            row=3, column=2, sticky="w", pady=(5, 0)
+        )
         frame.columnconfigure(1, weight=1)
 
     def _build_stats_section(self) -> None:
@@ -102,6 +114,7 @@ class IDsPanel(ttk.Frame):
         self.results_tree.tag_configure("normal", foreground="#006633")
         self.results_tree.tag_configure("attack", foreground="#CC0033")
         self.results_tree.tag_configure("error", foreground="#888888")
+        self.results_tree.tag_configure("warmup", foreground="#999999")
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.results_tree.yview)
         self.results_tree.configure(yscrollcommand=scrollbar.set)
         self.results_tree.pack(side="left", fill="both", expand=True)
@@ -109,14 +122,142 @@ class IDsPanel(ttk.Frame):
 
     # ---- 模型管理 ----
 
+    @staticmethod
+    def _probe_model(path: str) -> dict:
+        """快速预分类模型，返回 {"compatible": bool, "n_features": int|None,
+        "kind": str, "window_size": int}。不抛异常。
+
+        kind 取值: "BiLSTM", "GRU", "FNN", "Conv1d", "sklearn-17",
+                   "wrong_features", "incompatible_3d", "unknown",
+                   "missing_dep", "load_error"。
+        """
+        from pathlib import Path
+        p = Path(path)
+        if not p.exists():
+            return {"compatible": False, "n_features": None,
+                    "kind": "missing_dep", "window_size": 1}
+        try:
+            import joblib
+        except ImportError:
+            joblib = None
+        try:
+            import torch
+        except ImportError:
+            torch = None
+        try:
+            if p.suffix.lower() == ".joblib" and joblib is not None:
+                m = joblib.load(p)
+                n = getattr(m, "n_features_in_", None)
+                if n == 17:
+                    return {"compatible": True, "n_features": 17,
+                            "kind": "sklearn-17", "window_size": 1}
+                return {"compatible": False, "n_features": n,
+                        "kind": "wrong_features", "window_size": 1}
+            if p.suffix.lower() == ".pt" and torch is not None:
+                obj = torch.load(p, map_location="cpu", weights_only=False)
+                if isinstance(obj, dict) and "state_dict" in obj:
+                    sd = obj["state_dict"]
+                elif isinstance(obj, dict):
+                    sd = obj
+                else:
+                    # nn.Module: 探测第一个 Linear
+                    n = None
+                    for mod in obj.modules():
+                        if isinstance(mod, torch.nn.Linear):
+                            n = mod.in_features
+                            break
+                    if n == 17:
+                        return {"compatible": True, "n_features": 17,
+                                "kind": "FNN", "window_size": 1}
+                    return {"compatible": False, "n_features": n,
+                            "kind": "wrong_features", "window_size": 1}
+                # state_dict: 探测 lstm/gru/conv 关键字 + 第一层 Linear in_features
+                has_lstm = any(k.startswith(("lstm.", "gru.")) for k in sd)
+                has_3d = any(hasattr(v, "dim") and v.dim() == 3 for v in sd.values())
+                # BiLSTM/GRU：input_size 必须从 weight_ih_l0 读，classifier fc1 形状不可信
+                if has_lstm:
+                    import re
+                    pat = re.compile(r"^(lstm|gru)\.weight_ih_l0(_reverse)?$")
+                    in_size = None
+                    gate = None
+                    has_reverse = False
+                    is_lstm_module = False
+                    for k, v in sd.items():
+                        m = pat.match(k)
+                        if m and hasattr(v, "dim") and v.dim() == 2:
+                            in_size = int(v.shape[1])
+                            gate = int(v.shape[0])
+                            mod_name = m.group(1)  # lstm or gru
+                            if "_reverse" in k:
+                                has_reverse = True
+                            if mod_name == "lstm":
+                                is_lstm_module = True
+                    if in_size is not None and gate is not None:
+                        family = "LSTM" if is_lstm_module else "GRU"
+                        prefix = "Bi" if has_reverse else ""
+                        mod_kind = f"{prefix}{family}"
+                        return {"compatible": in_size == 17,
+                                "n_features": in_size,
+                                "kind": mod_kind if in_size == 17 else "wrong_features",
+                                "window_size": 16}
+                # 非 RNN：从第一个非-RNN/Conv 的 2D weight 取 in_features
+                first_linear_in = None
+                for k, v in sd.items():
+                    if hasattr(v, "dim") and v.dim() == 2 and not (
+                            "lstm" in k.lower() or "gru" in k.lower() or "conv" in k.lower()):
+                        first_linear_in = int(v.shape[1])
+                        break
+                if has_3d:
+                    # CNN/Conv1d 风格：需要更细探测；这里仅粗分类
+                    return {"compatible": first_linear_in == 17,
+                            "n_features": first_linear_in,
+                            "kind": "Conv1d" if first_linear_in == 17 else "wrong_features",
+                            "window_size": 16}
+                if first_linear_in is None:
+                    return {"compatible": False, "n_features": None,
+                            "kind": "unknown", "window_size": 1}
+                if first_linear_in != 17:
+                    return {"compatible": False, "n_features": first_linear_in,
+                            "kind": "wrong_features", "window_size": 1}
+                return {"compatible": True, "n_features": 17,
+                        "kind": "FNN", "window_size": 1}
+            return {"compatible": False, "n_features": None,
+                    "kind": "missing_dep", "window_size": 1}
+        except Exception:
+            return {"compatible": False, "n_features": None,
+                    "kind": "load_error", "window_size": 1}
+
     def _refresh_models(self) -> None:
         from pathlib import Path
         project_dir = Path(__file__).parent
         paths = list_available_models(str(project_dir))
         self._available_paths = paths
-        names = [Path(p).name for p in paths]
-        self.model_combo["values"] = names
-        if names and not self.model_var.get():
+        # 预分类每个模型，UI 上加标签提示兼容性
+        tagged_names: list[str] = []
+        first_compatible_idx: int | None = None
+        for i, p in enumerate(paths):
+            info = self._probe_model(p)
+            base = Path(p).name
+            if info["compatible"]:
+                tag = f"✅ {info['kind']} ({info['n_features']}f)"
+                if info["window_size"] > 1:
+                    tag += f" window={info['window_size']}"
+                if first_compatible_idx is None:
+                    first_compatible_idx = i
+            elif info["kind"] == "wrong_features":
+                tag = f"⚠ {info['n_features']}特征(需17)"
+            elif info["kind"] == "load_error":
+                tag = "❌ 加载错误"
+            else:
+                tag = f"⚠ {info['kind']}"
+            tagged_names.append(f"{base}  {tag}")
+        self.model_combo["values"] = tagged_names
+        # 自动选第一个兼容模型；若已有用户选择则保留
+        if first_compatible_idx is not None and not self.model_var.get():
+            self.model_combo.current(first_compatible_idx)
+            self._on_model_selected()
+            return
+        if paths and not self.model_var.get():
             self.model_combo.current(0)
             self._on_model_selected()
 
@@ -126,15 +267,64 @@ class IDsPanel(ttk.Frame):
         if idx < 0 or idx >= len(self._available_paths):
             return
         path = self._available_paths[idx]
+        # 从 Spinbox 读取窗口大小 (Spinbox 内部值字符串可能非数字)
         try:
-            wrapper = load_model(path)
+            ws = int(self.window_size_var.get())
+        except (tk.TclError, ValueError):
+            ws = 1
+        ws = max(1, ws)
+        self.window_size = ws
+        try:
+            wrapper = load_model(path, window_size=ws)
             self.wrapper = wrapper
             name = Path(path).name
-            self.status_var.set(f"已加载 {name} ({wrapper.input_features} features)")
-        except (FileNotFoundError, ValueError, RuntimeError, AttributeError) as e:
+            ws_tag = f", window={ws}" if ws > 1 else ""
+            self.status_var.set(
+                f"已加载 {name} ({wrapper.input_features} features{ws_tag})"
+            )
+        except ValueError as e:
+            # 3D 模型 + window_size=1 的常见情形：自动升级到 16 并重试
+            msg = str(e)
+            if ws == 1 and ("LSTM" in msg or "3D" in msg or "窗口" in msg):
+                try:
+                    wrapper = load_model(path, window_size=16)
+                    self.wrapper = wrapper
+                    self.window_size = 16
+                    try:
+                        self.window_size_var.set(16)
+                    except (tk.TclError, Exception):
+                        pass
+                    name = Path(path).name
+                    self.status_var.set(
+                        f"已加载 {name} ({wrapper.input_features} features, "
+                        f"window=16 自动升级)"
+                    )
+                    return
+                except Exception as e2:
+                    self.wrapper = None
+                    self.status_var.set(f"加载失败: {e2}")
+                    messagebox.showerror("模型加载失败", str(e2))
+                    return
+            self.wrapper = None
+            self.status_var.set(f"加载失败: {e}")
+            messagebox.showerror("模型加载失败", msg)
+        except (FileNotFoundError, RuntimeError, AttributeError) as e:
             self.wrapper = None
             self.status_var.set(f"加载失败: {e}")
             messagebox.showerror("模型加载失败", str(e))
+
+    def _on_window_size_change(self) -> None:
+        """窗口大小变化时，若已加载模型则提示需重新选择。"""
+        try:
+            ws = int(self.window_size_var.get())
+        except (tk.TclError, ValueError):
+            return
+        ws = max(1, ws)
+        self.window_size = ws
+        if self.wrapper is not None:
+            self.status_var.set(
+                f"窗口已改为 {ws}，请重新选择模型以重新加载"
+            )
 
     # ---- 阈值 ----
 
@@ -152,29 +342,42 @@ class IDsPanel(ttk.Frame):
         hex_bytes = self._hex_preview(record)
         try:
             features = extract_features(record)
-            label, prob = self.wrapper.infer(features)
-            # 重新应用当前阈值
-            label = 1 if prob >= self.threshold else 0
-            correct = "✓" if label == truth else "✗"
-            tag = "attack" if label == 1 else "normal"
-            prob_str = f"{prob:.3f}"
+            result = self.wrapper.infer(features)
         except Exception as e:
             label, prob, correct, tag, prob_str = -1, 0.0, "?", "error", f"ERR"
             print(f"[IDS] 推理失败 (frame {frame_index}): {e}")
+            self._record_frame(frame_index, hex_bytes, truth, label, prob_str, correct, tag)
+            self._update_stats(label, truth, label >= 0)
+            return
 
-        # 更新列表
+        # 3D 模型 warm-up：窗口未填满时 wrapper 返回 None
+        if result is None:
+            label, prob, correct, tag, prob_str = -2, 0.0, "·", "warmup", "warm"
+            self._record_frame(frame_index, hex_bytes, truth, label, prob_str, correct, tag)
+            # warm-up 不计入准确率统计（既非预测也非错误）
+            return
+
+        label, prob = result
+        # 重新应用当前阈值
+        label = 1 if prob >= self.threshold else 0
+        correct = "✓" if label == truth else "✗"
+        tag = "attack" if label == 1 else "normal"
+        prob_str = f"{prob:.3f}"
+        self._record_frame(frame_index, hex_bytes, truth, label, prob_str, correct, tag)
+        self._update_stats(label, truth, label >= 0)
+
+    def _record_frame(self, frame_index: int, hex_bytes: str, truth: int,
+                      label: int, prob_str: str, correct: str, tag: str) -> None:
+        """插入一条记录到 Treeview 并做 LRU 截断。"""
         self.results_tree.insert(
             "", "end",
             values=(frame_index + 1, hex_bytes, truth, label, prob_str, correct),
             tags=(tag,)
         )
-        # LRU 截断
         children = self.results_tree.get_children()
         if len(children) > _MAX_RESULTS:
             for c in children[:len(children) - _MAX_RESULTS]:
                 self.results_tree.delete(c)
-        # 更新统计
-        self._update_stats(label, truth, label >= 0)
 
     def clear(self) -> None:
         for c in self.results_tree.get_children():
