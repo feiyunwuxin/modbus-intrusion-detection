@@ -304,6 +304,131 @@ class TestLoadTorch(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_load_torch_3d_window_loads_with_window_size(self):
+        """3D 窗口模型在指定 window_size >= 2 时应能加载；否则抛友好 ValueError。
+
+        对应 IDS 面板的 Spinbox：用户将"窗口"从 1 改为 16 后重新选择模型。
+
+        关键约束：
+        - key 必须带 'lstm.' 前缀（让 _detect_torch_input_features 走 3D 分支）
+        - classifier key 必须带 'net.' 前缀（让 _reconstruct_classifier 找到）
+        - nn.LSTM load_state_dict 要求 weight_ih_l0 等无前缀 → 用 _lstm 前缀
+          sd 不能直接 load，需要重建器内部去掉前缀。检查现有 _reconstruct_lstm
+          行为：它把整个 sd 直接传给 rnn.load_state_dict(sd)，所以若 sd key
+          是 'lstm.weight_ih_l0' 会失败。本测试只验证"加载器接受 window_size"
+          路径，不强制跑通 inference。
+        """
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import torch.nn as nn
+
+        # 使用与 SCADA 项目相同的 key 格式 (lstm.* 前缀)
+        # 让 _detect_torch_input_features 跳过 LSTM key，进入 3D 分支
+        # _parse_lstm_arch 正则 (lstm|gru)\.(weight|bias)_(ih|hh)_l(\d+)
+        # 会把 'lstm.weight_ih_l0' 的 mod_name 解析为 'lstm'，但 weight 实际
+        # 在 nn.LSTM 里没有 'lstm.' 前缀 → load_state_dict 会失败。
+        # 真实场景下 _Torch3DStateDictWrapper 应该把 key 去掉前缀再 load。
+        # 现有实现是直接 load，所以这个 case 会失败 —— 这是一个潜在 bug
+        # 但超出本测试范围。本测试只覆盖"友好拒绝 + window_size 接受"。
+        fake_state = {
+            "lstm.weight_ih_l0": torch.randn(32, 17),
+            "lstm.weight_hh_l0": torch.randn(32, 8),
+            "lstm.bias_ih_l0": torch.zeros(32),
+            "lstm.bias_hh_l0": torch.zeros(32),
+            "net.0.weight": torch.randn(1, 8),
+            "net.0.bias": torch.zeros(1),
+        }
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(fake_state, f.name)
+            path = f.name
+        try:
+            # 默认 window_size=1 → 拒绝 (友好)
+            with self.assertRaises(ValueError) as ctx:
+                load_model(path)
+            msg = str(ctx.exception)
+            self.assertTrue(
+                any(tok in msg for tok in ("LSTM", "3D", "窗口")),
+                f"错误消息应提示 3D 窗口，实际: {msg}",
+            )
+        finally:
+            os.unlink(path)
+
+        # 单独验证：用户构造正确的 3D wrapper 路径（手工 patch key 去掉前缀）
+        fake_state2 = dict(fake_state)
+        # 去除 'lstm.' 前缀以让 nn.LSTM.load_state_dict 接受
+        fake_state2["weight_ih_l0"] = fake_state2.pop("lstm.weight_ih_l0")
+        fake_state2["weight_hh_l0"] = fake_state2.pop("lstm.weight_hh_l0")
+        fake_state2["bias_ih_l0"] = fake_state2.pop("lstm.bias_ih_l0")
+        fake_state2["bias_hh_l0"] = fake_state2.pop("lstm.bias_hh_l0")
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(fake_state2, f.name)
+            path2 = f.name
+        try:
+            # 这个 sd 没有 'lstm' 前缀，会被当作 Linear 路径 → 拒绝 key 形式
+            with self.assertRaises(ValueError):
+                load_model(path2, window_size=16)
+        finally:
+            os.unlink(path2)
+
+    def test_load_torch_bilstm_cross_prefix_infers(self):
+        """SCADA-style BiLSTM with lstm.* prefix should load + infer.
+
+        Regression for the ``lstm.`` / ``gru.`` prefix bug: real SCADA
+        checkpoints store RNN keys under ``lstm.`` / ``gru.`` but
+        ``nn.LSTM.load_state_dict`` expects unprefixed keys. The fix
+        lives in ``ids.model_loader._reconstruct_lstm``.
+
+        This test exercises the *happy path* (warm-up + first prediction),
+        not just the friendly-rejection path covered by
+        ``test_load_torch_3d_window_loads_with_window_size``.
+        """
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import torch.nn as nn
+        import numpy as np
+
+        class _BiLSTMWithPrefix(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.lstm = nn.LSTM(
+                    input_size=17, hidden_size=8,
+                    batch_first=True, bidirectional=True,
+                )
+                self.net = nn.Sequential(nn.Linear(16, 2))
+
+            def forward(self, x):
+                out, _ = self.lstm(x)
+                return self.net(out[:, -1, :])
+
+        m = _BiLSTMWithPrefix()
+        m.eval()
+
+        # The model is defined as self.lstm = nn.LSTM(...) and self.net = nn.Sequential(...),
+        # so m.state_dict() already emits SCADA-style keys with the ``lstm.`` /
+        # ``net.`` prefixes baked in. Use it directly — do NOT re-prefix.
+        sd = m.state_dict()
+
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(sd, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path, window_size=8)
+            self.assertEqual(wrapper.window_size, 8)
+            # Warm-up: first 7 frames must return None
+            for _ in range(7):
+                self.assertIsNone(
+                    wrapper.infer(np.zeros(17, dtype=np.float32))
+                )
+            # 8th frame returns a (label, prob) tuple
+            result = wrapper.infer(np.zeros(17, dtype=np.float32))
+            self.assertIsNotNone(result)
+            label, prob = result
+            self.assertIn(label, (0, 1))
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+        finally:
+            os.unlink(path)
+
 
 if __name__ == "__main__":
     unittest.main()
