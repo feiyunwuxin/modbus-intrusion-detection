@@ -429,6 +429,117 @@ class TestLoadTorch(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_load_torch_bilstm_with_normalization_keys(self):
+        """state_dict 含 __norm_mean__ / __norm_std__ 时, _Torch3DStateDictWrapper
+        应识别并在 infer 前对每帧做 (x - mean) / std。
+
+        这些 key 是 'magic' — 不被 _parse_lstm_arch / _reconstruct_lstm /
+        _reconstruct_classifier 处理。本测试确保它们被检测到并生效。
+        """
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import torch.nn as nn
+        import numpy as np
+
+        class _BiLSTMNorm(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.lstm = nn.LSTM(input_size=17, hidden_size=8,
+                                    batch_first=True, bidirectional=True)
+                self.net = nn.Sequential(nn.Linear(16, 2))
+            def forward(self, x):
+                out, _ = self.lstm(x)
+                return self.net(out[:, -1, :])
+
+        m = _BiLSTMNorm()
+        m.eval()
+        # state_dict already has ``lstm.`` / ``net.`` prefixes (because
+        # self.lstm and self.net are submodules). Use it directly.
+        sd = m.state_dict()
+        # 嵌入归一化参数 (1D, shape (17,))
+        # mean=1.0, std=2.0 → 任何 (x - 1) / 2 不会产生 NaN，且不是全 0
+        sd["__norm_mean__"] = torch.ones(17, dtype=torch.float32)
+        sd["__norm_std__"]  = torch.full((17,), 2.0, dtype=torch.float32)
+
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(sd, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path, window_size=8)
+            # 推理：传入全 0 特征，归一化后 = (0 - 1) / 2 = -0.5
+            for _ in range(7):
+                self.assertIsNone(wrapper.infer(np.zeros(17, dtype=np.float32)))
+            result = wrapper.infer(np.zeros(17, dtype=np.float32))
+            self.assertIsNotNone(result)
+            label, prob = result
+            self.assertIn(label, (0, 1))
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+        finally:
+            os.unlink(path)
+
+
+    def test_load_torch_bilstm_flat_classifier_reconstructs(self):
+        """Regression: flat-style classifier (fc1/fc2) must rebuild as Sequential.
+
+        Earlier bug: `_find_linear_classifier` only matched `prefix.<digit>.weight`
+        style keys. Models with `fc1.weight` / `fc2.weight` style names fell
+        through to `nn.Identity()` → wrapper produced constant ≈ 1/128 output
+        regardless of input. All 500 test predictions hit prob≈0.008.
+        """
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import torch.nn as nn
+        import numpy as np
+
+        class _BiLSTMFlatHead(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.lstm = nn.LSTM(input_size=17, hidden_size=8,
+                                    batch_first=True, bidirectional=True)
+                self.fc1 = nn.Linear(16, 4)
+                self.fc2 = nn.Linear(4, 1)
+                self.dropout = nn.Dropout(0.0)
+
+            def forward(self, x):
+                out, _ = self.lstm(x)
+                h = torch.relu(self.fc1(out[:, -1, :]))
+                h = self.dropout(h)
+                return self.fc2(h).squeeze(-1)
+
+        m = _BiLSTMFlatHead()
+        m.eval()
+        sd = m.state_dict()
+        # Verify the keys look like the buggy state_dict: fc1.weight, fc2.weight
+        # (no digit-index between prefix and .weight)
+        assert "fc1.weight" in sd and "fc2.weight" in sd
+
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save(sd, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path, window_size=8)
+            # The internal classifier MUST be a real Sequential, NOT nn.Identity
+            self.assertIsNot(type(wrapper._model.classifier), nn.Identity)
+            self.assertEqual(len(wrapper._model.classifier), 3)  # Linear, ReLU, Linear
+
+            # After 7-frame warmup the 8th frame must produce a real probability
+            for _ in range(7):
+                self.assertIsNone(wrapper.infer(np.zeros(17, dtype=np.float32)))
+            result = wrapper.infer(np.zeros(17, dtype=np.float32))
+            self.assertIsNotNone(result)
+            label, prob = result
+
+            # Regression assertion: prob must NOT be ≈ 1/64 ≈ 0.016 (the
+            # buggy constant from softmax-over-hidden-states)
+            self.assertNotAlmostEqual(prob, 1.0 / 64, places=2,
+                msg=f"wrapper still produces constant ~1/N prob, got {prob:.4f}")
+            # And must be a sensible sigmoid output (any value in (0, 1))
+            self.assertGreater(prob, 0.0)
+            self.assertLess(prob, 1.0)
+        finally:
+            os.unlink(path)
+
 
 if __name__ == "__main__":
     unittest.main()

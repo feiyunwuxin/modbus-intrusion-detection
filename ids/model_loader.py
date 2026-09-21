@@ -429,6 +429,15 @@ class _Torch3DStateDictWrapper:
         self._n = n_features
         self._window_size = window_size
         self._buffer: deque = deque(maxlen=window_size)
+        # 可选归一化：state_dict 里有 __norm_mean__ / __norm_std__ 时 (1D, shape (F,))
+        # 在 infer 前对每帧做 (x - mean) / std。这些 key 不会被 _parse_lstm_arch、
+        # _reconstruct_lstm 或 _reconstruct_classifier 误处理（不匹配任何前缀）。
+        import torch
+        self._norm_mean = state_dict.get("__norm_mean__")
+        self._norm_std  = state_dict.get("__norm_std__")
+        if self._norm_mean is not None and self._norm_std is not None:
+            self._norm_mean = torch.as_tensor(self._norm_mean, dtype=torch.float32)
+            self._norm_std  = torch.as_tensor(self._norm_std,  dtype=torch.float32)
         self._model = self._reconstruct(state_dict, n_features)
         self._model.eval()
 
@@ -451,6 +460,9 @@ class _Torch3DStateDictWrapper:
         if len(self._buffer) < self._window_size:
             return None
         window = np.stack(list(self._buffer), axis=0)  # (W, F)
+        # 若 state_dict 含归一化参数，先对每帧做 (x - mean) / std 再推理
+        if self._norm_mean is not None and self._norm_std is not None:
+            window = (window - self._norm_mean.numpy()) / self._norm_std.numpy()
         x = torch.as_tensor(window, dtype=torch.float32).unsqueeze(0)  # (1, W, F)
         with torch.no_grad():
             logits = self._model(x)
@@ -478,18 +490,21 @@ class _Torch3DStateDictWrapper:
             rnn = _reconstruct_lstm(sd, arch)
 
             # 找 classifier (非 lstm./gru. 前缀的 Linear 层)
-            classifier_prefix, classifier_indices = cls._find_linear_classifier(sd)
-            if classifier_indices and classifier_prefix is not None:
-                classifier = _reconstruct_classifier_from_state_dict(
-                    sd, classifier_prefix, classifier_indices
-                )
+            classifier_prefix, classifier_keys = cls._find_linear_classifier(sd)
+            if classifier_keys and classifier_prefix is not None:
+                if classifier_prefix == "flat:":
+                    classifier = cls._reconstruct_classifier_flat(sd, classifier_keys)
+                else:
+                    classifier = _reconstruct_classifier_from_state_dict(
+                        sd, classifier_prefix, classifier_keys
+                    )
             else:
                 # 无 classifier: RNN 直接输出（罕见）
                 classifier = nn.Identity()
 
             # 验证 classifier 的 in_features 与 RNN 输出匹配
             rnn_out_dim = arch["hidden_size"] * (2 if arch["bidirectional"] else 1)
-            if classifier_indices:
+            if classifier_keys and not isinstance(classifier, nn.Identity):
                 first_linear = classifier[0]
                 if hasattr(first_linear, "in_features") and first_linear.in_features != rnn_out_dim:
                     # 接受偏差：可能是用 final hidden state 而不是 last output
@@ -522,35 +537,78 @@ class _Torch3DStateDictWrapper:
         )
 
     @classmethod
-    def _find_linear_classifier(cls, sd: dict) -> tuple[str | None, list[int]]:
+    def _find_linear_classifier(cls, sd: dict) -> tuple[str | None, list]:
         """找非 RNN 前缀的 Linear 层（2D weight，不在 lstm/gru 命名空间下）。
 
-        返回 (prefix, [indices])。
+        支持两种命名风格：
+        - sequential-style: ``net.0.weight``、``classifier.0.weight``、``head.1.weight``
+          (前缀.<digit>.weight，返回 (prefix, [indices]))
+        - flat-style: ``fc1.weight``、``fc2.weight``、``fc.weight``
+          (2 段命名，无数字索引，返回 ("flat:", [完整 key 列表])，按名称末尾数字排序)
+
+        优先 flat-style：训练脚本更常见这种命名（BiLSTM + fc1/fc2 head）。
         """
-        indices_by_prefix: dict[str, list[int]] = {}
+        flat_layers: list[tuple[str, str]] = []
+        indexed_by_prefix: dict[str, list[int]] = {}
+
         for key, val in sd.items():
             if not (hasattr(val, "dim") and val.dim() == 2):
                 continue
             k_low = key.lower()
-            if k_low.startswith(("lstm.", "gru.")):
+            if any(k_low.startswith(p) for p in ("lstm.", "gru.")):
                 continue
-            # 需要是 .weight 后缀
             if not key.endswith(".weight"):
                 continue
             parts = key.split(".")
-            if len(parts) < 3:
-                continue
-            prefix = parts[0] + "."
-            if not parts[1].isdigit():
-                continue
-            i = int(parts[1])
-            indices_by_prefix.setdefault(prefix, []).append(i)
+            if len(parts) == 2:
+                # flat-style: "fc1.weight", "fc.weight", "head.weight"
+                flat_layers.append((parts[0], key))
+            elif len(parts) >= 3 and parts[1].isdigit():
+                # sequential-style: "net.0.weight"
+                indexed_by_prefix.setdefault(parts[0] + ".", []).append(int(parts[1]))
 
-        # 取数量最多的 prefix 作为 classifier
-        if not indices_by_prefix:
-            return None, []
-        prefix = max(indices_by_prefix, key=lambda p: len(indices_by_prefix[p]))
-        return prefix, indices_by_prefix[prefix]
+        # 优先 flat-style（更常见于 BiLSTM 训练脚本）
+        if flat_layers:
+            def _sort_key(item: tuple[str, str]) -> tuple[int, str]:
+                name = item[0]
+                digits = "".join(c for c in name if c.isdigit())
+                return (int(digits) if digits else 0, name)
+            flat_layers.sort(key=_sort_key)
+            return "flat:", [k for _, k in flat_layers]
+
+        # fallback: 选层数最多的 sequential prefix
+        if indexed_by_prefix:
+            prefix = max(indexed_by_prefix, key=lambda p: len(indexed_by_prefix[p]))
+            return prefix, indexed_by_prefix[prefix]
+
+        return None, []
+
+    @classmethod
+    def _reconstruct_classifier_flat(cls, sd: dict, keys: list[str]):
+        """从 flat-style key 列表 (如 ["fc1.weight", "fc2.weight"]) 重建 Sequential。
+
+        各层之间插入 ReLU（与训练时 `F.relu(self.fc1(last))` 一致）；
+        最后一层不加 ReLU（与训练时 `self.fc2(h).squeeze(-1)` 一致）。
+        Dropout 训练时存在但 eval 时是 identity，故省略。
+        """
+        import torch.nn as nn
+        layers: list[nn.Module] = []
+        last = len(keys) - 1
+        for i, wkey in enumerate(keys):
+            bkey = wkey[: -len(".weight")] + ".bias"
+            w = sd[wkey]
+            if not (hasattr(w, "dim") and w.dim() == 2):
+                raise ValueError(f"{wkey} 权重维度非 2D")
+            out_f, in_f = w.shape
+            has_bias = bkey in sd
+            linear = nn.Linear(in_f, out_f, bias=has_bias)
+            linear.weight.data = w.clone()
+            if has_bias:
+                linear.bias.data = sd[bkey].clone()
+            layers.append(linear)
+            if i != last:
+                layers.append(nn.ReLU())
+        return nn.Sequential(*layers)
 
     @classmethod
     def _reconstruct_conv1d(cls, sd: dict, n_features: int):
