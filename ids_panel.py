@@ -38,6 +38,12 @@ class IDsPanel(ttk.Frame):
         self.wrapper: ModelWrapper | None = None
         self.threshold: float = 0.5
         self.window_size: int = 1  # 1=单帧；>1=3D 窗口 (LSTM/CNN1d)
+        # Path of the model whose predictions are currently in the
+        # stats counters. Used by _on_model_selected to detect "user
+        # actually switched models" vs "we just re-loaded the same
+        # model" — only the former resets the stats. ``None`` until the
+        # first successful load.
+        self._active_path: str | None = None
         # Confusion-matrix counters for binary classification
         # (positive class = attack / label 1). Total / normal / attack /
         # correct are kept for the existing display; the four tp/fp/tn/fn
@@ -292,8 +298,9 @@ class IDsPanel(ttk.Frame):
             self.wrapper = wrapper
             name = Path(path).name
             ws_tag = f", window={ws}" if ws > 1 else ""
+            base_status = f"已加载 {name} ({wrapper.input_features} features{ws_tag})"
             self.status_var.set(
-                f"已加载 {name} ({wrapper.input_features} features{ws_tag})"
+                base_status + self._maybe_reset_for_new_model(path)
             )
         except ValueError as e:
             # 3D 模型 + window_size=1 的常见情形：自动升级到 16 并重试
@@ -308,9 +315,12 @@ class IDsPanel(ttk.Frame):
                     except (tk.TclError, Exception):
                         pass
                     name = Path(path).name
-                    self.status_var.set(
+                    base_status = (
                         f"已加载 {name} ({wrapper.input_features} features, "
                         f"window=16 自动升级)"
+                    )
+                    self.status_var.set(
+                        base_status + self._maybe_reset_for_new_model(path)
                     )
                     return
                 except Exception as e2:
@@ -325,6 +335,21 @@ class IDsPanel(ttk.Frame):
             self.wrapper = None
             self.status_var.set(f"加载失败: {e}")
             messagebox.showerror("模型加载失败", str(e))
+
+    def _maybe_reset_for_new_model(self, path: str) -> str:
+        """Reset stats + results tree iff ``path`` differs from the model
+        currently held in ``self._active_path``. Returns a status suffix
+        so the caller can tell the user a reset just happened.
+
+        Re-selecting the same model (or the bootstrap call from
+        ``_refresh_models``) is a no-op — counters keep their values so
+        the user is not silently wiped on a no-op refresh.
+        """
+        if path == self._active_path:
+            return ""
+        self._active_path = path
+        self.clear()
+        return "（统计已重置）"
 
     def _on_window_size_change(self) -> None:
         """窗口大小变化时，若已加载模型则提示需重新选择。"""

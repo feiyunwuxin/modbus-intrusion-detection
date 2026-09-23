@@ -701,6 +701,53 @@ class TestIDsPanelStats(unittest.TestCase):
         self.assertEqual(self.panel.metrics_var.get(),
                          "准确率:-  精确率:-  召回率:-  F1:-")
 
+    def test_maybe_reset_for_new_model_first_load_resets(self):
+        """First successful load: _active_path goes from None → path, and
+        stats (which happen to be empty here) get a reset pass through
+        clear(). The status suffix is '（统计已重置）'."""
+        suffix = self.panel._maybe_reset_for_new_model("/path/to/model_a.pt")
+        self.assertIn("已重置", suffix)
+        self.assertEqual(self.panel._active_path, "/path/to/model_a.pt")
+
+    def test_maybe_reset_for_new_model_same_path_no_op(self):
+        """Re-selecting the SAME model must not wipe stats — that would
+        surprise the operator every time they accidentally click the
+        dropdown. Empty suffix means 'no reset happened'."""
+        self.panel._maybe_reset_for_new_model("/path/to/model_a.pt")
+        # Add some stats so we can prove they survive the second call.
+        self._feed([(1, 1), (0, 0)])
+        suffix = self.panel._maybe_reset_for_new_model("/path/to/model_a.pt")
+        self.assertEqual(suffix, "")
+        self.assertEqual(self.panel._stats["total"], 2)
+
+    def test_maybe_reset_for_new_model_switch_clears(self):
+        """Switching to a different path MUST clear stats and the
+        results tree — otherwise the displayed Accuracy/Precision/Recall/F1
+        would silently belong to the previous model. Empty the tree too
+        so the operator does not see rows tagged with the old model's
+        colors after the switch."""
+        # Populate some stats + tree rows.
+        self._feed([(1, 1), (1, 0), (0, 0)])
+        self.panel.results_tree.insert(
+            "", "end", values=("1", "deadbeef", 1, 1, "0.870", "✓"),
+            tags=("attack",),
+        )
+        self.assertEqual(self.panel._stats["total"], 3)
+        self.assertEqual(len(self.panel.results_tree.get_children()), 1)
+
+        suffix = self.panel._maybe_reset_for_new_model("/path/to/model_b.pt")
+        self.assertIn("已重置", suffix)
+        self.assertEqual(self.panel._active_path, "/path/to/model_b.pt")
+        # Stats are zeroed — every confusion-matrix key included.
+        for k in ("total", "normal", "attack", "correct",
+                  "tp", "fp", "tn", "fn"):
+            self.assertEqual(self.panel._stats[k], 0)
+        # Tree is empty.
+        self.assertEqual(self.panel.results_tree.get_children(), ())
+        # Display is the empty-state form again.
+        self.assertEqual(self.panel.metrics_var.get(),
+                         "准确率:-  精确率:-  召回率:-  F1:-")
+
 
 if __name__ == "__main__":
     unittest.main()
