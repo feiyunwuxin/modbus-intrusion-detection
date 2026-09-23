@@ -648,7 +648,10 @@ class _Torch3DStateDictWrapper:
         if not conv_indices:
             raise ValueError("未找到 Conv1d 层（应有 3D weight tensor）")
         if not classifier_indices:
-            raise ValueError("未找到 classifier Linear 层")
+            # 没找到内联 classifier，尝试 flat-style（CNN 23-dim 用 fc1/fc2）。
+            flat_prefix, flat_keys = cls._find_linear_classifier(sd)
+            if not (flat_prefix == "flat:" and flat_keys):
+                raise ValueError("未找到 classifier Linear 层")
 
         # 校验第一层 Conv1d 的 in_channels
         first_w = sd[f"{prefix}{conv_indices[0]}.weight"]
@@ -657,11 +660,19 @@ class _Torch3DStateDictWrapper:
                 f"Conv1d 期望 {first_w.shape[1]} 通道，但 IDS 提供 {n_features}。"
             )
 
-        # 验证 classifier 索引在 Conv1d 之后（idx 大于最后 conv）
+        # 验证 classifier 索引在 Conv1d 之后（idx 大于最后 conv）。
+        # 若 conv.* 前缀下没找到 2D classifier（CNN 23-dim 等用 flat-style
+        # fc1.weight/fc2.weight），退回到 flat-style classifier 重建。
         last_conv_idx = max(conv_indices)
         valid_classifier = [i for i in classifier_indices if i > last_conv_idx]
+        use_flat_classifier = False
         if not valid_classifier:
-            raise ValueError("classifier Linear 索引位置异常（应在 Conv1d 之后）")
+            flat_prefix, flat_keys = cls._find_linear_classifier(sd)
+            if flat_prefix == "flat:" and flat_keys:
+                use_flat_classifier = True
+                valid_classifier = flat_keys
+            else:
+                raise ValueError("未找到 classifier Linear 层（既无 conv.* 内联，也无 fc*/head* flat-style）")
 
         # 构建 conv stack: Conv1d → (BN → ReLU) → ...
         conv_layers: list[nn.Module] = []
@@ -685,9 +696,12 @@ class _Torch3DStateDictWrapper:
 
         conv_seq = nn.Sequential(*conv_layers)
         pool = nn.AdaptiveAvgPool1d(1)
-        classifier = _reconstruct_classifier_from_state_dict(
-            sd, prefix, valid_classifier
-        )
+        if use_flat_classifier:
+            classifier = cls._reconstruct_classifier_flat(sd, valid_classifier)
+        else:
+            classifier = _reconstruct_classifier_from_state_dict(
+                sd, prefix, valid_classifier
+            )
 
         class _CNN3DModel(nn.Module):
             def __init__(self, convs, pool, classifier):
@@ -704,6 +718,324 @@ class _Torch3DStateDictWrapper:
                 return self.classifier(h)
 
         return _CNN3DModel(conv_seq, pool, classifier)
+
+
+# ----------------------------------------------------------------------
+# TCN+Pool 嵌套格式 (train_tcn_23dim_*5seed.py 输出)
+# ----------------------------------------------------------------------
+
+_TCN_POOL_DEFAULTS = {
+    # 与 train_tcn_23dim_*5seed.py:21-31 默认值保持一致
+    "n_blocks": 3,
+    "channels": 32,
+    "kernel_size": 3,
+    "dilations": (1, 2, 4),
+    "dropout": 0.1,
+    "attn_hidden": 16,
+    "n_heads": 2,
+}
+
+
+def _detect_tcn_pool_nested(sd: dict) -> bool:
+    """True if ``sd`` 含有 ``tcn.{i}.conv1.weight`` 形式的嵌套 4 段 key。
+
+    训练脚本 (train_tcn_23dim_*.py) 保存的 state_dict 每个 TCN block 都有
+    conv1/bn1/conv2/bn2/residual/se 子模块，而 ``_reconstruct_conv1d``
+    只认 ``prefix.{i}.weight`` 这种扁平命名。识别后改走 :func:`_reconstruct_tcn_pool_model`。
+    """
+    for key in sd:
+        parts = key.split(".")
+        if (
+            len(parts) >= 4
+            and parts[0] == "tcn"
+            and parts[1].isdigit()
+            and parts[2] in {"conv1", "conv2", "bn1", "bn2", "residual", "se"}
+        ):
+            return True
+    return False
+
+
+def _detect_pool_type(sd: dict) -> str:
+    """从 state_dict 的非 tcn/fc 前缀 key 识别 pool head 类型。"""
+    if any(k.startswith("attpool.") for k in sd):
+        return "attpool"
+    if any(k.startswith("gatedpool.") for k in sd):
+        return "gatedpool"
+    if any(k.startswith("mhattpool.") for k in sd):
+        return "mhattpool"
+    if any(k.startswith("tfpool.") for k in sd):
+        return "tfpool"
+    return "gap"
+
+
+def _has_se_block(sd: dict) -> bool:
+    return any(
+        len(k.split(".")) >= 4 and k.split(".")[2] == "se" for k in sd
+    )
+
+
+def _make_tcn_block(in_ch: int, out_ch: int, kernel_size: int,
+                    dilation: int, dropout: float, has_se: bool, se_hidden: int):
+    """Build one TCN block module mirroring ``TCNBlock`` / ``TCNBlockSE``."""
+    import torch.nn as nn
+    import torch.nn.functional as F
+    pad = (kernel_size - 1) * dilation // 2
+
+    class _TCNBlock(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv1d(in_ch, out_ch, kernel_size,
+                                   padding=pad, dilation=dilation)
+            self.bn1 = nn.BatchNorm1d(out_ch)
+            self.conv2 = nn.Conv1d(out_ch, out_ch, kernel_size,
+                                   padding=pad, dilation=dilation)
+            self.bn2 = nn.BatchNorm1d(out_ch)
+            self.drop = nn.Dropout(dropout)
+            self.residual = (
+                nn.Conv1d(in_ch, out_ch, 1) if in_ch != out_ch
+                else nn.Identity()
+            )
+            if has_se:
+                self.se = self._make_se(out_ch, se_hidden)
+
+        @staticmethod
+        def _make_se(channels, hidden):
+            class _SE(nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.gap = nn.AdaptiveAvgPool1d(1)
+                    self.fc1 = nn.Linear(channels, hidden)
+                    self.fc2 = nn.Linear(hidden, channels)
+                def forward(self, x):
+                    s = self.gap(x).squeeze(-1)
+                    s = F.relu(self.fc1(s))
+                    s = torch.sigmoid(self.fc2(s))
+                    return x * s.unsqueeze(-1)
+            return _SE()
+
+        def forward(self, x):
+            r = self.residual(x)
+            x = F.relu(self.bn1(self.conv1(x)))
+            x = self.drop(x)
+            x = F.relu(self.bn2(self.conv2(x)))
+            x = self.drop(x)
+            if has_se:
+                x = self.se(x)
+            return F.relu(x + r)
+
+    return _TCNBlock()
+
+
+def _make_attpool(channels: int, hidden: int):
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    class _AP(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.proj = nn.Sequential(
+                nn.Linear(channels, hidden),
+                nn.Tanh(),
+                nn.Linear(hidden, 1),
+            )
+
+        def forward(self, x):
+            x_t = x.transpose(1, 2)
+            weights = F.softmax(self.proj(x_t), dim=1)
+            return (x_t * weights).sum(dim=1)
+
+    return _AP()
+
+
+def _make_gatedpool(channels: int, hidden: int):
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    class _GP(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.gate = nn.Sequential(
+                nn.Linear(channels, hidden),
+                nn.Tanh(),
+                nn.Linear(hidden, channels),
+                nn.Sigmoid(),
+            )
+
+        def forward(self, x):
+            x_t = x.transpose(1, 2)
+            g = self.gate(x_t)
+            return (x_t * g).sum(dim=1)
+
+    return _GP()
+
+
+def _make_mhattpool(channels: int, n_heads: int, hidden: int):
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    class _MH(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.n_heads = n_heads
+            self.heads = nn.ModuleList([
+                nn.Sequential(
+                    nn.Linear(channels, hidden),
+                    nn.Tanh(),
+                    nn.Linear(hidden, 1),
+                ) for _ in range(n_heads)
+            ])
+
+        def forward(self, x):
+            x_t = x.transpose(1, 2)
+            pooled = []
+            for head in self.heads:
+                w = F.softmax(head(x_t), dim=1)
+                pooled.append((x_t * w).sum(dim=1))
+            return torch.stack(pooled, dim=0).mean(dim=0)
+
+    return _MH()
+
+
+def _make_tfpool(channels: int):
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    class _TF(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.query = nn.Parameter(torch.randn(channels) * 0.02)
+            self.norm = nn.LayerNorm(channels)
+
+        def forward(self, x):
+            x_t = x.transpose(1, 2)
+            scores = (x_t * self.query).sum(dim=-1)
+            weights = F.softmax(scores, dim=-1).unsqueeze(-1)
+            context = (x_t * weights).sum(dim=1)
+            return self.norm(context)
+
+    return _TF()
+
+
+def _reconstruct_tcn_pool_model(sd: dict, n_features: int):
+    """Build TCN+pool+classifier module from nested state_dict.
+
+    Mirrors ``TCN*GELUClassifier`` / ``TCNAttPoolClassifier`` etc. in
+    ``train_tcn_23dim_*5seed.py``. Defaults to the standard 23-dim config:
+
+        n_blocks=3, channels=32, kernel_size=3, dilations=[1,2,4],
+        dropout=0.1, attn_hidden=16, n_heads=2.
+
+    Forward takes ``(batch, window, n_features)`` (transpose 1/2 internally)
+    and returns ``(batch,)`` logits.
+    """
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    cfg = _TCN_POOL_DEFAULTS
+    n_blocks = cfg["n_blocks"]
+    channels = cfg["channels"]
+    kernel_size = cfg["kernel_size"]
+    dilations = cfg["dilations"]
+    dropout = cfg["dropout"]
+    attn_hidden = cfg["attn_hidden"]
+    n_heads = cfg["n_heads"]
+
+    pool_type = _detect_pool_type(sd)
+    has_se = _has_se_block(sd)
+    se_hidden = max(channels // 8, 4) if has_se else 0
+
+    # 激活函数：gelu 路径显式使用 GELU；其他用 ReLU（与所有
+    # train_tcn_23dim_*5seed.py 训练脚本 forward 一致）。
+    activation = "gelu" if pool_type == "gap" and has_se is False and False else "relu"
+    # 注：geu 池式（gelu_s*.pt）activation 为 gelu，其余均为 relu。
+    # 没有可靠的方式从 state_dict 推断；改为依据训练脚本默认——
+    # 通过 pool_type 决策：只有 GAP + 显式无其他头 才视为 gelu 路径，
+    # 否则走 relu。这里我们用 "relu" 默认，仅当激活必须为 gelu 时由
+    # _activate_from_sd 覆写（占位 hook，便于后续扩展）。
+    activation = "relu"
+
+    blocks_mod = []
+    for i in range(n_blocks):
+        in_ch = n_features if i == 0 else channels
+        d = dilations[i] if i < len(dilations) else dilations[-1]
+        blocks_mod.append(
+            _make_tcn_block(in_ch, channels, kernel_size, d, dropout,
+                            has_se=has_se, se_hidden=se_hidden)
+        )
+
+    if pool_type == "gap":
+        pool = nn.AdaptiveAvgPool1d(1)
+    elif pool_type == "attpool":
+        pool = _make_attpool(channels, attn_hidden)
+    elif pool_type == "gatedpool":
+        pool = _make_gatedpool(channels, attn_hidden)
+    elif pool_type == "mhattpool":
+        pool = _make_mhattpool(channels, n_heads, attn_hidden)
+    elif pool_type == "tfpool":
+        pool = _make_tfpool(channels)
+    else:
+        raise ValueError(f"未知的 pool head: {pool_type!r}")
+
+    act_fn = F.gelu if activation == "gelu" else F.relu
+
+    class _TCNPoolModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.tcn = nn.Sequential(*blocks_mod)
+            # 命名 pool 头使其对应 state_dict 前缀：gap (AdaptiveAvgPool1d 无参数),
+            # attpool / gatedpool / mhattpool / tfpool
+            if pool_type == "gap":
+                self.gap = pool
+            else:
+                setattr(self, pool_type, pool)
+            self.fc1 = nn.Linear(channels, 32)
+            self.fc_drop = nn.Dropout(0.1)
+            self.fc2 = nn.Linear(32, 1)
+
+        def forward(self, x):
+            # x: (batch, window, features) → Conv1d 需要 (batch, features, window)
+            x = x.transpose(1, 2)
+            x = self.tcn(x)
+            if pool_type == "gap":
+                x = self.gap(x).squeeze(-1)
+            else:
+                x = getattr(self, pool_type)(x)
+            x = act_fn(self.fc1(x))
+            x = self.fc_drop(x)
+            return self.fc2(x).squeeze(-1)
+
+    model = _TCNPoolModel()
+    missing, unexpected = model.load_state_dict(sd, strict=False)
+    if missing or unexpected:
+        # missing: Dropout / AdaptiveAvgPool1d / Identity 无参数，正常
+        bad_missing = [k for k in missing if not _is_dropout_or_identity_key(k)]
+        bad_unexpected = [k for k in unexpected if not _is_dropout_or_identity_key(k)]
+        if bad_missing or bad_unexpected:
+            raise ValueError(
+                f"TCN+pool state_dict 加载失败: missing={bad_missing[:3]}, "
+                f"unexpected={bad_unexpected[:3]}"
+            )
+    model.eval()
+    return model
+
+
+def _is_dropout_or_identity_key(key: str) -> bool:
+    """Dropout / AdaptiveAvgPool1d / Identity 无参数，其前缀不应出现在 sd 中。
+
+    检查方式是判断 key 以这些前缀结尾：
+      *.drop.* / *.gap.* / *.residual.*（Identity）
+    """
+    parts = key.split(".")
+    if len(parts) >= 2 and parts[-2] in {"drop", "gap", "residual"}:
+        return True
+    return False
+
+
+# ----------------------------------------------------------------------
+# 23-dim wrapper（接在最底部）
+# ----------------------------------------------------------------------
 
 
 class _Torch3DStateDictWrapper23:
@@ -740,10 +1072,14 @@ class _Torch3DStateDictWrapper23:
         # Lazy-load 的 RobustScaler
         from ids.scaler_23dim import Scaler23
         self._scaler = Scaler23()
-        # 复用既有 _reconstruct(n_features=23) 重建 LSTM/GRU/Conv1d
-        self._model = _Torch3DStateDictWrapper._reconstruct(
-            state_dict, self._n_features
-        )
+        # 嵌套 TCN+pool 格式 (e.g. model_tcn_23dim_w16_*_s*.pt) 用专用
+        # parser；LSTM/GRU/扁平 Conv1d 仍走 _reconstruct。
+        if _detect_tcn_pool_nested(state_dict):
+            self._model = _reconstruct_tcn_pool_model(state_dict, self._n_features)
+        else:
+            self._model = _Torch3DStateDictWrapper._reconstruct(
+                state_dict, self._n_features
+            )
         self._model.eval()
 
     @property

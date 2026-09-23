@@ -916,5 +916,121 @@ class TestLoadTorch23Dim(unittest.TestCase):
             os.unlink(path)
 
 
+class TestLoadTorchTCNPool(unittest.TestCase):
+    """``model_tcn_23dim_w16_*_s*.pt`` 嵌套 TCN+pool 格式可加载并推理。
+
+    这些 checkpoint 来自 ``train_tcn_23dim_*5seed.py``，每个 TCN block 是
+    带 ``conv1/bn1/conv2/bn2/residual`` 子模块的 Module（不是扁平
+    Sequential），外加 attpool / gatedpool / mhattpool / tfpool / gap
+    pool head —— 现有 ``_reconstruct_conv1d`` 解析不了这些 key。
+    ``_reconstruct_tcn_pool_model`` 必须能：
+
+    * 自动识别 5 种 pool head
+    * 加载真实 checkpoint 并 round-trip 出 wrapper
+    * 推理 16 帧后产出 (label, prob)
+    """
+
+    POOL_VARIANTS = ("gelu", "attpool", "gatedpool", "mhattpool", "tfpool")
+
+    def _checkpoint_path(self, variant: str) -> Path:
+        return Path(__file__).resolve().parent.parent / f"model_tcn_23dim_w16_{variant}_s123.pt"
+
+    def test_real_checkpoints_present(self):
+        """测试本身依赖真实 checkpoint 存在；缺失时给出明确指引。"""
+        for variant in self.POOL_VARIANTS:
+            p = self._checkpoint_path(variant)
+            self.assertTrue(
+                p.exists(),
+                f"缺少 checkpoint {p.name}；请确认 5 个 model_tcn_23dim_w16_*_s123.pt 在项目根目录",
+            )
+
+    def test_load_each_pool_variant_succeeds(self):
+        """5 种 pool 都能加载到 input_features=23、window_size=16 的 wrapper。"""
+        if _TinyTorchModel is None:
+            self.skipTest("torch not installed")
+        for variant in self.POOL_VARIANTS:
+            p = self._checkpoint_path(variant)
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(variant=variant):
+                w = load_model(str(p), window_size=16)
+                self.assertEqual(w.input_features, 23, variant)
+                self.assertEqual(w.window_size, 16, variant)
+
+    def test_real_checkpoint_warmup_then_infer(self):
+        """真实 gelu checkpoint：前 15 帧 None，第 16 帧返回 (label, prob)。"""
+        if _TinyTorchModel is None:
+            self.skipTest("torch not installed")
+        p = self._checkpoint_path("gelu")
+        if not p.exists():
+            self.skipTest(f"checkpoint {p.name} 缺失")
+        w = load_model(str(p), window_size=16)
+
+        def make_record(i):
+            return {
+                "address": 1, "function": 3, "length": 16,
+                "setpoint": 0, "gain": 0, "reset": 0, "deadband": 0,
+                "cycle": 0, "rate": 0, "system": 0, "control": 0,
+                "pump": 0, "solenoid": 0, "pressure": 0.0,
+                "crc": 12869, "command": 1,
+                "time": 1000 + i,
+            }
+
+        for i in range(15):
+            self.assertIsNone(w.infer(make_record(i)))
+        result = w.infer(make_record(15))
+        self.assertIsNotNone(result)
+        label, prob = result
+        self.assertIn(label, (0, 1))
+        self.assertGreaterEqual(prob, 0.0)
+        self.assertLessEqual(prob, 1.0)
+
+    def test_detect_nested_format_helper(self):
+        """``_detect_tcn_pool_nested`` 识别嵌套 4 段 key，扁平 Conv1d 不识别。"""
+        from ids.model_loader import _detect_tcn_pool_nested
+        nested = {"tcn.0.conv1.weight": "x", "tcn.0.bn1.weight": "y"}
+        flat = {"layers.0.weight": "x", "layers.1.running_mean": "y"}
+        self.assertTrue(_detect_tcn_pool_nested(nested))
+        self.assertFalse(_detect_tcn_pool_nested(flat))
+
+    def test_detect_pool_type_helper(self):
+        """``_detect_pool_type`` 按前缀识别 attpool / gatedpool / mhattpool / tfpool / gap。"""
+        from ids.model_loader import _detect_pool_type
+        self.assertEqual(_detect_pool_type({"attpool.proj.0.weight": "x"}), "attpool")
+        self.assertEqual(_detect_pool_type({"gatedpool.gate.0.weight": "x"}), "gatedpool")
+        self.assertEqual(_detect_pool_type({"mhattpool.heads.0.0.weight": "x"}), "mhattpool")
+        self.assertEqual(_detect_pool_type({"tfpool.norm.weight": "x"}), "tfpool")
+        self.assertEqual(_detect_pool_type({"tcn.0.conv1.weight": "x"}), "gap")
+
+
+class TestLoadCNN23Dim(unittest.TestCase):
+    """``model_cnn_23dim_w16_s*.pt`` 扁平 Conv1d + flat-style fc1/fc2 classifier。
+
+    与 TCN+pool 不同：CNN 用 ``conv.{0,1,4,5,8,9}.{weight,bias,running_*}`` 这种
+    扁平 Sequential 命名，但 classifier 用 ``fc1.weight`` / ``fc2.weight``
+    flat-style（2 段），``_reconstruct_conv1d`` 之前不会自动回退到
+    flat-style，所以加这条 fallback：内联 conv.* 没 2D classifier 时，
+    试 ``_find_linear_classifier`` 找 ``fc*/`` ``head*/`` ``classifier.``。
+    """
+
+    CNN_SEEDS = (42, 123, 456, 789, 1024)
+
+    def _cnn_path(self, seed: int) -> Path:
+        return Path(__file__).resolve().parent.parent / f"model_cnn_23dim_w16_s{seed}.pt"
+
+    def test_load_each_cnn_seed_succeeds(self):
+        """5 个 CNN 23-dim seed 都能加载。"""
+        if _TinyTorchModel is None:
+            self.skipTest("torch not installed")
+        for seed in self.CNN_SEEDS:
+            p = self._cnn_path(seed)
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(seed=seed):
+                w = load_model(str(p), window_size=16)
+                self.assertEqual(w.input_features, 23)
+                self.assertEqual(w.window_size, 16)
+
+
 if __name__ == "__main__":
     unittest.main()
