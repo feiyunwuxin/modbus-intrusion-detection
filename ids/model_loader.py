@@ -1141,6 +1141,10 @@ class _Torch3DStateDictWrapper23:
         aggs = self._compute_aggregates(buf)
         # 拼成 (W, 23)
         x_window = np.concatenate([per_frame, aggs], axis=-1)  # (W, 23)
+        # 训练管道对每个 cell 截断到 ±CLIP_VAL=10.0（_common_train.py:46-48），
+        # 不做这一步会让 v4_se_23dim 等模型的 logits 爆炸（sigmoid 全 1.0），
+        # 表现为「IDS 面板所有帧都判定为 attack」。
+        x_window = np.clip(x_window, -10.0, 10.0)
         x = torch.as_tensor(x_window, dtype=torch.float32).unsqueeze(0)  # (1, W, 23)
         with torch.no_grad():
             logits = self._model(x)
@@ -1161,9 +1165,9 @@ class _Torch3DStateDictWrapper23:
 
         | 输出列 | 含义              | 来源 19-dim 索引 |
         |--------|-------------------|-------------------|
-        | 19     | press_mean_w      | mean(buf[:, 11])  |
+        | 19     | press_mean_w      | mean(buf[:, 13])  |
         | 20     | (crc_mean_w)      | 不在 KEEP_23      |
-        | 21     | crc_max_w         | max(buf[:, 12])   |
+        | 21     | crc_max_w         | max(buf[:, 14])   |
         | 22     | (cmd_count_w)     | 不在 KEEP_23      |
         | 23     | resp_count_w      | sum(buf[:, 18])   |
         | 24     | cmd_resp_balance_w| (cmd-resp)/W      |
@@ -1175,8 +1179,8 @@ class _Torch3DStateDictWrapper23:
         """
         import numpy as np
         W = buf_19.shape[0]
-        press = buf_19[:, 11]                # pressure_measurement
-        crc = buf_19[:, 12]                  # crc_rate
+        press = buf_19[:, 13]                # pressure_measurement (preprocess_v2_scada:177)
+        crc = buf_19[:, 14]                  # crc_rate (preprocess_v2_scada:178)
         is_resp = buf_19[:, 18]              # is_response (0/1)
         is_unusual = buf_19[:, 17]           # is_unusual_fc
         length = buf_19[:, 2]                # length

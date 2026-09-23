@@ -1075,6 +1075,53 @@ class TestLoadTCNv4SE23Dim(unittest.TestCase):
                 self.assertGreaterEqual(prob, 0.0)
                 self.assertLessEqual(prob, 1.0)
 
+    def test_extreme_inputs_clipped_to_avoid_sigmoid_saturation(self):
+        """回归测试：``_Torch3DStateDictWrapper23.infer`` 必须在送入模型前
+        把 23-dim 窗口截断到 ±10（训练管道 ``_common_train.py:46-48``），
+        否则 ``press_mean_w`` / ``crc_max_w`` 等聚合会被 outliers 撑到 10^3
+        量级，Conv1d + TCN 累加后 logits 爆到 +∞，sigmoid 饱和在 1.0 →
+        IDS 面板把每帧都标成 attack。
+
+        行为级测试（仅看 prob 是否变）不可靠：合成 record dict 的特征分布
+        与训练数据不符，模型本来就会输出极端概率。本测试改为结构级：
+        在模型 forward 上挂 hook 截获输入，断言 ``input.abs().max() <= 10``。
+        """
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        p = self._path(123)
+        if not p.exists():
+            self.skipTest(f"checkpoint {p.name} 缺失")
+        wrapper = load_model(str(p), window_size=16)
+        captured: list[torch.Tensor] = []
+        hook_handle = wrapper._model.register_forward_pre_hook(
+            lambda _m, inp: (captured.append(inp[0].detach().clone()), None)[1]
+        )
+        try:
+            # 极端 outliers：pressure=5000 (scaled=5000)、crc=200000 (scaled=38)
+            # — 没 clip 的话模型会直接拿到 5000 / 38；有 clip 会全在 [-10, 10]。
+            rec = {
+                "address": 1, "function": 3, "length": 16,
+                "setpoint": 0, "gain": 0, "reset": 0, "deadband": 0,
+                "cycle": 0, "rate": 0, "system": 0, "control": 0,
+                "pump": 0, "solenoid": 0, "pressure": 5000.0,
+                "crc": 200000, "command": 1,
+                "time": 1000,
+            }
+            for i in range(16):
+                rec["time"] = 1000 + i
+                wrapper.infer(rec)
+            self.assertGreaterEqual(len(captured), 1,
+                "模型 forward 没被触发，hook 未生效")
+            model_input = captured[0]
+            max_abs = float(model_input.abs().max())
+            self.assertLessEqual(
+                max_abs, 10.0 + 1e-5,
+                f"模型收到了 |x|={max_abs:.2f} > 10 的输入（缺 np.clip(±10)），"
+                f"会被 Conv1d 累加 → sigmoid=1.0 → IDS 把每帧都标 attack。",
+            )
+        finally:
+            hook_handle.remove()
+
 
 class TestIDSPanelProbe(unittest.TestCase):
     """``IDSPanel._probe_model`` 必须正确探测 23-dim TCN+pool 模型。
