@@ -1032,5 +1032,49 @@ class TestLoadCNN23Dim(unittest.TestCase):
                 self.assertEqual(w.window_size, 16)
 
 
+class TestLoadTCNv4SE23Dim(unittest.TestCase):
+    """``model_v4_se_23dim_b64_ch32_do01_window16_s*.pt`` TCN+SE 架构——
+    每个 block 含 ``tcn.X.se.fc1/fc2`` 子模块。这是触发
+    ``_make_tcn_block(..., has_se=True)`` 的回归测试。
+    """
+
+    SEEDS = (42, 123, 456, 789, 1024)
+
+    def _path(self, seed: int) -> Path:
+        return Path(__file__).resolve().parent.parent / f"model_v4_se_23dim_b64_ch32_do01_window16_s{seed}.pt"
+
+    def test_load_each_v4se_seed_succeeds(self):
+        """5 个 v4_se_23dim seed 都能加载并跑出第 16 帧推理。"""
+        if _TinyTorchModel is None:
+            self.skipTest("torch not installed")
+        for seed in self.SEEDS:
+            p = self._path(seed)
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(seed=seed):
+                w = load_model(str(p), window_size=16)
+                self.assertEqual(w.input_features, 23)
+                self.assertEqual(w.window_size, 16)
+                # 推 16 帧覆盖 warm-up；如果 SE 路径 torch 未 import 会
+                # 在这里抛 NameError：name 'torch' is not defined。
+                rec = {
+                    "address": 1, "function": 3, "length": 16,
+                    "setpoint": 0, "gain": 0, "reset": 0, "deadband": 0,
+                    "cycle": 0, "rate": 0, "system": 0, "control": 0,
+                    "pump": 0, "solenoid": 0, "pressure": 0.0,
+                    "crc": 12869, "command": 1,
+                    "time": 1000,
+                }
+                last_result = None
+                for i in range(16):
+                    rec["time"] = 1000 + i
+                    last_result = w.infer(rec)
+                self.assertIsNotNone(last_result)
+                label, prob = last_result
+                self.assertIn(label, (0, 1))
+                self.assertGreaterEqual(prob, 0.0)
+                self.assertLessEqual(prob, 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

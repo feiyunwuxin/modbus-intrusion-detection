@@ -800,6 +800,7 @@ def _make_tcn_block(in_ch: int, out_ch: int, kernel_size: int,
 
         @staticmethod
         def _make_se(channels, hidden):
+            import torch
             class _SE(nn.Module):
                 def __init__(self):
                     super().__init__()
