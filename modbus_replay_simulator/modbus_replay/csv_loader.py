@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
 import pandas as pd
 
 RowCount = int
@@ -25,9 +25,25 @@ REQUIRED_COLUMNS = {
     "command response", "time",
 }
 
+ProgressCallback = Callable[[int, int], None]
 
-def load_rows(path: str | Path) -> list[dict[str, Any]]:
+
+def load_rows(
+    path: str | Path,
+    progress_callback: Optional[ProgressCallback] = None,
+    progress_every: int = 1000,
+) -> list[dict[str, Any]]:
     """Load CSV at `path` and return a list of row dicts.
+
+    Optional ``progress_callback(current, total)`` is invoked three times:
+
+    1. ``(0, total)`` right after pandas has read the file, so the caller
+       can size its progress bar to the real row count.
+    2. ``(current, total)`` every ``progress_every`` rows (default 1000)
+       during the per-row type coercion. The slow part of CSV load is the
+       row-by-row loop, so this is where the bar actually moves.
+    3. ``(total, total)`` once at the end, so the caller can close any
+       modal dialog.
 
     Raises:
         FileNotFoundError: if `path` does not exist.
@@ -43,6 +59,10 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
     if missing:
         raise ValueError(f"CSV missing required columns: {sorted(missing)}")
 
+    total = len(df)
+    if progress_callback is not None:
+        progress_callback(0, total)
+
     # Convert the columns that are known to be numeric to float/int.
     # `numeric_cols` and `float_cols` both route to float() because int()
     # would reject values like "4.0" that appear in some rows.
@@ -57,10 +77,12 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
     int_cols = {"command response", "time"}
 
     rows: list[dict[str, Any]] = []
-    for _, raw in df.iterrows():
+    for i, raw in enumerate(df.iterrows()):
+        # ``raw`` is a (idx, Series) tuple; the row payload is raw[1].
+        series = raw[1]
         row: dict[str, Any] = {}
         for col in REQUIRED_COLUMNS:
-            v = raw[col]
+            v = series[col]
             if v is None or (isinstance(v, float) and math.isnan(v)) or v == "?":
                 row[col] = "?"   # sentinel
             elif col in int_cols:
@@ -76,4 +98,9 @@ def load_rows(path: str | Path) -> list[dict[str, Any]]:
             else:
                 row[col] = v
         rows.append(row)
+        if progress_callback is not None and (i + 1) % progress_every == 0:
+            progress_callback(i + 1, total)
+
+    if progress_callback is not None:
+        progress_callback(total, total)
     return rows

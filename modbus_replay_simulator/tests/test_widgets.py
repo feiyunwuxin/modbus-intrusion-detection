@@ -58,12 +58,12 @@ def test_port_selector_set_baudrate_no_change_emits_nothing(qapp):
     assert captured == []
 
 
-def test_progress_panel_renders_values(qapp):
+def test_progress_panel_has_no_progress_bar(qapp):
+    """The horizontal progress bar that used to live in ProgressPanel
+    was removed — CSV import uses a modal QProgressDialog and the
+    persistent bar was just visual clutter on multi-hour replays."""
     panel = ProgressPanel()
-    panel.set_total(100)
-    panel.set_progress(50, 100)
-    assert panel.progress_bar.value() == 50
-    assert panel.progress_bar.maximum() == 100
+    assert not hasattr(panel, "progress_bar")
 
 
 def test_progress_panel_shows_current_row_info(qapp):

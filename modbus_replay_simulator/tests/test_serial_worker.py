@@ -4,8 +4,9 @@ import pytest
 
 pytest.importorskip("PyQt5")
 from PyQt5.QtCore import QCoreApplication, QEventLoop, QTimer
+from PyQt5.QtWidgets import QApplication
 
-from modbus_replay.serial_worker import SerialWorker
+from modbus_replay.serial_worker import SerialReader, SerialWorker
 from modbus_replay.frame_format import FRAME_SIZE
 
 
@@ -15,6 +16,10 @@ class FakeSerial:
         self.written = bytearray()
         self._raise_on_write = kwargs.pop("raise_on_write", None)
         self._closed = False
+        # RX queue so SerialReader (which polls in_waiting + read) has
+        # something to deliver when the test wants to exercise the RX
+        # path. Tests that don't care about RX simply leave it empty.
+        self._rx_queue = bytearray()
 
     def write(self, data):
         if self._closed:
@@ -26,6 +31,17 @@ class FakeSerial:
 
     def close(self):
         self._closed = True
+
+    # SerialReader interface — both attributes are read on every poll
+    # iteration, so make them cheap properties.
+    @property
+    def in_waiting(self):
+        return len(self._rx_queue)
+
+    def read(self, n):
+        chunk = bytes(self._rx_queue[:n])
+        del self._rx_queue[:n]
+        return chunk
 
 
 def _row(t=1000):
@@ -197,3 +213,97 @@ def test_serial_worker_verbose_tx_default_is_off(qapp):
     worker.wait(2000)
     tx_only = [(lvl, msg) for lvl, msg in tx_logs if lvl == "TX"]
     assert tx_only == []
+
+
+def test_serial_worker_emits_rx_received_for_inbound_bytes(qapp):
+    """Bytes queued on the serial handle while the worker is running
+    must be forwarded via ``rx_received`` so the GUI's RxPanel can show
+    them. This is the path that was broken — previously RxPanel was
+    wired to the probe handle and never saw MCU replies during replay.
+    """
+    rows = [_row(1000 + i * 0.001) for i in range(3)]
+    fake = FakeSerial()
+    # Queue 16 bytes BEFORE the worker starts so the very first poll
+    # iteration delivers both chunks atomically (the reader's first
+    # ``read(in_waiting)`` returns everything available at that
+    # instant). Splitting the queue across two iterations would race
+    # against the fast replay loop closing the port.
+    fake._rx_queue.extend(b"\x01\x02\x03\x04\x05\x06\x07\x08")
+    fake._rx_queue.extend(b"\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10")
+
+    worker = SerialWorker(
+        rows=rows, port="COM_FAKE", baudrate=115200,
+        databits=8, parity="N", stopbits=1,
+        loop_mode=False, serial_factory=lambda: fake,
+    )
+    rx_chunks = []
+    worker.rx_received.connect(lambda b: rx_chunks.append(bytes(b)))
+    worker.start()
+    _wait_for(worker.finished_run, timeout=3000)
+    # The reader emits on its own QThread; queued signals must be
+    # drained by processing events before we assert on the captured
+    # list. Without this the test sees an empty list because Qt's
+    # queued-connection delivery is gated on the event loop.
+    deadline = time.time() + 1.0
+    while time.time() < deadline and not rx_chunks:
+        QApplication.processEvents()
+        time.sleep(0.02)
+    worker.wait(2000)
+
+    # At least one chunk must arrive (the reader picks up whatever was
+    # waiting on the first poll). The exact split between two chunks
+    # vs one combined chunk is timing-dependent and not worth pinning.
+    assert rx_chunks, "rx_received must fire for bytes waiting on the port"
+    # And the union of all chunks must equal what we put in the queue.
+    assert b"".join(rx_chunks) == (
+        b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        b"\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
+    )
+
+
+def test_serial_worker_reader_exits_cleanly_on_close(qapp):
+    """After the worker finishes, its internal SerialReader must be
+    stopped (not left polling a closed handle). ``_rx_reader`` is
+    cleared by the run() finally block."""
+    rows = [_row()]
+    fake = FakeSerial()
+    worker = SerialWorker(
+        rows=rows, port="COM_FAKE", baudrate=115200,
+        databits=8, parity="N", stopbits=1,
+        loop_mode=False, serial_factory=lambda: fake,
+    )
+    worker.start()
+    _wait_for(worker.finished_run, timeout=3000)
+    worker.wait(2000)
+    # The reader was instantiated and then cleared on shutdown.
+    assert worker._rx_reader is None
+
+
+def test_serial_reader_emits_received_bytes(qapp):
+    """SerialReader used standalone (e.g. by the probe handle) forwards
+    bytes from the in_waiting queue via ``data_received``."""
+    class Handle:
+        def __init__(self):
+            self._q = bytearray(b"\xaa\xbb")
+        @property
+        def in_waiting(self):
+            return len(self._q)
+        def read(self, n):
+            chunk = bytes(self._q[:n])
+            del self._q[:n]
+            return chunk
+
+    handle = Handle()
+    reader = SerialReader(handle)
+    captured = []
+    reader.data_received.connect(lambda b: captured.append(bytes(b)))
+    reader.start()
+    # Poll interval is 100ms; wait up to 1s for the first chunk.
+    deadline = time.time() + 1.0
+    while time.time() < deadline and not captured:
+        QApplication.processEvents()
+        time.sleep(0.02)
+    reader.stop()
+    reader.wait(1000)
+
+    assert captured == [b"\xaa\xbb"]

@@ -14,7 +14,7 @@ pytest.importorskip("PyQt5")
 from PyQt5.QtCore import QCoreApplication, QEventLoop, QThread, QTimer
 from PyQt5.QtWidgets import QApplication
 
-from modbus_replay.gui.main_window import _SerialReader
+from modbus_replay.serial_worker import SerialReader as _SerialReader
 from modbus_replay.gui.widgets import (
     RxPanel,
     _format_ascii_only,

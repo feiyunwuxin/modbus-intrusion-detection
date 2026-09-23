@@ -28,7 +28,6 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
-    QProgressBar,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
@@ -198,7 +197,14 @@ class PortSelector(QWidget):
 
 
 class ProgressPanel(QWidget):
-    """Progress bar + current-row label + elapsed/ETA label.
+    """Current-row label + elapsed/ETA label.
+
+    The horizontal progress bar that used to live above these labels
+    was removed — CSV import now uses its own modal QProgressDialog,
+    and the persistent bar was visual clutter that crept along over
+    multi-hour replays. The two labels remain because they show
+    operator-useful info (most recent protocol header, wall-clock pace)
+    that the verbose TX log line per frame already prints in detail.
 
     Driven by :class:`PyQt5.QtCore.QTimer` (500 ms tick) — the timer is
     started lazily on the first ``set_progress`` call so the ETA
@@ -209,17 +215,13 @@ class ProgressPanel(QWidget):
         super().__init__(parent)
         self._total = 0
         self._run_start: float | None = None
+        self._last_cur = 0
 
         layout = QVBoxLayout(self)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setValue(0)
 
         self.current_row_label = QLabel("-")
         self.elapsed_label = QLabel("00:00:00 / 00:00:00")
 
-        layout.addWidget(self.progress_bar)
         layout.addWidget(self.current_row_label)
         layout.addWidget(self.elapsed_label)
 
@@ -230,21 +232,24 @@ class ProgressPanel(QWidget):
     # -- Public API -------------------------------------------------------
 
     def set_total(self, total: int) -> None:
-        """Set the upper bound for the progress bar (total row count)."""
+        """Set the upper bound used to compute ETA.
+
+        Kept on the API surface because ``MainWindow._on_start`` still
+        calls it — the bound is needed for the elapsed/ETA math even
+        though no progress bar reads it any more.
+        """
         self._total = max(0, int(total))
-        self.progress_bar.setMaximum(self._total)
-        self.progress_bar.setValue(0)
         self._refresh_elapsed()
 
     def set_progress(self, cur: int, total: int = -1) -> None:
-        """Update the current row position.
+        """Update the current row position (used for ETA + tick start).
 
         Starts the elapsed/ETA timer on the first non-zero update. The
-        ``total`` arg is accepted for parity with the documented
-        interface but the upper bound is governed by ``set_total``.
+        ``total`` arg is accepted for parity with the old interface but
+        the bound is governed by ``set_total``.
         """
-        self.progress_bar.setValue(int(cur))
-        if self._run_start is None and int(cur) > 0:
+        self._last_cur = int(cur)
+        if self._run_start is None and self._last_cur > 0:
             self._run_start = time.monotonic()
             self._tick.start()
 
@@ -265,7 +270,7 @@ class ProgressPanel(QWidget):
         """Stop the timer and zero out the panel (for the next run)."""
         self._run_start = None
         self._tick.stop()
-        self.progress_bar.setValue(0)
+        self._last_cur = 0
         self.elapsed_label.setText("00:00:00 / 00:00:00")
         self.current_row_label.setText("-")
 
@@ -275,7 +280,7 @@ class ProgressPanel(QWidget):
         if self._run_start is None:
             return
         elapsed = time.monotonic() - self._run_start
-        cur = self.progress_bar.value()
+        cur = self._last_cur
         if cur > 0 and elapsed > 0:
             rate = cur / elapsed
             remaining = (self._total - cur) / rate if rate > 0 else 0
