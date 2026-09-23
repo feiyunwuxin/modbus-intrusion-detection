@@ -219,7 +219,11 @@ class IDsPanel(ttk.Frame):
                                 "n_features": in_size,
                                 "kind": mod_kind if in_size == 17 else "wrong_features",
                                 "window_size": 16}
-                # 非 RNN：从第一个非-RNN/Conv 的 2D weight 取 in_features
+                # 非 RNN：先按 2D weight 探测分类器 head 的 in_features。
+                # 但若 state_dict 是 3D（Conv1d 权重存在），**输入维度应
+                # 该从第一层 Conv1d 的 weight.shape[1] 取**（in_channels），
+                # 而不是从 fc1/fc2（分类器 head，shape[1]=channels）。
+                # 否则 23-dim TCN 会被误判成「32 特征(需 17)」。
                 first_linear_in = None
                 for k, v in sd.items():
                     if hasattr(v, "dim") and v.dim() == 2 and not (
@@ -227,11 +231,38 @@ class IDsPanel(ttk.Frame):
                         first_linear_in = int(v.shape[1])
                         break
                 if has_3d:
-                    # CNN/Conv1d 风格：需要更细探测；这里仅粗分类
-                    return {"compatible": first_linear_in == 17,
-                            "n_features": first_linear_in,
-                            "kind": "Conv1d" if first_linear_in == 17 else "wrong_features",
-                            "window_size": 16}
+                    # 优先尝试嵌套 TCN+pool 格式 (train_tcn_23dim_*5seed.py)：
+                    # tcn.0.conv1.weight shape = (out_ch, in_ch, kernel)
+                    conv_in = None
+                    is_tcn_pool = False
+                    for k, v in sd.items():
+                        parts = k.split(".")
+                        if (
+                            len(parts) >= 4
+                            and parts[0] == "tcn"
+                            and parts[1].isdigit()
+                            and parts[2] in {"conv1", "conv2"}
+                            and k.endswith(".weight")
+                            and hasattr(v, "dim") and v.dim() == 3
+                        ):
+                            conv_in = int(v.shape[1])
+                            is_tcn_pool = True
+                            break
+                    if conv_in is None:
+                        # 扁平 Conv1d（CNN 23-dim: conv.0.weight 等）；
+                        # 取第一个 3D weight 的 shape[1]
+                        for v in sd.values():
+                            if hasattr(v, "dim") and v.dim() == 3:
+                                conv_in = int(v.shape[1])
+                                break
+                    in_features = conv_in if conv_in is not None else first_linear_in
+                    kind = "TCN+pool" if is_tcn_pool else "Conv1d"
+                    return {
+                        "compatible": in_features in (17, 23),
+                        "n_features": in_features,
+                        "kind": kind if in_features in (17, 23) else "wrong_features",
+                        "window_size": 16,
+                    }
                 if first_linear_in is None:
                     return {"compatible": False, "n_features": None,
                             "kind": "unknown", "window_size": 1}

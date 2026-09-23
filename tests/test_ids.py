@@ -1076,5 +1076,65 @@ class TestLoadTCNv4SE23Dim(unittest.TestCase):
                 self.assertLessEqual(prob, 1.0)
 
 
+class TestIDSPanelProbe(unittest.TestCase):
+    """``IDSPanel._probe_model`` 必须正确探测 23-dim TCN+pool 模型。
+
+    修复前：probe 读 ``fc1.weight.shape[1] = 32``（分类器 head 的
+    in_features），把所有 TCN+pool 23-dim 标记成「⚠ 32特征(需17)」
+    → dropdown 不可选。修复后：先识别嵌套 ``tcn.0.conv1.weight``，
+    读 ``shape[1] = 23`` 标 compatible。
+
+    本类只测 probe 的纯函数行为，不实例化 panel，避免 Tk root 依赖。
+    """
+
+    V4_SE_23DIM_SEEDS = (42, 123, 456, 789, 1024)
+    CNN_23DIM_SEEDS = (42, 123, 456, 789, 1024)
+
+    def _probe(self, path):
+        # 延迟导入，避免在无 Tk 环境下加载 ids_panel 模块顶层失败
+        from ids_panel import IDsPanel
+        return IDsPanel._probe_model(str(path))
+
+    def _path(self, name: str) -> Path:
+        return Path(__file__).resolve().parent.parent / name
+
+    def test_v4_se_23dim_probe_accepts(self):
+        """5 个 v4_se_23dim seed 都被 probe 标为 compatible=23 / TCN+pool。"""
+        for seed in self.V4_SE_23DIM_SEEDS:
+            p = self._path(f"model_v4_se_23dim_b64_ch32_do01_window16_s{seed}.pt")
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(seed=seed):
+                info = self._probe(p)
+                self.assertTrue(info["compatible"], info)
+                self.assertEqual(info["n_features"], 23, info)
+                self.assertEqual(info["kind"], "TCN+pool", info)
+                self.assertEqual(info["window_size"], 16, info)
+
+    def test_cnn_23dim_probe_accepts(self):
+        """5 个 CNN 23-dim seed 都被 probe 标为 compatible=23 / Conv1d。"""
+        for seed in self.CNN_23DIM_SEEDS:
+            p = self._path(f"model_cnn_23dim_w16_s{seed}.pt")
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(seed=seed):
+                info = self._probe(p)
+                self.assertTrue(info["compatible"], info)
+                self.assertEqual(info["n_features"], 23, info)
+                self.assertEqual(info["kind"], "Conv1d", info)
+
+    def test_tcn_pool_23dim_probe_accepts(self):
+        """5 种 tcn+pool 23-dim（gelu/attpool/...）也走 TCN+pool 路径。"""
+        for variant in ("gelu", "attpool", "gatedpool", "mhattpool", "tfpool"):
+            p = self._path(f"model_tcn_23dim_w16_{variant}_s123.pt")
+            if not p.exists():
+                self.skipTest(f"checkpoint {p.name} 缺失")
+            with self.subTest(variant=variant):
+                info = self._probe(p)
+                self.assertTrue(info["compatible"], info)
+                self.assertEqual(info["n_features"], 23, info)
+                self.assertEqual(info["kind"], "TCN+pool", info)
+
+
 if __name__ == "__main__":
     unittest.main()
