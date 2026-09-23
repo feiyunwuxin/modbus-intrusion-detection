@@ -7,7 +7,8 @@
     │ 阈值: [====●====] 0.50 │
     └────────────────────────┘
     ┌─ 统计 ────────────────┐
-    │ 总:0 正常:0 攻击:0 ... │
+    │ 总:0 正常:0 攻击:0 正确:0│
+    │ 准确率:- 精确率:- 召回率:- F1:- │
     └────────────────────────┘
     ┌─ 检测结果 (滚动) ──────┐
     │ Treeview: #/hex/真/预/...│
@@ -37,7 +38,14 @@ class IDsPanel(ttk.Frame):
         self.wrapper: ModelWrapper | None = None
         self.threshold: float = 0.5
         self.window_size: int = 1  # 1=单帧；>1=3D 窗口 (LSTM/CNN1d)
-        self._stats = {"total": 0, "normal": 0, "attack": 0, "correct": 0}
+        # Confusion-matrix counters for binary classification
+        # (positive class = attack / label 1). Total / normal / attack /
+        # correct are kept for the existing display; the four tp/fp/tn/fn
+        # cells power the new Precision / Recall / F1 metrics.
+        self._stats = {
+            "total": 0, "normal": 0, "attack": 0, "correct": 0,
+            "tp": 0, "fp": 0, "tn": 0, "fn": 0,
+        }
         self._build_ui()
         self._refresh_models()
 
@@ -93,8 +101,13 @@ class IDsPanel(ttk.Frame):
     def _build_stats_section(self) -> None:
         frame = ttk.LabelFrame(self, text="统计", padding=5)
         frame.pack(fill="x", pady=(0, 5))
-        self.stats_var = tk.StringVar(value="总:0  正常:0  攻击:0  准确率:-")
-        ttk.Label(frame, textvariable=self.stats_var, font=("Consolas", 10)).pack()
+        # Two rows: counts on top (existing), classification metrics on
+        # bottom (Accuracy / Precision / Recall / F1). Both update on the
+        # same _render_stats() tick so they can never disagree.
+        self.stats_var = tk.StringVar(value="总:0  正常:0  攻击:0  正确:0")
+        ttk.Label(frame, textvariable=self.stats_var, font=("Consolas", 10)).pack(anchor="w")
+        self.metrics_var = tk.StringVar(value="准确率:-  精确率:-  召回率:-  F1:-")
+        ttk.Label(frame, textvariable=self.metrics_var, font=("Consolas", 10)).pack(anchor="w")
 
     def _build_results_section(self) -> None:
         frame = ttk.LabelFrame(self, text="检测结果", padding=5)
@@ -382,30 +395,82 @@ class IDsPanel(ttk.Frame):
     def clear(self) -> None:
         for c in self.results_tree.get_children():
             self.results_tree.delete(c)
-        self._stats = {"total": 0, "normal": 0, "attack": 0, "correct": 0}
+        self._stats = {
+            "total": 0, "normal": 0, "attack": 0, "correct": 0,
+            "tp": 0, "fp": 0, "tn": 0, "fn": 0,
+        }
         self._render_stats()
 
     def _update_stats(self, pred: int, truth: int, counted: bool) -> None:
+        """Increment the right confusion-matrix cell for ``(pred, truth)``.
+
+        ``counted`` is False for warm-up / error frames — those don't
+        enter the metric calculation at all. Truth / pred are 0 (normal)
+        or 1 (attack); anything else is treated as not-counted.
+        """
         if not counted:
             return
-        self._stats["total"] += 1
+        if pred not in (0, 1) or truth not in (0, 1):
+            return
+        s = self._stats
+        s["total"] += 1
         if pred == 1:
-            self._stats["attack"] += 1
+            s["attack"] += 1
         else:
-            self._stats["normal"] += 1
+            s["normal"] += 1
         if pred == truth:
-            self._stats["correct"] += 1
+            s["correct"] += 1
+        # Confusion matrix: positive class = attack
+        if pred == 1 and truth == 1:
+            s["tp"] += 1
+        elif pred == 1 and truth == 0:
+            s["fp"] += 1
+        elif pred == 0 and truth == 0:
+            s["tn"] += 1
+        else:  # pred == 0, truth == 1
+            s["fn"] += 1
         self._render_stats()
 
     def _render_stats(self) -> None:
         s = self._stats
         if s["total"] == 0:
-            acc_str = "-"
+            self.stats_var.set("总:0  正常:0  攻击:0  正确:0")
+            self.metrics_var.set("准确率:-  精确率:-  召回率:-  F1:-")
+            return
+        # Accuracy
+        acc = s["correct"] / s["total"]
+        # Precision = TP / (TP + FP); undefined if model never predicted
+        # attack — show "-" so the user isn't misled by a 0 from
+        # "denominator was zero".
+        if (s["tp"] + s["fp"]) > 0:
+            precision = s["tp"] / (s["tp"] + s["fp"])
+            prec_str = f"{precision:.3f}"
         else:
-            acc = s["correct"] / s["total"]
-            acc_str = f"{acc:.3f}"
+            prec_str = "-"
+        # Recall = TP / (TP + FN); undefined if there were no positive
+        # truths in the stream.
+        if (s["tp"] + s["fn"]) > 0:
+            recall = s["tp"] / (s["tp"] + s["fn"])
+            rec_str = f"{recall:.3f}"
+        else:
+            rec_str = "-"
+        # F1 = 2*P*R/(P+R); undefined when either is (because both
+        # formulas already produced "-"). NaN guard for the floating
+        # case where P or R is exactly 0 but the other is defined.
+        if prec_str == "-" or rec_str == "-":
+            f1_str = "-"
+        else:
+            p, r = precision, recall
+            if (p + r) > 0:
+                f1 = 2 * p * r / (p + r)
+                f1_str = f"{f1:.3f}"
+            else:
+                f1_str = "-"
         self.stats_var.set(
-            f"总:{s['total']}  正常:{s['normal']}  攻击:{s['attack']}  准确率:{acc_str}"
+            f"总:{s['total']}  正常:{s['normal']}  攻击:{s['attack']}  正确:{s['correct']}"
+        )
+        self.metrics_var.set(
+            f"准确率:{acc:.3f}  精确率:{prec_str}  召回率:{rec_str}  F1:{f1_str}"
         )
 
     @staticmethod

@@ -541,5 +541,166 @@ class TestLoadTorch(unittest.TestCase):
             os.unlink(path)
 
 
+class TestIDsPanelStats(unittest.TestCase):
+    """Tests for the IDS panel's classification-metrics display.
+
+    Exercises ``_update_stats`` / ``_render_stats`` without booting the
+    full GUI — we just need a Tk root for the StringVars. The panel is
+    constructed against that root, then we drive ``_update_stats`` directly
+    with synthetic (pred, truth) pairs and read ``stats_var`` / ``metrics_var``.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import tkinter as tk
+            cls._tk = tk.Tk()
+            cls._tk.withdraw()
+        except Exception as e:
+            raise unittest.SkipTest(f"no Tk available: {e}")
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls._tk.destroy()
+        except Exception:
+            pass
+
+    def setUp(self):
+        # Import here so the module-level Tk requirement is enforced by
+        # setUpClass, not by module import.
+        from ids_panel import IDsPanel
+        self.panel = IDsPanel(self._tk)
+
+    def tearDown(self):
+        # Drop the frame so the next test gets a clean tree; widget
+        # destruction is what cleans up the Tk children we created.
+        try:
+            self.panel.destroy()
+        except Exception:
+            pass
+
+    def _feed(self, pairs):
+        """Drive _update_stats with a list of (pred, truth) pairs."""
+        for pred, truth in pairs:
+            self.panel._update_stats(pred, truth, counted=True)
+
+    def test_empty_stats_show_dashes(self):
+        """On a fresh panel the metrics line must read all '-' so the
+        user does not see a misleading 0.000 before any frames run."""
+        self.assertEqual(
+            self.panel.stats_var.get(),
+            "总:0  正常:0  攻击:0  正确:0",
+        )
+        self.assertEqual(
+            self.panel.metrics_var.get(),
+            "准确率:-  精确率:-  召回率:-  F1:-",
+        )
+
+    def test_confusion_matrix_cells_increment_independently(self):
+        """Every (pred, truth) cell must land in its own counter — feeding
+        a known mix and reading the raw stats dict is the strongest test
+        that the branching is right."""
+        # (pred, truth) distribution:
+        #   TP: pred=1 truth=1  → 3
+        #   FP: pred=1 truth=0  → 1
+        #   TN: pred=0 truth=0  → 4
+        #   FN: pred=0 truth=1  → 2
+        self._feed([
+            (1, 1), (1, 1), (1, 1),    # TP ×3
+            (1, 0),                    # FP ×1
+            (0, 0), (0, 0), (0, 0), (0, 0),  # TN ×4
+            (0, 1), (0, 1),            # FN ×2
+        ])
+        s = self.panel._stats
+        self.assertEqual(s["total"], 10)
+        self.assertEqual(s["attack"], 4)  # pred=1 count
+        self.assertEqual(s["normal"], 6)  # pred=0 count
+        self.assertEqual(s["correct"], 7)  # TP + TN
+        self.assertEqual(s["tp"], 3)
+        self.assertEqual(s["fp"], 1)
+        self.assertEqual(s["tn"], 4)
+        self.assertEqual(s["fn"], 2)
+
+    def test_metrics_known_fixture(self):
+        """Pin the four metric values on a balanced fixture so any
+        future regression in the formula is loud.
+
+        Fixture: TP=3, FP=1, TN=4, FN=2 (total=10)
+          Accuracy = (3+4)/10           = 0.700
+          Precision = 3/(3+1)           = 0.750
+          Recall    = 3/(3+2)           = 0.600
+          F1        = 2*0.75*0.6/(0.75+0.6) ≈ 0.667
+        """
+        self._feed([
+            (1, 1), (1, 1), (1, 1),    # TP ×3
+            (1, 0),                    # FP ×1
+            (0, 0), (0, 0), (0, 0), (0, 0),  # TN ×4
+            (0, 1), (0, 1),            # FN ×2
+        ])
+        m = self.panel.metrics_var.get()
+        # Substring checks — display order is fixed and stable, but the
+        # surrounding format string is more readable as a piece-level test
+        # than as a single literal.
+        self.assertIn("准确率:0.700", m)
+        self.assertIn("精确率:0.750", m)
+        self.assertIn("召回率:0.600", m)
+        # F1 is a repeating decimal; the rounded-to-3dp string is what
+        # the user sees. Compare with the same formula.
+        f1_expected = 2 * 0.75 * 0.6 / (0.75 + 0.6)
+        self.assertIn(f"F1:{f1_expected:.3f}", m)
+
+    def test_precision_undefined_when_no_positive_predictions(self):
+        """If the model never predicts attack, Precision is mathematically
+        undefined (0/0). Display must be '-' rather than 0.000 so the
+        user does not mistake it for a real value."""
+        # Only TN — model predicted 0 every time.
+        self._feed([(0, 0), (0, 0), (0, 0)])
+        m = self.panel.metrics_var.get()
+        self.assertIn("精确率:-", m)
+        # Recall is well-defined here (denominator is the truth count = 0
+        # because all truths were 0) — same undefined case, also '-'.
+        self.assertIn("召回率:-", m)
+        self.assertIn("F1:-", m)
+        # Accuracy is still computable: 3/3.
+        self.assertIn("准确率:1.000", m)
+
+    def test_recall_undefined_when_no_positive_truths(self):
+        """Mirror case: if every actual frame was normal, Recall is
+        0/0. Same '-' handling."""
+        self._feed([(1, 0), (1, 0), (0, 0)])  # 2 FP + 1 TN
+        m = self.panel.metrics_var.get()
+        self.assertIn("精确率:0.000", m)  # 0/(0+2)=0 → defined as 0
+        self.assertIn("召回率:-", m)       # 0/(0+0)=undefined
+        self.assertIn("F1:-", m)
+        # Accuracy = 1/3.
+        self.assertIn("准确率:0.333", m)
+
+    def test_counted_false_does_not_change_skips(self):
+        """Warm-up / error frames (counted=False) must not touch the
+        counters at all — otherwise long BiLSTM warm-ups would corrupt
+        the metrics."""
+        before = dict(self.panel._stats)
+        self.panel._update_stats(1, 1, counted=False)
+        self.panel._update_stats(0, 0, counted=False)
+        self.assertEqual(self.panel._stats, before)
+
+    def test_clear_resets_all_eight_keys(self):
+        """clear() must zero all 8 stat keys — tp/fp/tn/fn are easy to
+        forget because they're behind the older total/normal/attack/correct
+        API."""
+        self._feed([
+            (1, 1), (1, 0), (0, 0), (0, 1),
+        ])
+        self.panel.clear()
+        s = self.panel._stats
+        for k in ("total", "normal", "attack", "correct",
+                  "tp", "fp", "tn", "fn"):
+            self.assertEqual(s[k], 0, f"{k} should be reset to 0 after clear()")
+        # And the display must reflect the empty state again.
+        self.assertEqual(self.panel.metrics_var.get(),
+                         "准确率:-  精确率:-  召回率:-  F1:-")
+
+
 if __name__ == "__main__":
     unittest.main()
