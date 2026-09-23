@@ -706,6 +706,162 @@ class _Torch3DStateDictWrapper:
         return _CNN3DModel(conv_seq, pool, classifier)
 
 
+class _Torch3DStateDictWrapper23:
+    """23-dim KEEP_23 模型的滑动窗口推理 wrapper。
+
+    与 :class:`_Torch3DStateDictWrapper` 区别:
+
+    * ``infer()`` 入参是**原始 record dict**（不是预先提取的特征数组），
+      因为 19 行级特征里有 4 个派生列（time_diff、time_since_last、
+      is_unusual_fc、is_response）需要跨帧状态。
+    * 维护一个 16 帧的 buffer，buffer 满后计算 6 个窗口聚合列
+      （press_mean_w / crc_max_w / resp_count_w / cmd_resp_balance_w /
+      length_nunique_w / unusual_count_w），按 KEEP_23 顺序拼成
+      (16, 23) 喂给模型。
+    * RobustScaler 来自 ``scaler_binary_v2_scada.joblib``，缺文件时
+      退化为 identity（带一次性 warning），模型仍能跑（预测会偏，
+      但 IDS 面板的 TP/FP/TN/FN 计数 + metrics 显示链路保持工作）。
+    * 模型结构重建复用 :meth:`_Torch3DStateDictWrapper._reconstruct`，
+      传 ``n_features=23``；LSTM/GRU 走 batch_first 路径，Conv1d
+      由 ``_CNN3DModel.forward`` 内部 ``transpose(1, 2)``，所以
+      wrapper 喂 ``(1, 16, 23)`` 两种都兼容。
+    """
+
+    def __init__(self, state_dict: dict, window_size: int):
+        if window_size < 1:
+            raise ValueError(f"window_size 必须 >= 1，实际 {window_size}")
+        self._n_features = 23
+        self._window_size = window_size
+        # 19-dim raw 的 buffer（用于聚合计算：press / crc / length / unusual / is_response）
+        self._buffer_19: deque = deque(maxlen=window_size)
+        # 跨帧状态：time_diff 和 time_since_last 需要 prev_time + 查表
+        self._prev_time: int | None = None
+        self._last_seen_time: dict[int, int] = {}
+        # Lazy-load 的 RobustScaler
+        from ids.scaler_23dim import Scaler23
+        self._scaler = Scaler23()
+        # 复用既有 _reconstruct(n_features=23) 重建 LSTM/GRU/Conv1d
+        self._model = _Torch3DStateDictWrapper._reconstruct(
+            state_dict, self._n_features
+        )
+        self._model.eval()
+
+    @property
+    def input_features(self) -> int:
+        return self._n_features
+
+    @property
+    def window_size(self) -> int:
+        return self._window_size
+
+    @property
+    def warmup_remaining(self) -> int:
+        return max(0, self._window_size - len(self._buffer_19))
+
+    def infer(self, record: dict) -> tuple[int, float] | None:
+        """喂一帧原始 record；满窗后返回 (label, prob_attack)，否则 None。
+
+        record 必须包含 17 维 IDS 列（FEATURE_COLUMNS）。派生列
+        time_diff / time_since_last 由 wrapper 内部维护。
+        """
+        import numpy as np
+        import torch
+
+        from ids.inference import (
+            extract_features_19,
+            keep_23_per_frame_indices,
+            keep_23_aggregate_indices,
+        )
+
+        raw_19 = extract_features_19(
+            record,
+            prev_time=self._prev_time,
+            last_seen_time=self._last_seen_time,
+        )
+        # 更新跨帧状态，供下一帧使用
+        self._prev_time = int(raw_19[0])  # placeholder, overwritten below
+        t = int(record.get("time") or 0)
+        addr = int(record.get("address") or 0)
+        fn = int(record.get("function") or 0)
+        self._prev_time = t
+        self._last_seen_time[addr * 1000 + fn] = t
+
+        # 标准化：scaler 需要 (N, 19)；scaler_23dim 兼容任意前置维度
+        scaled_19 = self._scaler.transform(
+            raw_19.reshape(1, -1)
+        )[0]  # (19,) float32
+
+        self._buffer_19.append(scaled_19)
+        if len(self._buffer_19) < self._window_size:
+            return None  # warm-up
+
+        # 计算 6 个窗口聚合（在 scaled 19-dim 上做，与训练一致）
+        buf = np.stack(list(self._buffer_19), axis=0)  # (W, 19)
+        # KEEP_23 per-frame 索引（17 个）→ 取 (W, 17) per-frame
+        per_frame_idx = keep_23_per_frame_indices()
+        per_frame = buf[:, per_frame_idx]  # (W, 17)
+        # 6 个聚合：按 keep_23_aggregate_indices() 顺序
+        aggs = self._compute_aggregates(buf)
+        # 拼成 (W, 23)
+        x_window = np.concatenate([per_frame, aggs], axis=-1)  # (W, 23)
+        x = torch.as_tensor(x_window, dtype=torch.float32).unsqueeze(0)  # (1, W, 23)
+        with torch.no_grad():
+            logits = self._model(x)
+        if logits.dim() == 2 and logits.shape[-1] >= 2:
+            probs = torch.softmax(logits, dim=-1)[0]
+            prob_attack = float(probs[-1])
+        else:
+            prob_attack = float(torch.sigmoid(logits).flatten()[0])
+        label = 1 if prob_attack >= 0.5 else 0
+        return label, prob_attack
+
+    @staticmethod
+    def _compute_aggregates(buf_19: np.ndarray) -> np.ndarray:
+        """在 (W, 19) scaled 矩阵上算 6 个窗口聚合，输出 (W, 6)。
+
+        每列与 KEEP_23 中 [19, 26] 一一对应（参见 _common_train.py:46
+        与 preprocess_v2_scada.py:194–203）：
+
+        | 输出列 | 含义              | 来源 19-dim 索引 |
+        |--------|-------------------|-------------------|
+        | 19     | press_mean_w      | mean(buf[:, 11])  |
+        | 20     | (crc_mean_w)      | 不在 KEEP_23      |
+        | 21     | crc_max_w         | max(buf[:, 12])   |
+        | 22     | (cmd_count_w)     | 不在 KEEP_23      |
+        | 23     | resp_count_w      | sum(buf[:, 18])   |
+        | 24     | cmd_resp_balance_w| (cmd-resp)/W      |
+        | 25     | length_nunique_w  | unique count of [2]|
+        | 26     | unusual_count_w   | sum(buf[:, 17])   |
+
+        KEEP_23 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,23,24,25,26]
+        6 个保留的聚合列对应输出位置 [0, 1, 2, 3, 4, 5]（即 KEEP_23 减 18）。
+        """
+        import numpy as np
+        W = buf_19.shape[0]
+        press = buf_19[:, 11]                # pressure_measurement
+        crc = buf_19[:, 12]                  # crc_rate
+        is_resp = buf_19[:, 18]              # is_response (0/1)
+        is_unusual = buf_19[:, 17]           # is_unusual_fc
+        length = buf_19[:, 2]                # length
+
+        press_mean_w = float(press.mean())
+        crc_max_w = float(crc.max())
+        resp_count_w = float(is_resp.sum())
+        cmd_count_w = float((1.0 - is_resp).sum())
+        balance_w = (cmd_count_w - resp_count_w) / W
+        length_nunique_w = float(len(np.unique(length)))
+        unusual_count_w = float(is_unusual.sum())
+
+        # 6 列：press_mean, crc_max, resp_count, balance, length_nunique, unusual_count
+        col_vecs = np.array(
+            [press_mean_w, crc_max_w, resp_count_w, balance_w,
+             length_nunique_w, unusual_count_w],
+            dtype=np.float32,
+        )  # (6,)
+        # 广播到 (W, 6) — 与训练 make_windows_with_agg 一致
+        return np.broadcast_to(col_vecs, (W, 6)).copy()
+
+
 def load_model(path: str, *, window_size: int = 1) -> ModelWrapper:
     """按扩展名加载模型。
 
@@ -809,7 +965,7 @@ def _load_torch(p: Path, *, window_size: int = 1) -> ModelWrapper:
     if not isinstance(sd, dict):
         raise ValueError("state_dict 格式错误")
 
-    # 3. 检测 3D 窗口层 → 用 _Torch3DStateDictWrapper 重建
+    # 3. 检测 3D 窗口层 → 用对应 wrapper 重建（17-dim 或 23-dim）
     is_3d = _TorchStateDictWrapper._is_3d_compatible_from_tensors(sd)
     if is_3d:
         if window_size < 2:
@@ -818,12 +974,30 @@ def _load_torch(p: Path, *, window_size: int = 1) -> ModelWrapper:
                 "加载时需指定 window_size >= 2（如 16、32）。"
                 "请在 IDS 面板设置窗口大小后重试（建议从 16 开始）。"
             )
+        # 探测第一层 RNN/Conv1d 的 in_features：决定走 17 还是 23
+        n_3d = _detect_3d_input_features(sd)
+        if n_3d == 23:
+            try:
+                return _Torch3DStateDictWrapper23(sd, window_size)
+            except ValueError:
+                raise
+            except Exception as e:
+                raise ValueError(f"无法从 state_dict 重建 23-dim 3D 模型: {e}") from e
+        if n_3d == 17:
+            try:
+                return _Torch3DStateDictWrapper(sd, 17, window_size)
+            except ValueError:
+                raise
+            except Exception as e:
+                raise ValueError(f"无法从 state_dict 重建 3D 模型: {e}") from e
+        # 探测失败：fall back to 17-dim，让 wrapper 自己报友好错误
         try:
             return _Torch3DStateDictWrapper(sd, 17, window_size)
-        except ValueError:
-            raise
-        except Exception as e:
-            raise ValueError(f"无法从 state_dict 重建 3D 模型: {e}") from e
+        except ValueError as ve:
+            raise ValueError(
+                f"3D 模型输入维度既不是 17 也不是 23（探测到 {n_3d}）。"
+                "请确认模型来自 IDS 训练流程。"
+            ) from ve
 
     # 4. 纯 Linear/MLP：从 state_dict 重建
     n = _detect_torch_input_features(sd)
@@ -838,6 +1012,24 @@ def _load_torch(p: Path, *, window_size: int = 1) -> ModelWrapper:
         raise
     except Exception as e:
         raise ValueError(f"无法从 state_dict 重建模型: {e}") from e
+
+
+def _detect_3d_input_features(sd: dict) -> int | None:
+    """从 3D state_dict 探测第一层输入维度：LSTM 看 weight_ih_l0.shape[1]，
+    Conv1d 看第一层 weight.shape[1]。返回探测到的维度（17/23/...），
+    都不识别返回 None。
+    """
+    import re
+    # RNN: weight_ih_l0 shape = (4*hidden, input_size)
+    for key, val in sd.items():
+        if re.match(r"^(lstm|gru)\.weight_ih_l0(_reverse)?$", key):
+            if hasattr(val, "dim") and val.dim() == 2:
+                return int(val.shape[1])
+    # Conv1d: 第一个 .dim() == 3 的 weight 的 shape[1] = in_channels
+    for val in sd.values():
+        if hasattr(val, "dim") and val.dim() == 3:
+            return int(val.shape[1])
+    return None
 
 
 def list_available_models(directory: str) -> list[str]:

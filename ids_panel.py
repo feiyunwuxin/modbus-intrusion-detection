@@ -373,14 +373,26 @@ class IDsPanel(ttk.Frame):
     # ---- 推理接口 ----
 
     def process_frame(self, record: dict, frame_index: int) -> None:
-        """每帧调用一次。已有模型 → 推理；无模型 → 跳过。"""
+        """每帧调用一次。已有模型 → 推理；无模型 → 跳过。
+
+        输入特征维度由 wrapper.input_features 决定：17 时喂 (17,)
+        数组（走 ``extract_features``），23 时喂原始 record dict
+        （23-dim wrapper 自己解 19 行级特征 + RobustScaler + 6 个
+        窗口聚合列）。
+        """
         if self.wrapper is None:
             return
         truth = int(record.get("binary", 0))
         hex_bytes = self._hex_preview(record)
         try:
-            features = extract_features(record)
-            result = self.wrapper.infer(features)
+            n_feat = self.wrapper.input_features
+            if n_feat == 23:
+                # 23-dim KEEP_23 wrapper 需要 record（含 time / addr /
+                # function 派生列），不能传预提取特征。
+                result = self.wrapper.infer(record)
+            else:
+                features = extract_features(record)
+                result = self.wrapper.infer(features)
         except Exception as e:
             label, prob, correct, tag, prob_str = -1, 0.0, "?", "error", f"ERR"
             print(f"[IDS] 推理失败 (frame {frame_index}): {e}")

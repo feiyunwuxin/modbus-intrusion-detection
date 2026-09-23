@@ -749,5 +749,172 @@ class TestIDsPanelStats(unittest.TestCase):
                          "准确率:-  精确率:-  召回率:-  F1:-")
 
 
+class TestExtractFeatures19(unittest.TestCase):
+    """19 行级特征 = 17 维 IDS 列 + 4 个派生列 (time_diff,
+    time_since_last_same_addr_func, is_unusual_fc, is_response)。"""
+
+    def test_returns_19_floats_in_documented_order(self):
+        from ids import extract_features_19
+        record = {
+            "address": 4, "function": 3, "length": 16,
+            "setpoint": 0, "gain": 100, "reset": 0, "deadband": 0,
+            "cycle": 10, "rate": 0, "system": 1, "control": 0,
+            "pump": 1, "solenoid": 0, "pressure": 50.0,
+            "crc": 12869, "command": 1, "time": 1418682163,
+        }
+        out = extract_features_19(record)
+        self.assertEqual(out.shape, (19,))
+        self.assertEqual(out.dtype, __import__("numpy").float32)
+        # 前两列直接来自 record（rename 后）
+        self.assertEqual(float(out[0]), 4.0)   # address
+        self.assertEqual(float(out[1]), 3.0)   # function
+        self.assertEqual(float(out[2]), 16.0)  # length
+        self.assertEqual(float(out[4]), 100.0)  # gain
+
+    def test_first_frame_derived_features_are_zero(self):
+        """没有 prev_time 时 time_diff/time_since_last 应该是 0。"""
+        from ids import extract_features_19
+        record = {"address": 1, "function": 3, "time": 100}
+        out = extract_features_19(record)
+        # time_diff 在索引 15
+        self.assertEqual(float(out[15]), 0.0)
+        # time_since_last_same_addr_func 在索引 16
+        self.assertEqual(float(out[16]), 0.0)
+
+    def test_subsequent_frame_time_diff_is_delta(self):
+        """第二帧 time_diff = time - prev_time。"""
+        from ids import extract_features_19
+        last_seen = {}
+        r1 = {"address": 1, "function": 3, "time": 100}
+        out1 = extract_features_19(r1, last_seen_time=last_seen)
+        last_seen[1003] = 100
+        r2 = {"address": 1, "function": 3, "time": 150}
+        out2 = extract_features_19(
+            r2, prev_time=100, last_seen_time=last_seen,
+        )
+        # time_diff = 150 - 100 = 50
+        self.assertEqual(float(out2[15]), 50.0)
+        # 同 (1, 3) 出现 → time_since_last = 150 - 100 = 50
+        self.assertEqual(float(out2[16]), 50.0)
+
+    def test_unusual_fc_flag(self):
+        """function ∈ UNUSUAL_FCS 时 is_unusual_fc = 1。"""
+        from ids import extract_features_19
+        r_unusual = {"address": 1, "function": 136, "time": 0}
+        out = extract_features_19(r_unusual)
+        self.assertEqual(float(out[17]), 1.0)
+        r_normal = {"address": 1, "function": 3, "time": 0}
+        out2 = extract_features_19(r_normal)
+        self.assertEqual(float(out2[17]), 0.0)
+
+    def test_is_response_tracks_command_field(self):
+        """is_response 直接取 record.command。"""
+        from ids import extract_features_19
+        out = extract_features_19({"address": 0, "function": 0,
+                                   "command": 1, "time": 0})
+        self.assertEqual(float(out[18]), 1.0)
+        out2 = extract_features_19({"address": 0, "function": 0,
+                                    "command": 0, "time": 0})
+        self.assertEqual(float(out2[18]), 0.0)
+
+
+class TestLoadTorch23Dim(unittest.TestCase):
+    """load_model() 接受 23-dim KEEP_23 训练的 3D 模型。"""
+
+    def _build_tcn_state_dict(self):
+        """构造一个最小可重建的 23-dim TCN state_dict:
+        - 一个 Conv1d(23, 8, kernel_size=3)
+        - 一个 classifier Linear(8, 1)
+
+        state_dict 必须有 3 段命名（如 ``layers.0.weight``），因此用
+        Module 子类持有 ``self.layers = nn.Sequential(...)``；裸
+        ``nn.Sequential(...).state_dict()`` 会产生 ``0.weight``（2 段），
+        ``_reconstruct_conv1d`` 拒绝。
+        """
+        import torch
+        import torch.nn as nn
+        torch.manual_seed(0)
+
+        class _Holder(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.layers = nn.Sequential(
+                    nn.Conv1d(23, 8, kernel_size=3, padding=1),
+                    nn.BatchNorm1d(8),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool1d(1),
+                    nn.Linear(8, 1),
+                )
+
+        return _Holder().state_dict()
+
+    def test_load_23dim_tcn_with_window_16_succeeds(self):
+        """window=16 时 load_model 应该成功，返回 input_features=23 的 wrapper。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import tempfile, os
+        sd = self._build_tcn_state_dict()
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save({"state_dict": sd, "seed": 0, "best_epoch": 1}, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path, window_size=16)
+            self.assertEqual(wrapper.input_features, 23)
+            self.assertEqual(wrapper.window_size, 16)
+        finally:
+            os.unlink(path)
+
+    def test_load_23dim_tcn_without_window_fails_cleanly(self):
+        """window=1 时 3D 模型直接拒绝，错误信息提到 23-dim。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import tempfile, os
+        sd = self._build_tcn_state_dict()
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save({"state_dict": sd}, f.name)
+            path = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                load_model(path, window_size=1)
+            # 友好的 3D 模型错误
+            self.assertIn("3D", str(cm.exception))
+        finally:
+            os.unlink(path)
+
+    def test_23dim_wrapper_warmup_then_infer(self):
+        """warm-up 阶段 infer 返回 None；满窗后返回 (label, prob)。"""
+        if _TinyTorchModel is None or torch is None:
+            self.skipTest("torch not installed")
+        import tempfile, os
+        import numpy as np
+        sd = self._build_tcn_state_dict()
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
+            torch.save({"state_dict": sd}, f.name)
+            path = f.name
+        try:
+            wrapper = load_model(path, window_size=16)
+            # 第 1..15 帧：返回 None（warm-up）
+            for i in range(15):
+                rec = {
+                    "address": 1, "function": 3, "length": 16,
+                    "setpoint": 0, "gain": 0, "reset": 0, "deadband": 0,
+                    "cycle": 0, "rate": 0, "system": 0, "control": 0,
+                    "pump": 0, "solenoid": 0, "pressure": 0.0,
+                    "crc": 12869, "command": 1,
+                    "time": 1000 + i,
+                }
+                self.assertIsNone(wrapper.infer(rec))
+            # 第 16 帧：返回 (label, prob)
+            rec["time"] = 1015
+            result = wrapper.infer(rec)
+            self.assertIsNotNone(result)
+            label, prob = result
+            self.assertIn(label, (0, 1))
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+        finally:
+            os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main()
