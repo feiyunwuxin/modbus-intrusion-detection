@@ -5,8 +5,11 @@ CLI 模式:
     python modbus_simulator.py --self-test   # 自检模式
 """
 import csv
+import queue
 import struct
 import sys
+import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -191,7 +194,15 @@ class ModbusSimulatorApp:
         self.current_file: str | None = None
         self._auto_after_id: str | None = None
         self._auto_enabled: bool = False
-        self._last_valid_interval: int = 500
+        self._last_valid_interval: float = 500.0
+        # sub-ms (Tk root.after 1ms 是极限) 调度需要的子线程状态。
+        # 间隔 < 1ms 时用 time.perf_counter + Event.wait 主循环；
+        # tick 写入线程安全 Queue，UI 线程每 1ms poll 一次把 tick
+        # 派发到 _on_send_next（Tk 控件必须在 UI 线程访问）。
+        self._auto_thread: threading.Thread | None = None
+        self._auto_stop_event = threading.Event()
+        self._subms_queue: queue.Queue = queue.Queue(maxsize=10000)
+        self._subms_poll_after_id: str | None = None
 
         self._build_ui()
 
@@ -243,12 +254,14 @@ class ModbusSimulatorApp:
         self.auto_btn.pack(side="left", padx=(0, 10))
         ttk.Label(frame, text="间隔:").pack(side="left")
         self.interval_var = tk.StringVar(value="500")
+        # from_=0.001（1μs）— Tk root.after 在 >= 1ms 用；
+        # < 1ms 自动切换到 time.perf_counter 子线程循环
         self.interval_spin = ttk.Spinbox(
-            frame, from_=1, to=10000, width=6, textvariable=self.interval_var,
-            command=self._on_interval_change
+            frame, from_=0.001, to=10000.0, increment=0.1, width=8,
+            textvariable=self.interval_var, command=self._on_interval_change
         )
         self.interval_spin.pack(side="left", padx=(0, 3))
-        ttk.Label(frame, text="ms (1-10000)").pack(side="left")
+        ttk.Label(frame, text="ms (0.001-10000)").pack(side="left")
 
     def _build_log_area(self, parent) -> None:
         frame = ttk.LabelFrame(parent, text="通信日志", padding=5)
@@ -367,7 +380,11 @@ class ModbusSimulatorApp:
         interval = self._validate_interval()
         self._auto_enabled = True
         self.auto_btn.configure(text="自动发送: 开")
-        self._schedule_next_tick(interval)
+        # >= 1ms 用 Tk 原生 after；< 1ms 用子线程 + perf_counter
+        if interval >= 1.0:
+            self._schedule_next_tick(int(interval))
+        else:
+            self._start_subms_thread(interval)
 
     def _schedule_next_tick(self, interval_ms: int) -> None:
         if not self._auto_enabled:
@@ -375,46 +392,158 @@ class ModbusSimulatorApp:
         self._auto_after_id = self.root.after(interval_ms, self._auto_tick)
 
     def _auto_tick(self) -> None:
-        """自动发送 tick：发一条 + 调度下一条。"""
+        """自动发送 tick（UI 线程）：发一条 + 调度下一条。"""
         if not self._auto_enabled:
             return
         if self.index >= len(self.records):
             self._stop_auto()
             return
         self._on_send_next()
-        interval = self._validate_interval()
-        self._schedule_next_tick(interval)
+        # 当前 after 已经 fire，ID 不再 pending，清掉避免 stop 时多
+        # 余 after_cancel；同时切到 sub-ms 时也不会让旧 ID 留下来。
+        self._auto_after_id = None
+        # 用户中途把间隔调到 < 1ms 切到子线程模式
+        if self._last_valid_interval < 1.0:
+            self._start_subms_thread(self._last_valid_interval)
+            return
+        self._schedule_next_tick(int(self._last_valid_interval))
 
-    def _validate_interval(self) -> int:
-        """读取并校验间隔输入，返回合法值（非法回退到上次合法值）。"""
+    def _start_subms_thread(self, interval_ms: float) -> None:
+        """启动子线程做 sub-ms 高精度 tick 循环。
+
+        线程只算节奏 + 写 Queue（thread-safe），不直接调 Tk 控件。
+        UI 线程通过 ``_schedule_subms_poll``（1ms Tk timer）每 1ms
+        drain 一次 Queue 并执行 ``_on_send_next``——这样把串口写
+        和 log widget 更新都限制在 UI 线程。1ms 是 Tk after 的下限，
+        实际发送上限约 1000 fps；间隔 < 1ms 时 tick 会积压 / drop。
+        """
+        # 清空旧 queue，避免上次残留
+        self._subms_queue = queue.Queue(maxsize=10000)
+        self._auto_stop_event.clear()
+        self._auto_thread = threading.Thread(
+            target=self._auto_subms_loop,
+            args=(interval_ms,),
+            daemon=True,
+            name="auto-subms-tick",
+        )
+        self._auto_thread.start()
+        # 启动 UI 线程侧的 drain pump
+        self._schedule_subms_poll()
+
+    def _auto_subms_loop(self, initial_ms: float) -> None:
+        """子线程：``time.perf_counter`` 计算下一次 tick；``Event.wait``
+        让 stop 立即生效。每 tick 写一个 ``None`` 进 Queue 通知 UI。
+        """
+        interval_s = max(self._last_valid_interval, 0.001) / 1000.0
+        next_t = time.perf_counter() + interval_s
+        while self._auto_enabled and not self._auto_stop_event.is_set():
+            sleep_s = next_t - time.perf_counter()
+            if sleep_s > 0:
+                if self._auto_stop_event.wait(sleep_s):
+                    return
+            if not self._auto_enabled or self._auto_stop_event.is_set():
+                return
+            # 推一个 tick 进 queue；UI 线程 drain 时再触发发送
+            try:
+                self._subms_queue.put_nowait(None)
+            except queue.Full:
+                # UI 线程跟不上（< 1ms 间隔 + 慢 IO）；丢这一帧，避免阻塞
+                pass
+            ms = max(self._last_valid_interval, 0.001)
+            if ms >= 1.0:
+                # 用户中途把间隔调到 ms 区间：通知 UI 切回 Tk after
+                try:
+                    self._subms_queue.put_nowait("__switch_to_ms__")
+                except queue.Full:
+                    pass
+                return
+            next_t += ms / 1000.0
+
+    def _schedule_subms_poll(self) -> None:
+        """UI 线程侧的 1ms 循环：每 tick 从 queue drain 一批 + 发送。"""
+        if not self._auto_enabled or self._auto_thread is None:
+            return
+        self._subms_poll_after_id = self.root.after(1, self._drain_subms_queue)
+
+    def _drain_subms_queue(self) -> None:
+        """UI 线程：drain queue，最多 200 帧 / 周期 避免长时间阻塞 UI。"""
+        n_dispatched = 0
+        switch_to_ms = False
+        while n_dispatched < 200:
+            try:
+                item = self._subms_queue.get_nowait()
+            except queue.Empty:
+                break
+            if item == "__switch_to_ms__":
+                switch_to_ms = True
+                break
+            # 普通 tick：发一帧
+            if self.index >= len(self.records):
+                self._stop_auto()
+                return
+            self._on_send_next()
+            n_dispatched += 1
+        if switch_to_ms:
+            self._schedule_next_tick(int(self._last_valid_interval))
+            return
+        self._schedule_subms_poll()
+
+    def _schedule_next_tick_from_subms(self) -> None:
+        """sub-ms 线程退出后，UI 线程接管 Tk after 调度。"""
+        if not self._auto_enabled:
+            return
+        self._schedule_next_tick(int(self._last_valid_interval))
+
+    def _validate_interval(self) -> float:
+        """读取并校验间隔输入（float，0.001–10000ms），返回合法值。
+
+        非法输入回退到 ``_last_valid_interval`` 并把 spinbox 显示同步回来。
+        """
         try:
-            v = int(self.interval_var.get())
-            if 1 <= v <= 10000:
+            v = float(self.interval_var.get())
+            if 0.001 <= v <= 10000.0:
                 self._last_valid_interval = v
                 return v
         except ValueError:
             pass
-        # 回退
-        self.interval_var.set(str(self._last_valid_interval))
+        self.interval_var.set(f"{self._last_valid_interval:g}")
         return self._last_valid_interval
 
     def _on_interval_change(self) -> None:
-        """Spinbox 值变更：实时校验，更新最后合法值（不影响正在运行的 after）。"""
+        """Spinbox 值变更：实时校验，更新最后合法值（不影响正在运行的循环）。
+
+        模式（>=1ms vs sub-ms 子线程）在 ``_start_auto`` / ``_auto_tick`` /
+        ``_auto_subms_loop`` 中按当前 interval 自动切换；用户想从一种模式
+        切到另一种不用先 stop，直接调 spinbox 即可。
+        """
         try:
-            v = int(self.interval_var.get())
-            if 1 <= v <= 10000:
+            v = float(self.interval_var.get())
+            if 0.001 <= v <= 10000.0:
                 self._last_valid_interval = v
         except ValueError:
             pass
 
     def _stop_auto(self) -> None:
-        """停止自动发送。"""
+        """停止自动发送（同时清理 Tk after、sub-ms 1ms poll、sub-ms 子线程）。"""
         if self._auto_after_id is not None:
             try:
                 self.root.after_cancel(self._auto_after_id)
             except Exception:
                 pass
             self._auto_after_id = None
+        if self._subms_poll_after_id is not None:
+            try:
+                self.root.after_cancel(self._subms_poll_after_id)
+            except Exception:
+                pass
+            self._subms_poll_after_id = None
+        # 先 set event，让子线程 Event.wait 立刻醒来退出
+        self._auto_stop_event.set()
+        if self._auto_thread is not None:
+            self._auto_thread.join(timeout=0.5)
+            self._auto_thread = None
+            # 留给下次 start 复用前清掉
+            self._auto_stop_event.clear()
         if self._auto_enabled:
             self._auto_enabled = False
             self.auto_btn.configure(text="自动发送: 关")
