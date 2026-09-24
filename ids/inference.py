@@ -65,12 +65,30 @@ def _to_int(value) -> int:
         return 0
 
 
+def _to_float(value) -> float:
+    """保留小数位的浮点解析；与 preprocess_v2_scada.py 的 ``pd.to_numeric``
+    语义一致（``pressure_measurement`` / ``setpoint`` / ``gain`` /
+    ``deadband`` / ``cycle time`` / ``rate`` / ``system mode`` /
+    ``control scheme`` / ``pump`` / ``solenoid`` / ``reset rate``
+    等 SCADA 数值列都用这个语义）。None/空值/"?" → 0.0。
+    """
+    if value is None or value == "" or value == "?":
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _resolve_int(record: dict, short_key: str) -> int:
     """按 ``_FEATURE_ALIASES_17[short_key]`` 顺序在 record 里查找字段值。
 
     第一个找到的非 ``None`` 值转 int 返回；全部 miss 或值为 ``"?"`` /
     空字符串则返回 0。SCADA CSV 路径下用 ``"pressure measurement"``
     等长列名也能查到。
+
+    注意：int() 会截断小数 → 只用于模型按离散 code 处理的字段
+    （address / function / length / time / command）。
     """
     for alias in _FEATURE_ALIASES_17.get(short_key, (short_key,)):
         v = record.get(alias)
@@ -78,6 +96,24 @@ def _resolve_int(record: dict, short_key: str) -> int:
             continue
         return _to_int(v)
     return 0
+
+
+def _resolve_float(record: dict, short_key: str) -> float:
+    """保留小数位的版本；用于 SCADA 数值列（pressure / cumulative /
+    setpoint / gain / deadband / cycle / rate / system / control /
+    pump / solenoid / reset / crc_rate）。
+
+    23-dim KEEP_23 模型训练时 ``pressure_measurement`` /
+    ``reset_rate`` / ``deadband`` / ``cycle_time`` / ``rate`` 都用
+    ``pd.to_numeric`` 保留小数位；wrapper 必须同样保留，否则
+    ``press_mean_w`` 聚合特征错位 → 模型把所有帧预测成 attack。
+    """
+    for alias in _FEATURE_ALIASES_17.get(short_key, (short_key,)):
+        v = record.get(alias)
+        if v is None or v == "" or v == "?":
+            continue
+        return _to_float(v)
+    return 0.0
 
 
 def extract_features(record: dict) -> np.ndarray:
@@ -162,26 +198,33 @@ def extract_features_19(
     is_unusual_fc = 1 if fn in UNUSUAL_FCS else 0
     is_response = _resolve_int(record, "command")
 
-    # 13 个协议字段 + length 通过 _resolve_int 同时支持 SCADA CSV
+    # 13 个协议字段 + length 通过 _resolve_* 同时支持 SCADA CSV
     # 列名（"pressure measurement" / "reset rate" / ...）和短名
     # （"pressure" / "reset" / ...）。csv_loader 输出的是 SCADA 名，
     # 短名是历史路径。
+    #
+    # 数值列（setpoint / gain / reset_rate / deadband / cycle_time /
+    # rate / system_mode / control_scheme / pump / solenoid /
+    # pressure_measurement / crc_rate）必须用 _resolve_float 保留
+    # 小数位，否则 23-dim KEEP_23 wrapper 的 press_mean_w 聚合特征
+    # 跟 X_train 不匹配 → 模型全部判 attack。
+    # address / function / length / command / time 是离散 code，用 int。
     raw_19 = [
         float(addr),
         float(fn),
         float(_resolve_int(record, "length")),
-        float(_resolve_int(record, "setpoint")),
-        float(_resolve_int(record, "gain")),
-        float(_resolve_int(record, "reset")),    # reset rate
-        float(_resolve_int(record, "deadband")),
-        float(_resolve_int(record, "cycle")),    # cycle time
-        float(_resolve_int(record, "rate")),
-        float(_resolve_int(record, "system")),   # system mode
-        float(_resolve_int(record, "control")),  # control scheme
-        float(_resolve_int(record, "pump")),
-        float(_resolve_int(record, "solenoid")),
-        float(_resolve_int(record, "pressure")), # pressure measurement
-        float(_resolve_int(record, "crc")),      # crc rate
+        _resolve_float(record, "setpoint"),
+        _resolve_float(record, "gain"),
+        _resolve_float(record, "reset"),        # reset rate
+        _resolve_float(record, "deadband"),
+        _resolve_float(record, "cycle"),        # cycle time
+        _resolve_float(record, "rate"),
+        _resolve_float(record, "system"),       # system mode
+        _resolve_float(record, "control"),      # control scheme
+        _resolve_float(record, "pump"),
+        _resolve_float(record, "solenoid"),
+        _resolve_float(record, "pressure"),     # pressure measurement
+        _resolve_float(record, "crc"),          # crc rate
         float(time_diff),
         float(time_since_last),
         float(is_unusual_fc),

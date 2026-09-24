@@ -851,6 +851,35 @@ class TestExtractFeatures19(unittest.TestCase):
         self.assertEqual(float(out[14]), 12869.0)  # crc_rate (来自 "crc rate")
         self.assertEqual(float(out[18]), 1.0)   # is_response (来自 "command response")
 
+    def test_float_precision_preserved_for_pressure(self):
+        """pressure_measurement 是 float（0–100），_resolve_int 之前用
+        int(float(value)) 把 0.689655 截断成 0 → IDS 面板 23-dim 模型
+        的 raw_19[13] 全是 0 → press_mean_w 全 0 → 模型预测全 attack
+        （X_train 用 pd.to_numeric 保留小数位，wrapper 必须匹配）。
+
+        修复前：out[13] == 0.0（截断）
+        修复后：out[13] == 0.689655（精确）
+        """
+        from ids import extract_features_19
+        rec = {
+            "address": 4, "function": 3, "length": 16,
+            "setpoint": 0, "gain": 0,
+            "reset rate": 0.5, "deadband": 1.25,
+            "cycle time": 10.75, "rate": 2.5,
+            "system mode": 1, "control scheme": 0,
+            "pump": 1, "solenoid": 0,
+            "pressure measurement": 0.689655, "crc rate": 12869,
+            "command response": 1, "time": 1418682163,
+        }
+        out = extract_features_19(rec)
+        # 13 = pressure_measurement (浮点精度不能丢)
+        self.assertAlmostEqual(float(out[13]), 0.689655, places=5)
+        # 其他 NUMERIC_COLS 字段同样要保精度
+        self.assertAlmostEqual(float(out[5]), 0.5, places=5)   # reset_rate
+        self.assertAlmostEqual(float(out[6]), 1.25, places=5)  # deadband
+        self.assertAlmostEqual(float(out[7]), 10.75, places=5) # cycle_time
+        self.assertAlmostEqual(float(out[8]), 2.5, places=5)   # rate
+
     def test_extract_features_17d_accepts_scada_csv_columns(self):
         """17-dim 主线 extract_features 也必须能读 SCADA CSV 列名，
         否则 17-dim 模型在 IDS 面板上同样 100% 报警（之前以为只影响
