@@ -817,6 +817,83 @@ class TestExtractFeatures19(unittest.TestCase):
                                     "command": 0, "time": 0})
         self.assertEqual(float(out2[18]), 0.0)
 
+    def test_scada_csv_column_names_accepted(self):
+        """IanArffDataset_RAW.csv 用 SCADA 列名（"pressure measurement"
+        / "crc rate" / "reset rate" / "cycle time" / "system mode" /
+        "control scheme" / "command response"），extract_features_19 必须
+        也能解析这些 key，否则 IDS 面板从 csv_loader 拿到的 record 会
+        全部字段返回 None → 0 → 模型预测崩溃为「全部 attack」。
+
+        修复前：pressure_measurement(13) / crc_rate(14) / reset_rate(5)
+        / cycle_time(7) / system_mode(9) / control_scheme(10) /
+        is_response(18) 全是 0；X_test 在该模型上能到 85% 准确率，但
+        IDS 面板 100% 报警。
+        修复后：所有字段都能从 SCADA CSV 列名读到。
+        """
+        from ids import extract_features_19
+        rec_scada = {
+            "address": 4, "function": 3, "length": 16,
+            "setpoint": 0, "gain": 100,
+            "reset rate": 0, "deadband": 0,
+            "cycle time": 10, "rate": 0,
+            "system mode": 1, "control scheme": 0,
+            "pump": 1, "solenoid": 0,
+            "pressure measurement": 50.0, "crc rate": 12869,
+            "command response": 1, "time": 1418682163,
+        }
+        out = extract_features_19(rec_scada)
+        # 这些字段在 SCADA 命名下应该非零
+        self.assertEqual(float(out[5]), 0.0)   # reset_rate (来自 "reset rate")
+        self.assertEqual(float(out[7]), 10.0)   # cycle_time (来自 "cycle time")
+        self.assertEqual(float(out[9]), 1.0)    # system_mode (来自 "system mode")
+        self.assertEqual(float(out[10]), 0.0)   # control_scheme (来自 "control scheme")
+        self.assertEqual(float(out[13]), 50.0)  # pressure_measurement (来自 "pressure measurement")
+        self.assertEqual(float(out[14]), 12869.0)  # crc_rate (来自 "crc rate")
+        self.assertEqual(float(out[18]), 1.0)   # is_response (来自 "command response")
+
+    def test_extract_features_17d_accepts_scada_csv_columns(self):
+        """17-dim 主线 extract_features 也必须能读 SCADA CSV 列名，
+        否则 17-dim 模型在 IDS 面板上同样 100% 报警（之前以为只影响
+        23-dim，实测 BiLSTM 17-dim 也 38.46% acc = pos_rate）。
+        """
+        from ids import extract_features
+        rec_scada = {
+            "address": 4, "function": 3, "length": 16,
+            "setpoint": 0, "gain": 100,
+            "reset rate": 7, "deadband": 0,
+            "cycle time": 10, "rate": 0,
+            "system mode": 1, "control scheme": 0,
+            "pump": 1, "solenoid": 0,
+            "pressure measurement": 50.0, "crc rate": 12869,
+            "command response": 1, "time": 1418682163,
+        }
+        out = extract_features(rec_scada)
+        # FEATURE_COLUMNS 顺序：address, function, length, setpoint,
+        # gain, reset, deadband, cycle, rate, system, control, pump,
+        # solenoid, pressure, crc, command, time
+        self.assertEqual(float(out[5]), 7.0)      # reset
+        self.assertEqual(float(out[7]), 10.0)     # cycle
+        self.assertEqual(float(out[9]), 1.0)      # system
+        self.assertEqual(float(out[10]), 0.0)     # control
+        self.assertEqual(float(out[13]), 50.0)    # pressure
+        self.assertEqual(float(out[14]), 12869.0) # crc
+        self.assertEqual(float(out[15]), 1.0)     # command
+
+    def test_short_keys_still_work_for_backward_compat(self):
+        """短名（旧测试和部分代码路径还在用）必须继续工作。"""
+        from ids import extract_features_19, extract_features
+        rec_short = {
+            "address": 4, "function": 3, "length": 16,
+            "setpoint": 0, "gain": 100, "reset": 7, "deadband": 0,
+            "cycle": 10, "rate": 0, "system": 1, "control": 0,
+            "pump": 1, "solenoid": 0, "pressure": 50.0,
+            "crc": 12869, "command": 1, "time": 1418682163,
+        }
+        out19 = extract_features_19(rec_short)
+        out17 = extract_features(rec_short)
+        self.assertEqual(float(out19[5]), 7.0)
+        self.assertEqual(float(out17[5]), 7.0)
+
 
 class TestLoadTorch23Dim(unittest.TestCase):
     """load_model() 接受 23-dim KEEP_23 训练的 3D 模型。"""
@@ -1181,6 +1258,91 @@ class TestIDSPanelProbe(unittest.TestCase):
                 self.assertTrue(info["compatible"], info)
                 self.assertEqual(info["n_features"], 23, info)
                 self.assertEqual(info["kind"], "TCN+pool", info)
+
+
+class TestFormatModelTag(unittest.TestCase):
+    """``IDSPanel._format_model_tag(info, has_scaler)`` 把 probe 结果映射
+    到 dropdown 上显示的中文标签。
+
+    设计要点：
+
+    * 17-dim 兼容 → ``✅ {kind} · 17f``，窗口>1 加 ``· W{window}``。
+    * 23-dim 兼容 + scaler 在 → ``✅ {kind} · 23f · W{window} · scaler✓``。
+    * 23-dim 兼容 + scaler 缺 → ``⚠ {kind} · 23f · W{window} · 需scaler``。
+    * wrong_features → ``⚠ {n}f · 需 17/23``（IDS 同时支持 17/23，
+      所以"需17"是过时的说法）。
+    * load_error → ``❌ 加载错误``。
+
+    把这个函数做成纯函数是为了让 dropdown 文案不靠实例化 panel
+    也能测——probe 本身已经是纯函数了，format 顺延同样的取舍。
+    """
+
+    def _fmt(self, info, has_scaler=True):
+        from ids_panel import IDsPanel
+        return IDsPanel._format_model_tag(info, has_scaler)
+
+    def test_17d_bilstm_compatible(self):
+        info = {"compatible": True, "n_features": 17, "kind": "BiLSTM",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info), "✅ BiLSTM · 17f · W16")
+
+    def test_17d_gru_compatible(self):
+        info = {"compatible": True, "n_features": 17, "kind": "GRU",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info), "✅ GRU · 17f · W16")
+
+    def test_17d_fnn_single_frame_omits_window(self):
+        info = {"compatible": True, "n_features": 17, "kind": "FNN",
+                "window_size": 1}
+        self.assertEqual(
+            self._fmt(info), "✅ FNN · 17f")
+
+    def test_17d_sklearn(self):
+        info = {"compatible": True, "n_features": 17, "kind": "sklearn-17",
+                "window_size": 1}
+        self.assertEqual(
+            self._fmt(info), "✅ sklearn-17 · 17f")
+
+    def test_23d_tcn_with_scaler(self):
+        info = {"compatible": True, "n_features": 23, "kind": "TCN+pool",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info, has_scaler=True),
+            "✅ TCN+pool · 23f · W16 · scaler✓")
+
+    def test_23d_tcn_without_scaler(self):
+        info = {"compatible": True, "n_features": 23, "kind": "TCN+pool",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info, has_scaler=False),
+            "⚠ TCN+pool · 23f · W16 · 需scaler")
+
+    def test_23d_cnn_with_scaler(self):
+        info = {"compatible": True, "n_features": 23, "kind": "Conv1d",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info, has_scaler=True),
+            "✅ Conv1d · 23f · W16 · scaler✓")
+
+    def test_23d_cnn_without_scaler(self):
+        info = {"compatible": True, "n_features": 23, "kind": "Conv1d",
+                "window_size": 16}
+        self.assertEqual(
+            self._fmt(info, has_scaler=False),
+            "⚠ Conv1d · 23f · W16 · 需scaler")
+
+    def test_wrong_features_32(self):
+        info = {"compatible": False, "n_features": 32,
+                "kind": "wrong_features", "window_size": 1}
+        # IDS 现在同时支持 17 和 23，"需17" 已过时
+        self.assertEqual(self._fmt(info), "⚠ 32f · 需 17/23")
+
+    def test_load_error(self):
+        info = {"compatible": False, "n_features": None,
+                "kind": "load_error", "window_size": 1}
+        self.assertEqual(self._fmt(info), "❌ 加载错误")
 
 
 if __name__ == "__main__":

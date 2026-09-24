@@ -24,6 +24,36 @@ FEATURE_COLUMNS: tuple[str, ...] = (
     "crc", "command", "time",
 )
 
+# SCADA CSV 列名 → 17-dim 短 key 的别名映射。IanArffDataset_RAW.csv 用
+# SCADA 原始列名（"pressure measurement" / "crc rate" / "reset rate" /
+# "cycle time" / "system mode" / "control scheme" / "command response"），
+# 但 FEATURE_COLUMNS 用短名（"pressure" / "crc" / "reset" / ...）。
+# 不做这个映射的话，csv_loader 输出的 record 用 SCADA 名 → extract_features
+# 按短名 lookup 全部 None → 0 → IDS 面板实时推理所有字段静默丢失
+# （X_test 直接喂模型 85%+ 准确率，但 IDS 面板 100% 报警）。
+#
+# 别名按优先级排列：先查 SCADA CSV 列名（生产路径），再查短名
+# （历史测试 / 内部代码用）。
+_FEATURE_ALIASES_17: dict[str, tuple[str, ...]] = {
+    "address":  ("address",),
+    "function": ("function",),
+    "length":   ("length",),
+    "setpoint": ("setpoint",),
+    "gain":     ("gain",),
+    "reset":    ("reset rate", "reset"),
+    "deadband": ("deadband",),
+    "cycle":    ("cycle time", "cycle"),
+    "rate":     ("rate",),
+    "system":   ("system mode", "system"),
+    "control":  ("control scheme", "control"),
+    "pump":     ("pump",),
+    "solenoid": ("solenoid",),
+    "pressure": ("pressure measurement", "pressure"),
+    "crc":      ("crc rate", "crc"),
+    "command":  ("command response", "command"),
+    "time":     ("time",),
+}
+
 
 def _to_int(value) -> int:
     """与 build_frame 一致的浮点截断。None/空值 → 0。"""
@@ -35,13 +65,32 @@ def _to_int(value) -> int:
         return 0
 
 
+def _resolve_int(record: dict, short_key: str) -> int:
+    """按 ``_FEATURE_ALIASES_17[short_key]`` 顺序在 record 里查找字段值。
+
+    第一个找到的非 ``None`` 值转 int 返回；全部 miss 或值为 ``"?"`` /
+    空字符串则返回 0。SCADA CSV 路径下用 ``"pressure measurement"``
+    等长列名也能查到。
+    """
+    for alias in _FEATURE_ALIASES_17.get(short_key, (short_key,)):
+        v = record.get(alias)
+        if v is None or v == "" or v == "?":
+            continue
+        return _to_int(v)
+    return 0
+
+
 def extract_features(record: dict) -> np.ndarray:
     """从 CSV/XLSX 记录提取 17 个特征，返回 (17,) float32 数组。
 
     顺序固定为 FEATURE_COLUMNS；缺失字段视为 0。
+
+    通过 :func:`_resolve_int` 同时支持 SCADA CSV 列名（"pressure
+    measurement" 等）和短名（"pressure" 等）——前者是 csv_loader
+    输出的真实 record，后者保留向后兼容（历史测试 / 内部代码）。
     """
     return np.array(
-        [_to_int(record.get(col)) for col in FEATURE_COLUMNS],
+        [_resolve_int(record, col) for col in FEATURE_COLUMNS],
         dtype=np.float32,
     )
 
@@ -98,9 +147,9 @@ def extract_features_19(
     ``last_seen_time`` 并维护 16 帧的 buffer，wrapper 自己再过
     RobustScaler + 加窗后聚合得到 (23, 16) 模型输入。
     """
-    t = _to_int(record.get("time"))
-    fn = _to_int(record.get("function"))
-    addr = _to_int(record.get("address"))
+    t = _resolve_int(record, "time")
+    fn = _resolve_int(record, "function")
+    addr = _resolve_int(record, "address")
 
     time_diff = (t - prev_time) if prev_time is not None else 0
 
@@ -111,25 +160,28 @@ def extract_features_19(
         time_since_last = 0
 
     is_unusual_fc = 1 if fn in UNUSUAL_FCS else 0
-    is_response = _to_int(record.get("command"))
+    is_response = _resolve_int(record, "command")
 
-    # 13 个协议字段 + length 直接从 record 取（key 改名映射在下面）
+    # 13 个协议字段 + length 通过 _resolve_int 同时支持 SCADA CSV
+    # 列名（"pressure measurement" / "reset rate" / ...）和短名
+    # （"pressure" / "reset" / ...）。csv_loader 输出的是 SCADA 名，
+    # 短名是历史路径。
     raw_19 = [
         float(addr),
         float(fn),
-        float(_to_int(record.get("length"))),
-        float(_to_int(record.get("setpoint"))),
-        float(_to_int(record.get("gain"))),
-        float(_to_int(record.get("reset"))),    # reset rate
-        float(_to_int(record.get("deadband"))),
-        float(_to_int(record.get("cycle"))),    # cycle time
-        float(_to_int(record.get("rate"))),
-        float(_to_int(record.get("system"))),   # system mode
-        float(_to_int(record.get("control"))),  # control scheme
-        float(_to_int(record.get("pump"))),
-        float(_to_int(record.get("solenoid"))),
-        float(_to_int(record.get("pressure"))), # pressure measurement
-        float(_to_int(record.get("crc"))),      # crc rate
+        float(_resolve_int(record, "length")),
+        float(_resolve_int(record, "setpoint")),
+        float(_resolve_int(record, "gain")),
+        float(_resolve_int(record, "reset")),    # reset rate
+        float(_resolve_int(record, "deadband")),
+        float(_resolve_int(record, "cycle")),    # cycle time
+        float(_resolve_int(record, "rate")),
+        float(_resolve_int(record, "system")),   # system mode
+        float(_resolve_int(record, "control")),  # control scheme
+        float(_resolve_int(record, "pump")),
+        float(_resolve_int(record, "solenoid")),
+        float(_resolve_int(record, "pressure")), # pressure measurement
+        float(_resolve_int(record, "crc")),      # crc rate
         float(time_diff),
         float(time_since_last),
         float(is_unusual_fc),
