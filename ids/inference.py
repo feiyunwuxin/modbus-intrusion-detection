@@ -241,19 +241,31 @@ def keep_23_per_frame_indices() -> tuple[int, ...]:
     return _KEEP_23_PER_FRAME_IN_19
 
 
-def keep_23_aggregate_indices() -> tuple[int, ...]:
-    """KEEP_23 中 [19, 26] 的 6 个窗口聚合列名（按 27-dim 位置命名）。
+# Backwards-compat alias for callers using the old type-ignored tuple[int] form.
+# `keep_23_aggregate_indices` is now `tuple[tuple[str, int], ...]`.
+_AGG_KINDS = ("mean", "max", "sum", "balance", "nunique", "sum")
 
-    顺序与 _common_train.py:46 一致：press_mean_w, crc_max_w,
-    resp_count_w, cmd_resp_balance_w, length_nunique_w,
-    unusual_count_w。每个值都是 (kind, source_index) 二元组，
-    kind ∈ {"mean", "max", "sum", "balance", "nunique"}。
+
+def keep_23_aggregate_indices() -> tuple[tuple[str, int], ...]:
+    """KEEP_23 中 [19, 26] 的 6 个窗口聚合列（按 19-dim 来源索引）。
+
+    与 :meth:`_Torch3DStateDictWrapper23._compute_aggregates` 同源（直接
+    对应 preprocess_v2_scada.py:177-181 的 ``IDX_PRESS/CRC/ISRESP/
+    ISUNUSUAL/LENGTH`` 索引）。每个值都是 ``(kind, source_index)``
+    二元组，``source_index`` 指向 :data:`FEATURE_COLUMNS_19` 的位置：
+
+    * ``mean(buf[:, 13])`` → press_mean_w (pressure_measurement)
+    * ``max(buf[:, 14])``  → crc_max_w    (crc_rate)
+    * ``sum(buf[:, 18])``  → resp_count_w (is_response)
+    * ``balance(buf[:, 18])`` → cmd_resp_balance_w
+    * ``nunique(buf[:, 2])``  → length_nunique_w (length)
+    * ``sum(buf[:, 17])``  → unusual_count_w (is_unusual_fc)
     """
     return (
-        ("mean",    11),  # pressure_measurement → press_mean_w
-        ("max",     12),  # crc_rate → crc_max_w
+        ("mean",    13),  # pressure_measurement → press_mean_w
+        ("max",     14),  # crc_rate → crc_max_w
         ("sum",     18),  # is_response → resp_count_w
         ("balance", 18),  # is_response → cmd_resp_balance_w = (1-resp).sum - resp.sum / W
-        ("nunique", 2),   # length → length_nunique_w
+        ("nunique",  2),  # length → length_nunique_w
         ("sum",     17),  # is_unusual_fc → unusual_count_w
     )
