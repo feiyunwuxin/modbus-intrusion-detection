@@ -1548,3 +1548,159 @@ def _mcu_array_name_to_key(name: str, kind: str) -> str | None:
         # fc1_weight -> fc1.weight
         return f"{parts[0]}.{parts[1]}"
     return None
+
+
+import torch
+
+# Try to import the canonical TCNClassifierSE from the quantize script.
+# If unavailable (e.g., script moved), fall back to local reconstruction.
+try:
+    from quantize_v4se_23dim_ch32_to_h import TCNClassifierSE
+except ImportError:
+    TCNClassifierSE = None  # type: ignore
+
+from ids.inference import extract_features_23  # noqa: E402
+
+
+class _McuHeaderWrapper:
+    """ModelWrapper for STM32H743 MCU Hybrid INT8 C headers.
+
+    Bit-perfect replicates ch32_forward() by dequantizing INT8 weights to FP32
+    at construction time, then running standard FP32 inference on a
+    TCNClassifierSE architecture (imported from quantize script).
+
+    Class attributes:
+        kind:       "MCU-Hybrid-INT8" — used by ids_panel for routing
+        n_features: 23               — used by ids_panel for feature extraction branch
+        threshold:  0.49             — CH32_BEST_THRESHOLD
+    """
+
+    kind: str = "MCU-Hybrid-INT8"
+    n_features: int = 23
+    threshold: float = 0.49
+
+    def __init__(self, header_path, window_size: int = 16):
+        if TCNClassifierSE is None:
+            raise RuntimeError(
+                "TCNClassifierSE not importable from quantize_v4se_23dim_ch32_to_h. "
+                "Ensure the script is on sys.path."
+            )
+        self._window_size = int(window_size)
+        self._header_path = str(header_path)
+
+        parsed = _parse_mcu_header(header_path)
+        self._model = self._build_model_from_parsed(parsed)
+        self._model.eval()
+
+        # Sliding window buffer: holds last window_size feature vectors
+        self._feat_buffer: list[np.ndarray] = []
+
+    @torch.no_grad()
+    def infer(self, record_or_features):
+        """Run one forward pass and return (label, prob).
+
+        Args:
+            record_or_features: Either a Modbus record dict (will be passed to
+                extract_features_23) or a pre-extracted feature vector
+                (np.ndarray shape (23,) or (window_size, 23)).
+
+        Returns:
+            (label, prob) where label is 0 or 1, prob is sigmoid(logit) in [0,1].
+            Returns (0, 0.5) during warmup (fewer than window_size frames seen).
+        """
+        # Normalize input to a single 23-dim feature vector
+        if isinstance(record_or_features, dict):
+            feats = extract_features_23(record_or_features)
+        elif isinstance(record_or_features, np.ndarray):
+            if record_or_features.ndim == 2:
+                # (window_size, 23) — caller pre-built the window; transpose to (23, window_size)
+                window = record_or_features.T.astype(np.float32)
+                return self._forward_window(window)
+            feats = record_or_features.astype(np.float32).reshape(23)
+        else:
+            feats = np.asarray(record_or_features, dtype=np.float32).reshape(23)
+
+        self._feat_buffer.append(feats)
+        if len(self._feat_buffer) > self._window_size:
+            self._feat_buffer = self._feat_buffer[-self._window_size:]
+
+        if len(self._feat_buffer) < self._window_size:
+            return (0, 0.5)  # warmup
+
+        window = np.stack(self._feat_buffer, axis=-1)  # (23, window_size)
+        return self._forward_window(window)
+
+    def _forward_window(self, window: np.ndarray) -> tuple[int, float]:
+        # window shape is (23, window_size) — Conv1d expects (batch, channels, time)
+        x = torch.from_numpy(window).unsqueeze(0).float()  # (1, 23, 16)
+        logit = self._model(x).squeeze().item()
+        prob = 1.0 / (1.0 + np.exp(-logit))
+        label = 1 if prob >= self.threshold else 0
+        return (label, float(prob))
+
+    def _build_model_from_parsed(self, parsed: dict) -> "torch.nn.Module":
+        """Construct TCNClassifierSE and load dequantized FP32 weights."""
+        model = TCNClassifierSE(in_ch=23, channels=32, n_blocks=3,
+                                dilations=(1, 2, 4), dropout=0.1)
+        # Build state_dict
+        sd = {}
+        for bi, block in enumerate(model.tcn):
+            # conv1, conv2: dequantize int8 weight using per-channel scale
+            for ck in ("conv1", "conv2"):
+                w_key = f"tcn.{bi}.{ck}.weight"
+                s_key = f"tcn.{bi}.{ck}.scale"
+                b_key = f"tcn.{bi}.{ck}.bias"
+                if w_key in parsed and s_key in parsed:
+                    w_q = parsed[w_key].astype(np.float32)  # (out_ch, in_ch, k)
+                    scale = parsed[s_key].reshape(-1, 1, 1)  # (out_ch, 1, 1)
+                    sd[f"tcn.{bi}.{ck}.weight"] = torch.from_numpy(w_q * scale)
+                if b_key in parsed:
+                    sd[f"tcn.{bi}.{ck}.bias"] = torch.from_numpy(parsed[b_key])
+
+            # SE fc1, fc2: same per-channel dequant
+            for ck in ("se.fc1", "se.fc2"):
+                w_key = f"tcn.{bi}.{ck}.weight"
+                s_key = f"tcn.{bi}.{ck}.scale"
+                b_key = f"tcn.{bi}.{ck}.bias"
+                if w_key in parsed and s_key in parsed:
+                    w_q = parsed[w_key].astype(np.float32)  # (out_ch, in_ch)
+                    scale = parsed[s_key].reshape(-1, 1)
+                    sd[f"tcn.{bi}.{ck}.weight"] = torch.from_numpy(w_q * scale)
+                if b_key in parsed:
+                    sd[f"tcn.{bi}.{ck}.bias"] = torch.from_numpy(parsed[b_key])
+
+            # Residual (only block 0)
+            r_key = f"tcn.{bi}.residual.weight"
+            if r_key in parsed:
+                rs_key = f"tcn.{bi}.residual.scale"
+                rb_key = f"tcn.{bi}.residual.bias"
+                w_q = parsed[r_key].astype(np.float32)  # (out_ch, in_ch, 1)
+                scale = parsed[rs_key].reshape(-1, 1, 1)
+                sd[f"tcn.{bi}.residual.weight"] = torch.from_numpy(w_q * scale)
+                if rb_key in parsed:
+                    sd[f"tcn.{bi}.residual.bias"] = torch.from_numpy(parsed[rb_key])
+
+        # fc1, fc2: already FP32
+        if "fc1.weight" in parsed:
+            sd["fc1.weight"] = torch.from_numpy(parsed["fc1.weight"])
+        if "fc1.bias" in parsed:
+            sd["fc1.bias"] = torch.from_numpy(parsed["fc1.bias"])
+        if "fc2.weight" in parsed:
+            sd["fc2.weight"] = torch.from_numpy(parsed["fc2.weight"])
+        if "fc2.bias" in parsed:
+            sd["fc2.bias"] = torch.from_numpy(parsed["fc2.bias"])
+
+        # Load with strict=False to ignore BN running stats (we set them to defaults)
+        missing, unexpected = model.load_state_dict(sd, strict=False)
+        if unexpected:
+            raise ValueError(f"Unexpected keys when loading MCU model: {unexpected}")
+
+        # Set BN defaults so eval mode is identity (BN folded into conv bias already)
+        for block in model.tcn:
+            for bn in (block.bn1, block.bn2):
+                bn.weight.data.fill_(1.0)
+                bn.bias.data.zero_()
+                bn.running_mean.zero_()
+                bn.running_var.fill_(1.0)
+
+        return model

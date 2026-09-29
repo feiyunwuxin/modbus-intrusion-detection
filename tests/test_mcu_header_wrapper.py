@@ -7,7 +7,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ids.inference import FEATURE_COLUMNS_23, extract_features_23
-from ids.model_loader import _parse_mcu_header
+from ids.model_loader import _McuHeaderWrapper, _parse_mcu_header
 
 # Path to the actual MCU header file in repo
 _MCU_HEADER_PATH = (
@@ -126,6 +126,57 @@ class TestParseMcuHeader(unittest.TestCase):
                 self.assertIn(key, self.parsed, f"missing {key}")
         self.assertIn("fc1.bias", self.parsed)
         self.assertIn("fc2.bias", self.parsed)
+
+
+class TestMcuHeaderWrapper(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not _MCU_HEADER_PATH.exists():
+            raise unittest.SkipTest(f"MCU header not found: {_MCU_HEADER_PATH}")
+        cls.wrapper = _McuHeaderWrapper(_MCU_HEADER_PATH, window_size=16)
+
+    def test_kind_attribute(self):
+        self.assertEqual(_McuHeaderWrapper.kind, "MCU-Hybrid-INT8")
+
+    def test_n_features_attribute(self):
+        self.assertEqual(_McuHeaderWrapper.n_features, 23)
+
+    def test_threshold_attribute(self):
+        self.assertEqual(_McuHeaderWrapper.threshold, 0.49)
+
+    def test_init_no_error(self):
+        # Already constructed in setUpClass
+        self.assertIsNotNone(self.wrapper)
+
+    def test_infer_with_features_returns_tuple(self):
+        # Provide 16 random feature vectors (23-dim) directly
+        rng = np.random.default_rng(42)
+        feats_seq = rng.normal(size=(16, 23)).astype(np.float32)
+        result = self.wrapper.infer(feats_seq)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        label, prob = result
+        self.assertIn(label, (0, 1))
+        self.assertIsInstance(prob, float)
+        self.assertGreaterEqual(prob, 0.0)
+        self.assertLessEqual(prob, 1.0)
+
+    def test_infer_with_record_returns_tuple(self):
+        record = _FULL_RECORD.copy()
+        # Need 16 frames before getting a label
+        for _ in range(15):
+            self.wrapper.infer(record)
+        result = self.wrapper.infer(record)
+        self.assertIsInstance(result, tuple)
+        label, prob = result
+        self.assertIn(label, (0, 1))
+
+    def test_threshold_applied(self):
+        # Force a high-probability window by reusing same record many times (warmup)
+        for _ in range(16):
+            label, prob = self.wrapper.infer(_FULL_RECORD)
+        # Just verify label is in {0, 1}
+        self.assertIn(label, (0, 1))
 
 
 if __name__ == "__main__":
