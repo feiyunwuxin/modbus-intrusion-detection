@@ -25,7 +25,16 @@ class SerialWorker(QThread):
     state_changed = pyqtSignal(str)
     # (level, message)
     log_message = pyqtSignal(str, str)
+    # (bytes,) — raw RX bytes returned by the MCU during replay.
+    rx_received = pyqtSignal(bytes)
     finished_run = pyqtSignal()
+    # (row_idx, csv_row_dict, encoded_frame_bytes) — emitted once per
+    # successfully written frame when ``tx_event_enabled`` is True. The
+    # IdsWorker subscribes via a queued connection; an unconnected signal
+    # is a cheap no-op (Qt drops the emission when there are no
+    # receivers), so the cost on a non-IDS run is one function call per
+    # frame.
+    tx_event = pyqtSignal(int, dict, bytes)
 
     def __init__(self,
                  rows: list[dict],
@@ -36,6 +45,7 @@ class SerialWorker(QThread):
                  stopbits: int,
                  loop_mode: bool,
                  verbose_tx: bool = False,
+                 tx_event_enabled: bool = True,
                  serial_factory: Optional[Callable[[], object]] = None,
                  parent=None):
         super().__init__(parent)
@@ -50,12 +60,37 @@ class SerialWorker(QThread):
         # the GUI can show what each TX actually contained. Off by default
         # because 274k lines per run is too noisy for the log panel.
         self._verbose_tx = verbose_tx
+        # When True, emit ``tx_event`` once per successfully written frame
+        # so the IDS worker can mirror the TX stream through the PC-side
+        # model. Defaults to True so existing call-sites keep working;
+        # ``False`` is for tests that don't want the extra signal.
+        self._tx_event_enabled = tx_event_enabled
         self._serial_factory = serial_factory or self._default_serial_factory
 
         self._paused = False
         self._stopping = False
         self._pause_cond = threading.Condition()
         self._serial = None
+        # Background reader that polls ``self._serial.in_waiting`` and
+        # forwards MCU replies to ``rx_received``. Owned by this worker
+        # so the GUI can wire rx_received → RxPanel and see replies
+        # land in the same handle that TX wrote into.
+        self._rx_reader: SerialReader | None = None
+
+    # ------------------------------------------------------------------
+    # Slots
+    # ------------------------------------------------------------------
+    def _on_rx(self, chunk: bytes) -> None:
+        """Re-emit RX bytes from the reader thread on the worker thread.
+
+        Used as the slot for ``SerialReader.data_received``. Routed
+        through a method (rather than connecting ``data_received``
+        straight to ``rx_received.emit``) because Qt does not reliably
+        cross thread boundaries when chaining two signals in that
+        direct way — the bound ``emit`` method does not get the queued
+        treatment that a regular slot does.
+        """
+        self.rx_received.emit(chunk)
 
     # ------------------------------------------------------------------
     def _default_serial_factory(self):
@@ -111,6 +146,14 @@ class SerialWorker(QThread):
             self.finished_run.emit()
             return
 
+        # Start the RX reader so MCU replies land in the GUI's RxPanel.
+        # We start it AFTER the port opens (not before) so the reader
+        # never races with the open. ``_on_rx`` is a regular slot so Qt
+        # gives the connection its proper cross-thread treatment.
+        self._rx_reader = SerialReader(self._serial)
+        self._rx_reader.data_received.connect(self._on_rx)
+        self._rx_reader.start()
+
         self.state_changed.emit("running")
         engine = ReplayEngine(self._rows)
         total_rows = len(self._rows)
@@ -163,6 +206,13 @@ class SerialWorker(QThread):
                     fc = frame[1]
                     direction = frame[3]
                     self.progress.emit(i, total_rows, addr, fc, direction)
+                    # Tap into the same per-frame site for the IDS
+                    # worker. ``self._rows[i]`` is the original CSV row
+                    # dict (same shape csv_loader produces), so the IDS
+                    # pipeline can featurize without re-decoding the
+                    # 32-byte payload.
+                    if self._tx_event_enabled:
+                        self.tx_event.emit(i, self._rows[i], frame)
 
                     # Optional verbose TX log — one line per frame with
                     # row index, protocol header, ms offset, and the first
@@ -198,9 +248,63 @@ class SerialWorker(QThread):
                 self.log_message.emit("INFO", "run finished")
                 self.state_changed.emit("finished")
         finally:
+            # Stop the reader first so it cannot read from a port that
+            # is about to be closed under it. ``wait(1000)`` caps the
+            # join so a stuck reader cannot deadlock the worker.
+            if self._rx_reader is not None:
+                self._rx_reader.stop()
+                self._rx_reader.wait(1000)
+                self._rx_reader = None
             try:
                 if self._serial is not None:
                     self._serial.close()
             except Exception:
                 pass
             self.finished_run.emit()
+
+
+class SerialReader(QThread):
+    """Background reader that polls a pyserial.Serial handle and
+    forwards every chunk of received bytes via ``data_received``.
+
+    Used twice by the GUI:
+
+    * the diagnostic probe handle (``MainWindow._probe_serial``) lets the
+      user verify wiring without a replay — bytes from the MCU show up
+      in RxPanel as soon as they arrive;
+    * ``SerialWorker`` binds one of these to its own serial handle so
+      MCU replies during a replay also reach RxPanel.
+
+    Cheap: sleeps for ``POLL_INTERVAL_MS`` between polls and only emits
+    when ``in_waiting`` is non-zero. ``stop()`` flips the loop flag and
+    ``wait()`` joins the thread.
+
+    Any exception (port closed, read error, ``in_waiting`` missing on a
+    fake) exits cleanly — the reader never raises into Qt's event loop.
+    """
+
+    data_received = pyqtSignal(bytes)
+    POLL_INTERVAL_MS = 100
+
+    def __init__(self, serial_handle, parent=None):
+        super().__init__(parent)
+        self._serial = serial_handle
+        self._stopping = False
+
+    def stop(self):
+        self._stopping = True
+
+    def run(self):
+        while not self._stopping:
+            try:
+                n = self._serial.in_waiting
+                if n:
+                    chunk = self._serial.read(n)
+                    if chunk:
+                        self.data_received.emit(chunk)
+                else:
+                    self.msleep(self.POLL_INTERVAL_MS)
+            except Exception:
+                # Port closed under us, fake handle without in_waiting,
+                # or any other benign failure — exit cleanly.
+                return

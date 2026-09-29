@@ -15,6 +15,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-qt>=4.2"]
+# Optional PC-side IDS monitor panel. Adds torch + numpy + sklearn +
+# joblib — several hundred MB of wheels — so it's deliberately opt-in.
+# Install with: pip install -e ".[ids,dev]"
+ids = ["torch>=2.0", "numpy>=1.24", "scikit-learn>=1.3", "joblib>=1.3"]
 
 [project.scripts]
 modbus-replay = "modbus_replay.__main__:main"
