@@ -7,17 +7,21 @@ exercises real serial hardware. Run this checklist once per release
 candidate (or after any change to `frame_format.py`,
 `replay_engine.py`, `serial_worker.py`, or `gui/main_window.py`).
 
-Automated coverage already in place (40 tests):
+Automated coverage already in place (92 tests):
 
 * 6 `csv_loader` — preserves `?`, missing-column guard, etc.
 * 8 `frame_format` — round-trip, NaN encoding, size = 32, etc.
 * 7 `replay_engine` — pacing, encoding, first-packet direction.
-* 5 `serial_worker` — write progress, stop, error, paused-state, etc.
-* 5 `gui/widgets` — PortSelector defaults, ProgressPanel, LogPanel.
-* 4 `gui/main_window` — composition + missing-CSV / missing-port guards.
+* 7 `serial_worker` — write progress, stop, error, paused-state, tx_event signal, etc.
+* 8 `gui/widgets` — PortSelector defaults, ProgressPanel, LogPanel, IdsPanel.
+* 9 `gui/main_window` — composition + missing-CSV / missing-port guards + IDS panel wiring.
+* 5 `gui/rx_panel` — receive-panel rendering.
 * 5 `integration_loopback` — 50-row round-trip, NaN round-trip,
   first-packet direction, real-dataset size guard (274,628 rows),
   real-dataset first-50-frame round-trip.
+* 37 `ids_pipeline` / `ids_panel` / `ids_worker` — bit-match featurizer
+  + window builder, threshold / scaler loaders, IdsPanel widget
+  states, IdsWorker QThread lifecycle.
 
 If any automated test fails, **stop** and fix before proceeding.
 
@@ -44,18 +48,40 @@ If any automated test fails, **stop** and fix before proceeding.
    `C:\work\Claude\Issue\IanArffDataset.csv` (the default). If the
    dataset lives elsewhere, click **📂 选择 CSV…** and pick it.
 
-Expected: GUI is responsive; no tracebacks in the log panel.
+Expected: GUI is responsive; **▶ 开始** stays disabled until you open
+the port in Step 1.6 — this is the deliberate UX gate that forces
+wiring/serial-param verification before a long replay.
+
+## Step 1.5 — Open the port (required before Step 2)
+
+1. Click **📡 打开串口**. The log shows `opened COMx @ 115200 8N1 (probe)`
+   and RxPanel starts polling. If you want to verify the wiring before
+   kicking off a long replay, send a frame manually and confirm it shows
+   up in RxPanel.
+2. **▶ 开始** is now enabled. Closing the port with **🔌 关闭串口**
+   re-disables **▶ 开始**.
 
 ## Step 2 — CSV load
 
 1. Click **▶ 开始**. The Start button disables; Pause and Stop
    enable; the port selector + CSV controls disable.
-2. The progress bar's maximum snaps to **274,628** after the worker
-   loads rows.
+2. A modal **加载 CSV** progress dialog appears immediately, labelled
+   `加载 CSV: N/274628 行 (X.X%)`. The dialog has no cancel button —
+   the import is fast enough that interrupting it would leave the
+   GUI in an inconsistent state. The dialog closes automatically once
+   the bar reaches 100 %.
 3. The log panel shows (in order):
    - `CSV loaded: 274628 rows`
+   - If the probe handle was open: `closing probe before replay so the
+     worker can open the port` followed by `port closed (probe)`. This
+     is Windows serial-port exclusivity in action — the GUI tears down
+     the probe automatically so the worker can take the same COM port.
    - `opened COMx @ 115200 8N1`
    - `state → running`
+   - Followed by one `[TX] row=N t=Nms addr=A fc=F cmd hex=…` line per
+     frame (the verbose checkbox is on by default; untick **📋 显示
+     发送日志** in the run-controls row if you want a clean status-only
+     log on long 274k runs).
 
 If `opened COMx …` does not appear within 1 s, the port is busy —
 close any other process (PuTTY, Arduino IDE Serial Monitor) and try
@@ -63,18 +89,21 @@ again.
 
 ## Step 3 — Run and observe
 
-1. Watch the progress bar advance. It should move at ≈ real-time
-   pace — for the 274k-row dataset at 1 row/second the full run is
+1. The current-row label updates roughly once per frame:
+   `row=N addr=A fc=F resp` (or `cmd` for master-initiated frames).
+2. The elapsed/ETA label ticks every 500 ms once the first frame has
+   been sent. For the 274k-row dataset at 1 row/second the full run is
    ≈ 76 hours; sub-second sampling collapses this dramatically in
    practice.
-2. The current-row label updates roughly once per frame:
-   `row=N addr=A fc=F resp` (or `cmd` for master-initiated frames).
-3. The elapsed/ETA label ticks every 500 ms once the first frame
-   has been sent.
 
 Expected: no ERROR / WARN lines in the log. A single WARN
 (`write error at row N`) followed by automatic retry is acceptable;
 two consecutive ERRORs indicate a real fault and you should stop.
+
+4. The **RxPanel** below the log updates as soon as the MCU replies.
+   Each reply shows up as a `[HH:MM:SS.mmm] RX (N B):` block followed
+   by the formatted hex+ASCII. If the MCU sends nothing back, the
+   panel stays empty (it shows TX only when something is received).
 
 ## Step 4 — Pause / Resume
 
@@ -110,7 +139,43 @@ On the MCU, confirm via SWO / UART log:
 Expected: the MCU's intrusion-detection log mirrors the PC-side
 progress without drops, overruns, or framing errors.
 
-## Step 7 — Release tag (optional)
+## Step 7 — PC-side IDS panel (optional, requires `[ids]` extra)
+
+Verifies the new IDS monitor panel independently from the MCU.
+Requires `pip install -e ".[ids]"` and three local files:
+`model_v4_se_23dim_b64_ch32_do01_window16_s42.pt`,
+`scaler_binary_v2_scada.joblib`, and `best_threshold_*.json`.
+
+1. Open the GUI; confirm the IDS panel is visible between the
+   progress panel and the log panel. The **🛡 启用 IDS** checkbox
+   starts unchecked, the three file pickers greyed out.
+2. Tick **🛡 启用 IDS**; the model / scaler / threshold / CSV
+   controls become live.
+3. Pick the model `.pt` file, then the scaler `.joblib`, then the
+   threshold `.json`. The threshold JSON's `best_threshold` should
+   auto-fill the spinbox (≈0.49 for the canonical checkpoint).
+4. Tick **记录每帧 prob 到 CSV** and pick an output path
+   (e.g. `ids_log.csv`). The CSV checkbox now reports **enabled**.
+5. Click **▶ 开始**. The IDS status label transitions
+   `window: 0/16` → `scoring` once 16 frames have flowed. The
+   **已评分** KPI advances past 0; the alarm-log table starts
+   filling with `is_alarm=1` rows.
+6. After ~100 rows, open the CSV. Confirm the header is
+   `row_idx,time_ms,addr,fc,direction,prob,is_alarm` exactly once
+   and that the data rows match the live KPIs (scored count = N
+   in the header-excluded body, alarm count matches the
+   **报警数** label).
+7. Run again with the same CSV-log path; the file should grow
+   without a duplicate header.
+8. Cross-check the first known-attack row from
+   `IanArffDataset.csv` (frame index ≈62 in the canonical
+   binary-classification CSV) — it should appear as `is_alarm=1`
+   in both the table and the CSV.
+9. Click **⏹ 停止**; the IDS worker drains its queue and emits
+   `finished_run`. `MainWindow._ids_worker` becomes `None`.
+   Close the window — no orphaned threads.
+
+## Step 8 — Release tag (optional)
 
 If this validation passed and you want to mark the release:
 
@@ -135,6 +200,7 @@ action — confirm with the maintainer before pushing.)
 
 ## Pass / fail criteria
 
-The release is **passing** when Steps 1–6 all succeed with no
-unrecovered errors. Step 7 (tagging) is a release action; the
-release is "ready to tag" once Steps 1–6 are green.
+The release is **passing** when Steps 1–6 (and Step 7 if the IDS
+panel is shipped) all succeed with no unrecovered errors. Step 8
+(tagging) is a release action; the release is "ready to tag" once
+Steps 1–7 are green.

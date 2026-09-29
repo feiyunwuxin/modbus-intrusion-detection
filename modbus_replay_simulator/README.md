@@ -10,12 +10,17 @@ Desktop tool that reads `IanArffDataset.csv` and replays its rows as
 ```bash
 git clone <this repo>
 cd modbus_replay_simulator
-pip install -e ".[dev]"
+pip install -e ".[dev]"           # core GUI only
+pip install -e ".[ids,dev]"        # adds PC-side IDS monitor (torch etc.)
 python -m modbus_replay
 ```
 
 The GUI launches; pick the COM port your USB-UART bridge exposes,
 select `IanArffDataset.csv`, click **▶ 开始**.
+
+The `[ids]` extra pulls in `torch`, `numpy`, `scikit-learn`, and
+`joblib` (~hundreds of MB). Without it the GUI still launches and
+the IDS panel stays greyed out.
 
 ## Bench wiring
 
@@ -102,16 +107,47 @@ across the lifetime of the probe handle and resets on **🗑 清空**.
 The reader stops automatically when **🔌 关闭串口** is clicked, when
 the window closes, and before the probe handle is released.
 
+## PC-side IDS monitoring (optional)
+
+The GUI can mirror the H743 firmware's TCN+SE inference on the PC side
+so you can compare per-frame probabilities against the JSON the MCU
+uploads. Requires `pip install -e ".[ids]"`.
+
+Steps:
+
+1. Tick **🛡 启用 IDS** in the IDS panel (initially greyed out).
+2. Pick three files each session — paths are not persisted:
+   * **Model** — `*.pt` checkpoint (e.g. `model_v4_se_23dim_b64_ch32_do01_window16_s42.pt`)
+   * **Scaler** — `*.joblib` (e.g. `scaler_binary_v2_scada.joblib`)
+   * **Threshold** — `*.json` containing `best_threshold` (pre-fills the spinbox)
+3. Optionally tick **记录每帧 prob 到 CSV** and pick an output path;
+   every scored frame appends one row
+   `(row_idx, time_ms, addr, fc, direction, prob, is_alarm)`.
+   Re-runs append without a duplicate header.
+4. Click **▶ 开始**. The status label flips from `window: 0/16` to
+   `scoring` after 16 frames; then **已评分 / 报警数 / 报警率** start
+   advancing. The alarm-log table keeps the most recent 200 alarms;
+   per-frame data lives in the CSV.
+
+Architecture used: 23-dim TCN+SE (`in_ch=23, n_blocks=3, channels=32,
+kernel_size=3, dilations=(1,2,4), dropout=0.1, se_reduction=8`) — see
+`modbus_replay/ids_worker_torch.py`.
+
+Cross-check vs H743: feed the same CSV and compare
+`pandas.read_csv('ids_log.csv')['is_alarm']` against the MCU's JSON
+report for the same frame indices.
+
 ## Tests
 
 ```bash
 pytest -v
 ```
 
-61 unit tests cover the eight modules (csv_loader, frame_format,
+92 unit tests cover the nine modules (csv_loader, frame_format,
 replay_engine, serial_worker, gui.widgets, gui.main_window,
-gui.rx_panel, integration_loopback). End-to-end hardware validation
-is the manual checklist in `docs/MANUAL_VALIDATION.md` (Task 10).
+gui.rx_panel, integration_loopback, ids_pipeline+panel+worker).
+End-to-end hardware validation is the manual checklist in
+`docs/MANUAL_VALIDATION.md` (Task 10).
 
 ## License
 
