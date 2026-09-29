@@ -9,6 +9,13 @@
   用于 23 维 KEEP_23 模型的窗口推理。需 ``prev_time`` /
   ``last_seen_time`` 状态来算 ``time_diff`` / ``time_since_last`` /
   ``is_unusual_fc`` / ``is_response`` 四个派生列。
+
+另含 :func:`resolve_label`：从 record 取 ground-truth 标签（binary /
+categorized / specific），跟 :func:`extract_features` 共用 SCADA 长 /
+短列名别名策略——之前 ``ids_panel.process_frame`` 直接用
+``record.get("binary", 0)`` 在 RAW CSV（列名 ``binary result``）下永远
+返回 0，导致 truth 全是 normal、模型正确率统计完全错位（attack 预测
+都算错，normal 预测都算对）。
 """
 from __future__ import annotations
 
@@ -23,6 +30,17 @@ FEATURE_COLUMNS: tuple[str, ...] = (
     "system", "control", "pump", "solenoid", "pressure",
     "crc", "command", "time",
 )
+
+# 标签列别名：跟 _FEATURE_ALIASES_17 同源思路。RAW CSV 里标签列叫
+# ``binary result`` / ``categorized result`` / ``specific result``，
+# 短名 CSV 里叫 ``binary`` / ``categorized`` / ``specific``。GROUND-TRUTH
+# lookup 必须走别名，否则 IDS 面板在 RAW CSV 下无法正确区分 attack/normal。
+_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
+    "binary":       ("binary result", "binary"),
+    "categorized":  ("categorized result", "categorized"),
+    "specific":     ("specific result", "specific"),
+}
+
 
 # SCADA CSV 列名 → 17-dim 短 key 的别名映射。IanArffDataset_RAW.csv 用
 # SCADA 原始列名（"pressure measurement" / "crc rate" / "reset rate" /
@@ -59,6 +77,12 @@ def _to_int(value) -> int:
     """与 build_frame 一致的浮点截断。None/空值 → 0。"""
     if value is None or value == "":
         return 0
+    # pandas NaN / numpy NaN → 0
+    try:
+        if isinstance(value, float) and value != value:  # NaN check
+            return 0
+    except Exception:
+        pass
     try:
         return int(float(value))
     except (TypeError, ValueError):
@@ -70,10 +94,20 @@ def _to_float(value) -> float:
     语义一致（``pressure_measurement`` / ``setpoint`` / ``gain`` /
     ``deadband`` / ``cycle time`` / ``rate`` / ``system mode`` /
     ``control scheme`` / ``pump`` / ``solenoid`` / ``reset rate``
-    等 SCADA 数值列都用这个语义）。None/空值/"?" → 0.0。
+    等 SCADA 数值列都用这个语义）。
+
+    None/空值/"?" → 0.0。
+    pandas ``NaN``/``np.nan`` → 0.0（之前会直接传成 ``float('nan')`` 污染
+    scaled 缓冲导致模型 logits=NaN、F1=0；preprocess_v2_scada.py:128 用
+    ``df.fillna(0)`` 同样语义）。
     """
     if value is None or value == "" or value == "?":
         return 0.0
+    try:
+        if isinstance(value, float) and value != value:  # NaN check
+            return 0.0
+    except Exception:
+        pass
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -84,7 +118,7 @@ def _resolve_int(record: dict, short_key: str) -> int:
     """按 ``_FEATURE_ALIASES_17[short_key]`` 顺序在 record 里查找字段值。
 
     第一个找到的非 ``None`` 值转 int 返回；全部 miss 或值为 ``"?"`` /
-    空字符串则返回 0。SCADA CSV 路径下用 ``"pressure measurement"``
+    空字符串 / pandas NaN 则返回 0。SCADA CSV 路径下用 ``"pressure measurement"``
     等长列名也能查到。
 
     注意：int() 会截断小数 → 只用于模型按离散 code 处理的字段
@@ -94,6 +128,12 @@ def _resolve_int(record: dict, short_key: str) -> int:
         v = record.get(alias)
         if v is None or v == "" or v == "?":
             continue
+        # NaN 也算 miss
+        try:
+            if isinstance(v, float) and v != v:
+                continue
+        except Exception:
+            pass
         return _to_int(v)
     return 0
 
@@ -107,11 +147,19 @@ def _resolve_float(record: dict, short_key: str) -> float:
     ``reset_rate`` / ``deadband`` / ``cycle_time`` / ``rate`` 都用
     ``pd.to_numeric`` 保留小数位；wrapper 必须同样保留，否则
     ``press_mean_w`` 聚合特征错位 → 模型把所有帧预测成 attack。
+
+    pandas NaN → 0.0（与 preprocess_v2_scada.py:128 ``df.fillna(0)`` 同语义；
+    之前传 float('nan') 污染 scaled 缓冲 → 模型 logits=NaN → F1=0）。
     """
     for alias in _FEATURE_ALIASES_17.get(short_key, (short_key,)):
         v = record.get(alias)
         if v is None or v == "" or v == "?":
             continue
+        try:
+            if isinstance(v, float) and v != v:
+                continue
+        except Exception:
+            pass
         return _to_float(v)
     return 0.0
 
@@ -124,11 +172,47 @@ def extract_features(record: dict) -> np.ndarray:
     通过 :func:`_resolve_int` 同时支持 SCADA CSV 列名（"pressure
     measurement" 等）和短名（"pressure" 等）——前者是 csv_loader
     输出的真实 record，后者保留向后兼容（历史测试 / 内部代码）。
+
+    数值列（pressure / setpoint / gain / reset / deadband / cycle / rate
+    / system / control / pump / solenoid）走 :func:`_resolve_float`
+    保留小数位；address / function / length / command / time / crc
+    这些离散 code 列走 :func:`_resolve_int`。这与 23 维
+    ``extract_features_19`` 的精度策略一致——之前的实现把 pressure
+    也用 int 截断（``int(0.689655)=0``），83% 的帧压力被合并成 0，
+    破坏 SCADA 核心传感器特征。
     """
+    int_cols = {"address", "function", "length", "crc", "command", "time"}
     return np.array(
-        [_resolve_int(record, col) for col in FEATURE_COLUMNS],
+        [
+            _resolve_int(record, col) if col in int_cols
+            else _resolve_float(record, col)
+            for col in FEATURE_COLUMNS
+        ],
         dtype=np.float32,
     )
+
+
+def resolve_label(record: dict, short_key: str, default: int = 0) -> int:
+    """按 :data:`_LABEL_ALIASES` 别名顺序查找 ground-truth 标签。
+
+    返回 int；记录里没标签列（短名 + 长名都没有）时返回 ``default``。
+    用于 IDS 面板 ``process_frame`` 取 ``truth`` —— 直接
+    ``record.get("binary")`` 在 RAW CSV 下永远 miss → truth 全是 normal。
+    """
+    for alias in _LABEL_ALIASES.get(short_key, (short_key,)):
+        v = record.get(alias)
+        if v is None or v == "" or v == "?":
+            continue
+        try:
+            if isinstance(v, float) and v != v:  # NaN check
+                return default
+        except Exception:
+            pass
+        try:
+            return int(float(v))
+        except (TypeError, ValueError):
+            return default
+    return default
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -231,6 +315,40 @@ def extract_features_19(
         float(is_response),
     ]
     return np.array(raw_19, dtype=np.float32)
+
+
+# ── 23-dim feature extraction for MCU Hybrid INT8 models ─────────────────
+# Source: KeilH743/H743/Core/Inc/ch32_inference.h header comment.
+# Indices into source 27-dim record: 0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+# 14, 15, 16, 17, 18, 19, 21, 23, 24, 25, 26. Skips length(2), setpoint(3),
+# crc_mean_w(20), cmd_count_w(22).
+FEATURE_COLUMNS_23: tuple[str, ...] = (
+    "address", "function",
+    "gain", "reset", "deadband", "cycle", "rate",
+    "system", "control", "pump", "solenoid",
+    "pressure", "crc", "time_diff",
+    "time_since_last_same_addr_func", "is_unusual_fc", "is_response",
+    "press_mean_w", "crc_max_w", "resp_count_w",
+    "cmd_resp_balance_w", "length_nunique_w", "unusual_count_w",
+)
+
+_MCU_FEATURE_INDICES_27 = (
+    0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 21, 23, 24, 25, 26,
+)
+
+
+def extract_features_23(record: dict) -> np.ndarray:
+    """Extract 23-dim feature vector matching MCU Hybrid INT8 model input order.
+
+    Returns float32 numpy array of shape (23,). Missing fields default to 0.0.
+    """
+    out = np.empty(23, dtype=np.float32)
+    for out_i, src_key in enumerate(_MCU_FEATURE_INDICES_27):
+        col_name = FEATURE_COLUMNS_23[out_i]
+        val = record.get(col_name, 0.0)
+        out[out_i] = float(val) if val is not None else 0.0
+    return out
 
 
 def keep_23_per_frame_indices() -> tuple[int, ...]:
