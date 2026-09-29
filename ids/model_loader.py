@@ -1227,7 +1227,9 @@ def load_model(path: str, *, window_size: int = 1) -> ModelWrapper:
         return _load_sklearn(p)
     if ext == ".pt":
         return _load_torch(p, window_size=window_size)
-    raise ValueError(f"不支持的模型格式: {ext}（仅 .pt / .joblib）")
+    if ext == ".h":
+        return _McuHeaderWrapper(p, window_size=window_size)
+    raise ValueError(f"不支持的模型格式: {ext}（仅 .pt / .joblib / .h）")
 
 
 def _load_sklearn(p: Path) -> ModelWrapper:
@@ -1377,13 +1379,37 @@ def _detect_3d_input_features(sd: dict) -> int | None:
 
 
 def list_available_models(directory: str) -> list[str]:
-    """扫描目录下 model_*.pt 和 model_*.joblib，按名字排序返回完整路径。"""
+    """扫描目录下 model_*.pt / model_*.joblib / model_*hybrid_s*.h, 按名字排序返回完整路径。"""
     d = Path(directory)
     if not d.is_dir():
         return []
     files: list[Path] = []
     for ext in (".pt", ".joblib"):
         files.extend(d.glob(f"model_*{ext}"))
+    # MCU Hybrid INT8 headers (separate pattern)
+    files.extend(list_available_mcu_headers(directory))
+    return sorted(set(str(f) for f in files))
+
+
+def list_available_mcu_headers(directory: str) -> list[str]:
+    """Scan a directory for MCU Hybrid INT8 C header files.
+
+    Matches: model_v4_se_23dim_ch32_hybrid_s{seed}.h and similar patterns.
+    Uses recursive search so headers in subdirectories (such as
+    KeilH743/H743/Core/Inc/) are also discoverable.
+    """
+    d = Path(directory)
+    if not d.is_dir():
+        return []
+    files = []
+    # Primary pattern: explicit hybrid s{seed}.h
+    files.extend(d.rglob("model_*hybrid_s*.h"))
+    # Fallback: any model_*.h with TCN/SE/ch32 patterns
+    for f in d.rglob("model_*.h"):
+        if f not in files:
+            text = f.read_text(encoding="utf-8", errors="ignore")[:2000]
+            if "v4se23_ch32" in text or "ch32_inference" in text:
+                files.append(f)
     return sorted(str(f) for f in files)
 
 

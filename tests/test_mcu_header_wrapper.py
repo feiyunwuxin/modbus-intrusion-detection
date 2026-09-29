@@ -6,8 +6,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ids import load_model
 from ids.inference import FEATURE_COLUMNS_23, extract_features_23
-from ids.model_loader import _McuHeaderWrapper, _parse_mcu_header
+from ids.model_loader import _McuHeaderWrapper, _parse_mcu_header, list_available_mcu_headers
 
 # Path to the actual MCU header file in repo
 _MCU_HEADER_PATH = (
@@ -177,6 +178,37 @@ class TestMcuHeaderWrapper(unittest.TestCase):
             label, prob = self.wrapper.infer(_FULL_RECORD)
         # Just verify label is in {0, 1}
         self.assertIn(label, (0, 1))
+
+
+class TestListAvailableMcuHeaders(unittest.TestCase):
+    def test_returns_list(self):
+        # Scan repo root
+        repo_root = str(Path(__file__).resolve().parent.parent)
+        result = list_available_mcu_headers(repo_root)
+        self.assertIsInstance(result, list)
+
+    def test_finds_known_header(self):
+        repo_root = str(Path(__file__).resolve().parent.parent)
+        result = list_available_mcu_headers(repo_root)
+        # The header should be found if it's in the repo
+        if _MCU_HEADER_PATH.exists():
+            self.assertIn(str(_MCU_HEADER_PATH), result)
+
+    def test_empty_dir(self):
+        result = list_available_mcu_headers("/nonexistent_dir_xyz")
+        self.assertEqual(result, [])
+
+
+class TestLoadModelMcuHeader(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not _MCU_HEADER_PATH.exists():
+            raise unittest.SkipTest(f"MCU header not found: {_MCU_HEADER_PATH}")
+
+    def test_load_via_load_model(self):
+        wrapper = load_model(str(_MCU_HEADER_PATH), window_size=16)
+        self.assertIsInstance(wrapper, _McuHeaderWrapper)
+        self.assertEqual(wrapper.kind, "MCU-Hybrid-INT8")
 
 
 if __name__ == "__main__":
