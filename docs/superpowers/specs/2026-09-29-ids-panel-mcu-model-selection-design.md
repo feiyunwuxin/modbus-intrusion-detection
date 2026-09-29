@@ -119,6 +119,22 @@ return (1 if prob >= 0.49 else 0, prob)
 4. 手动 `model.load_state_dict({...})`，strict=False（忽略 BN 参数）
 5. `model.eval()`
 
+### 3.6 Wrapper 公开接口（与 `ModelWrapper` 协议一致）
+
+`_McuHeaderWrapper` 必须实现以下属性/方法，与现有 `_Torch3DStateDictWrapper23` 等保持兼容：
+
+```python
+class _McuHeaderWrapper:
+    kind: str = "MCU-Hybrid-INT8"   # 类属性，ids_panel 通过它识别走 23-dim 分支
+    n_features: int = 23              # 用于下拉标签和 process_frame 分支
+    threshold: float = 0.49           # 默认阈值（来自 CH32_BEST_THRESHOLD）
+    def infer(self, record_or_features) -> tuple[int, float]:
+        """输入 Modbus record 或已提取的 23-dim np.ndarray，
+           返回 (label, prob)。内部维护 feature_buffer 滑动窗口 16 帧。"""
+```
+
+`_probe_model()` 对 `.h` 文件返回 `{"kind": "MCU-Hybrid-INT8", "n_features": 23, ...}`，让 `ids_panel` 在初始化 wrapper 前就能识别。
+
 ---
 
 ## 4. UI 改动
@@ -191,7 +207,7 @@ else:
   - 概率 max/mean diff
   - Verdict 一致率
   - Acc / F1 对比
-- 输出 `compare_fp32_vs_mcu_int8_v19.json` 与 `.md`
+- 输出 `compare_fp32_vs_mcu_int8_v4se_s42.json` 与 `.md`
 
 ---
 
