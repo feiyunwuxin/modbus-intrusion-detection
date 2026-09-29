@@ -100,3 +100,73 @@ def test_load_rows_time_column_preserved_as_number():
         assert int(out[0]["time"]) == 1418682163
     finally:
         os.unlink(path)
+
+
+def test_load_rows_progress_callback_fires_three_times():
+    """progress_callback receives (0,total), intermediate steps, then (total,total)."""
+    # 2500 rows so the default progress_every=1000 fires twice mid-loop
+    rows = [
+        (1, 3, 8, "?", "?", "?", "?", "?", "?", "?", "?", "?", "?",
+         "?", "?", 0, 100, 0, 0, 0)
+    ] * 2500
+    path = _write_csv(rows)
+    try:
+        calls = []
+        out = load_rows(path, progress_callback=lambda c, t: calls.append((c, t)))
+        assert len(out) == 2500
+        # First call sizes the bar: (0, 2500)
+        assert calls[0] == (0, 2500)
+        # Last call is the terminal (total, total)
+        assert calls[-1] == (2500, 2500)
+        # Intermediate calls are multiples of progress_every (default 1000):
+        # (1000, 2500) and (2000, 2500) — at least these two must appear.
+        intermediate = calls[1:-1]
+        assert (1000, 2500) in intermediate
+        assert (2000, 2500) in intermediate
+        # And every intermediate (current, total) has current < total.
+        for c, t in intermediate:
+            assert 0 < c < t
+            assert c % 1000 == 0
+    finally:
+        os.unlink(path)
+
+
+def test_load_rows_progress_callback_progress_every_override():
+    """progress_every controls how often the callback fires mid-loop."""
+    rows = [
+        (1, 3, 8, "?", "?", "?", "?", "?", "?", "?", "?", "?", "?",
+         "?", "?", 0, 100, 0, 0, 0)
+    ] * 2500
+    path = _write_csv(rows)
+    try:
+        calls = []
+        load_rows(
+            path,
+            progress_callback=lambda c, t: calls.append((c, t)),
+            progress_every=500,
+        )
+        intermediate = calls[1:-1]
+        # Every intermediate call should be a multiple of 500 (≤ total).
+        # ``c == total`` is allowed: when the row count is itself a
+        # multiple of progress_every the last mid-loop fire coincides
+        # with the row-count boundary, which is fine.
+        for c, t in intermediate:
+            assert c % 500 == 0
+            assert c <= t
+    finally:
+        os.unlink(path)
+
+
+def test_load_rows_no_callback_still_returns_rows():
+    """Backwards compat: omitting progress_callback behaves exactly as before."""
+    rows = [
+        (4, 3, 16, "?", "?", "?", "?", "?", "?", "?", "?", "?", "?",
+         "?", 12869, 1, 1418682163, 0, 0, 0),
+    ]
+    path = _write_csv(rows)
+    try:
+        out = load_rows(path)
+        assert len(out) == 1
+        assert out[0]["address"] == 4
+    finally:
+        os.unlink(path)
