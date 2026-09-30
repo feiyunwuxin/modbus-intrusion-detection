@@ -17,10 +17,19 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections import deque
 from tkinter import messagebox, ttk
 from typing import TYPE_CHECKING
 
-from ids import FEATURE_COLUMNS, extract_features, list_available_models, load_model
+from ids import (
+    FEATURE_COLUMNS,
+    FEATURE_COLUMNS_23,
+    extract_features,
+    extract_features_23,
+    list_available_models,
+    load_model,
+    resolve_label,
+)
 
 if TYPE_CHECKING:
     from ids.model_loader import ModelWrapper
@@ -52,6 +61,15 @@ class IDsPanel(ttk.Frame):
             "total": 0, "normal": 0, "attack": 0, "correct": 0,
             "tp": 0, "fp": 0, "tn": 0, "fn": 0,
         }
+        # Rolling buffer of the most recent ground-truth labels
+        # (one per frame). For 3D window models (window_size > 1)
+        # ``_update_stats`` is called once per completed window, but
+        # the truth of that window is ``max(buffer)`` rather than the
+        # last frame's truth — matching the training pipeline
+        # (``y.max()`` per window) so the panel's F1 is comparable to
+        # the training-time ``test_binary_f1``. For window_size=1 the
+        # buffer holds a single value and ``max()`` is a no-op.
+        self._truth_buffer: deque = deque(maxlen=self.window_size)
         self._build_ui()
         self._refresh_models()
 
@@ -148,8 +166,27 @@ class IDsPanel(ttk.Frame):
 
         kind 取值: "BiLSTM", "GRU", "FNN", "Conv1d", "sklearn-17",
                    "wrong_features", "incompatible_3d", "unknown",
-                   "missing_dep", "load_error"。
+                   "missing_dep", "load_error",
+                   "MCU-Hybrid-INT8", "mcu_header_incomplete"。
         """
+        p_str = str(path)
+        # MCU Hybrid INT8 C 头（.h）：用 _parse_mcu_header 静态校验
+        # tcn.{0,1,2}.conv{1,2}.weight 是否齐全，避免加载时报错。
+        if p_str.endswith(".h"):
+            try:
+                from ids.model_loader import _parse_mcu_header
+                parsed = _parse_mcu_header(p_str)
+                has_all = all(
+                    f"tcn.{bi}.{ck}.weight" in parsed
+                    for bi in range(3) for ck in ("conv1", "conv2")
+                )
+                return {
+                    "kind": "MCU-Hybrid-INT8" if has_all else "mcu_header_incomplete",
+                    "n_features": 23,
+                    "path": p_str,
+                }
+            except Exception as e:
+                return {"kind": "load_error", "error": str(e), "path": p_str}
         from pathlib import Path
         p = Path(path)
         if not p.exists():
@@ -277,34 +314,86 @@ class IDsPanel(ttk.Frame):
             return {"compatible": False, "n_features": None,
                     "kind": "load_error", "window_size": 1}
 
+    @staticmethod
+    def _format_model_tag(info: dict, has_scaler: bool) -> str:
+        """把 ``_probe_model`` 结果映射到 dropdown 标签。
+
+        17-dim 兼容 → ``✅ {kind} · 17f``（W>1 加 ``· W{window}``）
+        23-dim 兼容 → ``✅/⚠ {kind} · 23f · W{window} · scaler✓/需scaler``
+        wrong_features → ``⚠ {n}f · 需 17/23``
+        load_error → ``❌ 加载错误``
+
+        23-dim 用 ⚠ 而不是 ✅ 是因为缺 scaler 时预测概率会偏（见
+        ``ids/scaler_23dim.py``），告诉用户"加载了但数字不可信"。
+        """
+        kind = info.get("kind", "")
+        # MCU Hybrid INT8 头文件：固定 23-dim / W16 / 0.49 阈值，与
+        # 23-dim .pt KEEP_23 模型共用同一特征列但用 bit-perfect 复刻
+        # C 端 ch32_forward() 推理。无需 scaler（头里已是 FP32 dequant）。
+        if kind == "MCU-Hybrid-INT8":
+            return "✅ MCU-Hybrid-INT8 · 23-dim"
+        if kind == "mcu_header_incomplete":
+            return "❌ MCU header incomplete"
+        if info.get("compatible"):
+            kind = info["kind"]
+            n = info["n_features"]
+            w = info["window_size"]
+            parts = [f"✅ {kind}", f"{n}f"]
+            if w > 1:
+                parts.append(f"W{w}")
+            if n == 23:
+                parts.append("scaler✓" if has_scaler else "需scaler")
+                # 缺 scaler 时降级为 ⚠ 让用户看到警告
+                if not has_scaler:
+                    parts[0] = f"⚠ {kind}"
+            return " · ".join(parts)
+        if info["kind"] == "wrong_features":
+            return f"⚠ {info['n_features']}f · 需 17/23"
+        if info["kind"] == "load_error":
+            return "❌ 加载错误"
+        return f"⚠ {info['kind']}"
+
     def _refresh_models(self) -> None:
         from pathlib import Path
         project_dir = Path(__file__).parent
         paths = list_available_models(str(project_dir))
+        # 主下拉顺序：FP32 (.pt/.joblib) 优先，MCU (.h) 后缀。
+        # MCU 是 opt-in（bit-perfect 复刻 C 端推理，不是用户日常
+        # 选用的训练模型），分到末尾避免干扰默认选择。
+        fp32_paths = [p for p in paths if not p.endswith(".h")]
+        mcu_paths = [p for p in paths if p.endswith(".h")]
+        paths = fp32_paths + mcu_paths
         self._available_paths = paths
+        # 23-dim 模型需要 scaler；缺文件时 predictions 仍跑但不准。
+        # 在循环外检测一次，避免每个模型重复 stat。
+        scaler_path = project_dir / "scaler_binary_v2_scada.joblib"
+        has_scaler = scaler_path.exists()
         # 预分类每个模型，UI 上加标签提示兼容性
         tagged_names: list[str] = []
         first_compatible_idx: int | None = None
+        first_23dim_idx: int | None = None
         for i, p in enumerate(paths):
             info = self._probe_model(p)
             base = Path(p).name
-            if info["compatible"]:
-                tag = f"✅ {info['kind']} ({info['n_features']}f)"
-                if info["window_size"] > 1:
-                    tag += f" window={info['window_size']}"
+            tag = self._format_model_tag(info, has_scaler)
+            if info.get("compatible") or info.get("kind") == "MCU-Hybrid-INT8":
                 if first_compatible_idx is None:
                     first_compatible_idx = i
-            elif info["kind"] == "wrong_features":
-                tag = f"⚠ {info['n_features']}特征(需17)"
-            elif info["kind"] == "load_error":
-                tag = "❌ 加载错误"
+                # 23-dim 模型保留 pressure 浮点精度（pd.to_numeric
+                # 训练），优先选它而非 17-dim BiLSTM（int 截断训练
+                # 会把 0.689655 压成 0，83% 帧压力被合并）。
+                if info.get("n_features") == 23 and first_23dim_idx is None:
+                    first_23dim_idx = i
+            if p.endswith(".h"):
+                tagged_names.append(f"[MCU] {base}  {tag}")
             else:
-                tag = f"⚠ {info['kind']}"
-            tagged_names.append(f"{base}  {tag}")
+                tagged_names.append(f"{base}  {tag}")
         self.model_combo["values"] = tagged_names
-        # 自动选第一个兼容模型；若已有用户选择则保留
-        if first_compatible_idx is not None and not self.model_var.get():
-            self.model_combo.current(first_compatible_idx)
+        # 默认选 23-dim（保留 pressure 精度），其次任意兼容模型，
+        # 最后任意模型；已有用户选择则保留。
+        default_idx = first_23dim_idx or first_compatible_idx
+        if default_idx is not None and not self.model_var.get():
+            self.model_combo.current(default_idx)
             self._on_model_selected()
             return
         if paths and not self.model_var.get():
@@ -324,10 +413,24 @@ class IDsPanel(ttk.Frame):
             ws = 1
         ws = max(1, ws)
         self.window_size = ws
+        # Defensive: align the truth buffer's maxlen with the new
+        # window size in case the user switched models without
+        # touching the Spinbox first.
+        self._resize_truth_buffer(ws)
         try:
             wrapper = load_model(path, window_size=ws)
             self.wrapper = wrapper
             name = Path(path).name
+            # MCU Hybrid INT8 头：使用 0.49 (CH32_BEST_THRESHOLD) 而不是
+            # 默认 0.5。Bit-perfect 复刻 C 端推理，必须用同一阈值才能
+            # 在模拟器里复现 MCU 实际部署的检测判定。
+            if getattr(wrapper, "kind", None) == "MCU-Hybrid-INT8":
+                self.threshold_var.set(0.49)
+                self.status_var.set(
+                    f"已加载 MCU 模型 (阈值 0.49): {name}"
+                    + self._maybe_reset_for_new_model(path)
+                )
+                return
             ws_tag = f", window={ws}" if ws > 1 else ""
             base_status = f"已加载 {name} ({wrapper.input_features} features{ws_tag})"
             self.status_var.set(
@@ -390,10 +493,29 @@ class IDsPanel(ttk.Frame):
             return
         ws = max(1, ws)
         self.window_size = ws
+        # Resize the rolling truth buffer so subsequent
+        # ``_update_stats`` calls compute ``max()`` over the new
+        # window. The most recent ``ws`` truths are preserved so a
+        # window currently being scored doesn't suddenly lose its
+        # earlier frames.
+        self._resize_truth_buffer(ws)
         if self.wrapper is not None:
             self.status_var.set(
                 f"窗口已改为 {ws}，请重新选择模型以重新加载"
             )
+
+    def _resize_truth_buffer(self, ws: int) -> None:
+        """Resize the rolling truth buffer to ``ws`` slots.
+
+        Preserves the most recent ``ws`` truths so a window-size
+        change doesn't drop the just-completed window's truth
+        mid-flight. ``deque``'s ``maxlen`` cannot be mutated after
+        construction, so the buffer is recreated.
+        """
+        if ws < 1:
+            ws = 1
+        old = list(self._truth_buffer)
+        self._truth_buffer = deque(old[-ws:], maxlen=ws)
 
     # ---- 阈值 ----
 
@@ -413,11 +535,34 @@ class IDsPanel(ttk.Frame):
         """
         if self.wrapper is None:
             return
-        truth = int(record.get("binary", 0))
+        # ground truth：走 ``resolve_label`` 别名 lookup，兼容 RAW CSV
+        # （列名 ``binary result``）和短名 CSV（列名 ``binary``）；直接
+        # ``record.get("binary")`` 在 RAW CSV 下永远返回 0 → truth 全是
+        # normal → 准确率统计完全错位。
+        truth = resolve_label(record, "binary", default=0)
+        # Track the rolling truth so 3D-model windows can be evaluated
+        # against ``max()`` over their full window (matching the
+        # training pipeline). For window_size=1 this degenerates to
+        # ``max([truth]) == truth``.
+        self._truth_buffer.append(int(truth))
+        window_truth = max(self._truth_buffer)
         hex_bytes = self._hex_preview(record)
         try:
-            n_feat = self.wrapper.input_features
-            if n_feat == 23:
+            # 大多数 wrapper 暴露 ``input_features`` property；MCU wrapper
+            # 只暴露 ``n_features`` 类属性（spec §3.6）。两者都接受，
+            # 23 = "需要喂 record"，其它 = "需要喂预提取特征数组"。
+            n_feat = (
+                getattr(self.wrapper, "input_features", None)
+                or getattr(self.wrapper, "n_features", None)
+            )
+            wrapper_kind = getattr(self.wrapper, "kind", None)
+            if wrapper_kind == "MCU-Hybrid-INT8":
+                # MCU wrapper 内部调 extract_features_23；只喂 record
+                # 即可（无需预先 extract_features）。功能上等价于
+                # n_feat == 23 分支，但显式 kind 分支让阅读者一眼
+                # 看出「MCU 模型走 bit-perfect C 端复刻路径」。
+                result = self.wrapper.infer(record)
+            elif n_feat == 23:
                 # 23-dim KEEP_23 wrapper 需要 record（含 time / addr /
                 # function 派生列），不能传预提取特征。
                 result = self.wrapper.infer(record)
@@ -428,7 +573,10 @@ class IDsPanel(ttk.Frame):
             label, prob, correct, tag, prob_str = -1, 0.0, "?", "error", f"ERR"
             print(f"[IDS] 推理失败 (frame {frame_index}): {e}")
             self._record_frame(frame_index, hex_bytes, truth, label, prob_str, correct, tag)
-            self._update_stats(label, truth, label >= 0)
+            # ``label=-1`` makes ``counted=False`` in ``_update_stats``,
+            # so the buffer's max truth is irrelevant for metrics.
+            # We still pass ``window_truth`` for symmetry / future use.
+            self._update_stats(label, window_truth, label >= 0)
             return
 
         # 3D 模型 warm-up：窗口未填满时 wrapper 返回 None
@@ -445,11 +593,20 @@ class IDsPanel(ttk.Frame):
         tag = "attack" if label == 1 else "normal"
         prob_str = f"{prob:.3f}"
         self._record_frame(frame_index, hex_bytes, truth, label, prob_str, correct, tag)
-        self._update_stats(label, truth, label >= 0)
+        # Compare the model's window-level prediction against the
+        # window's max truth (the training target), not the last
+        # frame's truth. The Tree's per-row "✓/✗" above uses the
+        # per-frame truth and remains a per-frame indicator.
+        self._update_stats(label, window_truth, label >= 0)
 
     def _record_frame(self, frame_index: int, hex_bytes: str, truth: int,
                       label: int, prob_str: str, correct: str, tag: str) -> None:
-        """插入一条记录到 Treeview 并做 LRU 截断。"""
+        """插入一条记录到 Treeview 并做 LRU 截断。
+
+        每次插入后自动滚动到底部（与通信日志 ``see("end")`` 一致），
+        让"自动发送"高速流下用户始终能看到最新检测结果，不用手动
+        拉滚动条。LRU 截断仍保留最早 N 行；最旧行从顶部被删。
+        """
         self.results_tree.insert(
             "", "end",
             values=(frame_index + 1, hex_bytes, truth, label, prob_str, correct),
@@ -459,6 +616,8 @@ class IDsPanel(ttk.Frame):
         if len(children) > _MAX_RESULTS:
             for c in children[:len(children) - _MAX_RESULTS]:
                 self.results_tree.delete(c)
+        # 自动滚到最新行（与通信日志 _append_log 行为一致）
+        self.results_tree.yview_moveto(1.0)
 
     def clear(self) -> None:
         for c in self.results_tree.get_children():
@@ -467,6 +626,11 @@ class IDsPanel(ttk.Frame):
             "total": 0, "normal": 0, "attack": 0, "correct": 0,
             "tp": 0, "fp": 0, "tn": 0, "fn": 0,
         }
+        # Empty the rolling truth buffer too. Preserve the deque's
+        # ``maxlen`` (``_resize_truth_buffer`` will recreate it on the
+        # next window-size change); we only want to drop the
+        # accumulated labels, not change the window semantics.
+        self._truth_buffer.clear()
         self._render_stats()
 
     def _update_stats(self, pred: int, truth: int, counted: bool) -> None:
