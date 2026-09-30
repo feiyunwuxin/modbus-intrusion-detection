@@ -1605,6 +1605,21 @@ class _McuHeaderWrapper:
     n_features: int = 23
     threshold: float = 0.49
 
+    @property
+    def input_features(self) -> int:
+        """Expose ``n_features`` via the ``ModelWrapper`` protocol contract.
+
+        All other wrappers expose ``input_features`` as a property; MCU
+        wrapper historically exposed it only as a class attribute named
+        ``n_features``. Adding this property lets callers (and the
+        protocol) use ``wrapper.input_features`` uniformly.
+        """
+        return self.n_features
+
+    @property
+    def window_size(self) -> int:
+        return self._window_size
+
     def __init__(self, header_path, window_size: int = 16):
         if TCNClassifierSE is None:
             raise RuntimeError(

@@ -548,13 +548,10 @@ class IDsPanel(ttk.Frame):
         window_truth = max(self._truth_buffer)
         hex_bytes = self._hex_preview(record)
         try:
-            # 大多数 wrapper 暴露 ``input_features`` property；MCU wrapper
-            # 只暴露 ``n_features`` 类属性（spec §3.6）。两者都接受，
-            # 23 = "需要喂 record"，其它 = "需要喂预提取特征数组"。
-            n_feat = (
-                getattr(self.wrapper, "input_features", None)
-                or getattr(self.wrapper, "n_features", None)
-            )
+            # ``input_features`` 是 ``ModelWrapper`` protocol 要求的属性
+            # （所有 wrapper — 包括 MCU — 都已实现）。23 = "需要喂 record"，
+            # 其它 = "需要喂预提取特征数组"。
+            n_feat = self.wrapper.input_features
             wrapper_kind = getattr(self.wrapper, "kind", None)
             if wrapper_kind == "MCU-Hybrid-INT8":
                 # MCU wrapper 内部调 extract_features_23；只喂 record
