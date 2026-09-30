@@ -653,7 +653,15 @@ class IdsLineParser(QObject):
     count_changed = pyqtSignal(int)            # [ALARM] N 当前累计 count
     fp_changed    = pyqtSignal(int, bool)      # (count, is_fp) — True=误报 (FP)
     # ⭐ 第二十一轮: 增加 prob 字段信号 (含 H743 上行的 prob=0.NNN 1000 倍值)
-    alarm_with_prob = pyqtSignal(int, int, bool)  # (count, prob_x1000, is_fp)
+    alarm_with_prob = pyqtSignal(int, int, bool)  # (count, prob_x1000, is_fp) — legacy 单消息
+
+    # ⭐ 第二十三轮 (2026-09-30): delta-driven TP/FP 信号
+    #   H743 固件 modbus_ids.c:271 节流 (MIN_GAP_FRAMES=4): 每次判 attack frames_attack++,
+    #   但只发 ~40% 的 [ALARM] 上行消息. 旧逻辑按 [ALARM] 消息数算 TP/FP 会丢失 60%.
+    #   新逻辑按 frames_attack 增量算, 每个 H743 内部 alarm 都正确标签.
+    #   信号携带 (delta, cur_count, prob_x1000) — delta 给计数用, cur_count/prob 给日志用.
+    tp_delta = pyqtSignal(int, int, int)  # (delta, cur_count, prob_x1000)
+    fp_delta = pyqtSignal(int, int, int)  # (delta, cur_count, prob_x1000)
 
     # ⭐ 第二十二轮: 滑动窗口大小 (H743 TCN+SE 训练时 window=16)
     _SW_SIZE = 16
@@ -671,6 +679,8 @@ class IdsLineParser(QObject):
         #     - 全 normal      → FP (误报)
         #   旧逻辑只看最后一帧, attack burst 内除首帧外都误标 FP.
         self._window: "deque[bool]" = deque(maxlen=self._SW_SIZE)
+        # ⭐ 第二十三轮: 跟踪 H743 内部 frames_attack (alarm_count) 用于算 delta
+        self._last_alarm_count: Optional[int] = None
 
     def set_last_was_attack(self, val: Optional[bool]) -> None:
         """PC GUI 每次发完一帧后调用,推送该帧 binary 到滑动窗口.
@@ -689,6 +699,8 @@ class IdsLineParser(QObject):
     def reset_last_was_attack(self) -> None:
         """重置 PC 滑动窗口 (测试开始前/手动清零时调用)."""
         self._window.clear()
+        # ⭐ 第二十三轮: 同时重置 alarm_count 跟踪
+        self._last_alarm_count = None
 
     def feed(self, data: bytes) -> None:
         if not data:
@@ -720,19 +732,35 @@ class IdsLineParser(QObject):
         #   → 截取 3 位整数作为 prob_x1000, 范围 [0, 1000]. 未匹配则 -1.
         prob_match = self._PROB_RE.search(line)
         prob_x1000 = int(prob_match.group(1)) if prob_match else -1
-        # count_changed 始终 emit (兼容旧 IdsReportPanel._on_detected)
+        # count_changed 始终 emit (兼容旧 IdsReportPanel._on_detected 显示 Detected KPI)
         self.count_changed.emit(count)
+        # ⭐ 第二十三轮 (2026-09-30): delta-driven TP/FP 计数
+        #   H743 固件 modbus_ids.c:271 节流 (MIN_GAP_FRAMES=4): 每次判 attack frames_attack++,
+        #   但只发 ~40% 的 [ALARM] 上行. 旧逻辑按 [ALARM] 消息算 TP/FP 丢失 60% 真实检测.
+        #   delta = cur_count - last_count 是 H743 内部真实判 attack 次数.
+        if self._last_alarm_count is None:
+            # 首次 [ALARM]: H743 从 0 累计到 count, delta = count (不是 1!)
+            # 例如: H743 boot 后已判 5 次 attack, 第一次上行 alarm_count=5 → delta=5
+            delta = count
+        else:
+            delta = count - self._last_alarm_count
+            if delta < 1:
+                delta = 1  # 异常 (H743 重启/计数回退), 保守按 1 处理
+        self._last_alarm_count = count
         # ⭐ 第二十二轮 (2026-09-30): 滑动窗口评估 TP/FP (H743 推理基于 SW=16)
         #   - 窗口内任一帧 attack (binary=1) → TP (本次报警命中真实攻击)
         #   - 窗口内全 normal (binary=0)       → FP (本次报警是误报)
         #   - 窗口未填满 (< 16 帧)            → 不判定 (避免 ramp-up 期误分类)
-        # 旧逻辑只看上一帧, attack burst 内除首帧外 15 个 alarm 全误标 FP.
-        is_fp: Optional[bool] = None
+        # 第二十三轮: 用 delta 替代 1, 让 H743 内部每个 alarm 都正确标签
         if len(self._window) >= self._SW_SIZE:
             is_fp = not any(self._window)   # True=FP (全 normal), False=TP (有 attack)
+            # 新信号: delta-driven (推荐使用, 反映 H743 内部真实 alarm_count 增量)
+            if is_fp:
+                self.fp_delta.emit(delta, count, prob_x1000)
+            else:
+                self.tp_delta.emit(delta, count, prob_x1000)
+            # Legacy 信号 (单消息级, deprecated, 保留以兼容旧连接)
             self.fp_changed.emit(count, is_fp)
-        # ⭐ 第二十一轮: 含 prob 的报警信号 (供测试日志用)
-        if is_fp is not None:
             self.alarm_with_prob.emit(count, prob_x1000, is_fp)
 
 
@@ -768,13 +796,16 @@ class IdsReportPanel(QWidget):
         self._total_count = 0        # 总发送
         self._sent_count = 0         # 攻击次数 (binary==1 累计)
         self._normal_count = 0       # 正常数 (binary==0 累计)
-        self._detected_count = 0     # 识别攻击次数 (H743 上行累计)
-        self._tp_count = 0           # 真阳性 (alarm on attack frame)
-        self._fp_count = 0           # 假阳性 (alarm on normal frame)
+        self._detected_count = 0     # 识别攻击次数 (H743 上行累计 frames_attack)
+        self._tp_count = 0           # 真阳性 (delta-driven, H743 内部 alarm 命中 attack)
+        self._fp_count = 0           # 假阳性 (delta-driven, H743 内部 alarm 命中 normal)
         self._build_ui()
         # 接 parser 信号 (H743 上行的 [ALARM] N)
+        # ⭐ 第二十三轮: 改用 tp_delta/fp_delta 信号, 按 H743 内部 alarm_count 增量计 TP/FP.
+        #   旧 fp_changed 按 [ALARM] 消息数计 1 个, 漏掉 H743 MIN_GAP=4 节流吞掉的 60% alarm.
         self._parser.count_changed.connect(self._on_detected)
-        self._parser.fp_changed.connect(self._on_fp_changed)
+        self._parser.tp_delta.connect(self._on_tp_delta)
+        self._parser.fp_delta.connect(self._on_fp_delta)
 
     def _build_ui(self):
         outer = QHBoxLayout(self)
@@ -949,24 +980,50 @@ class IdsReportPanel(QWidget):
         """IdsLineParser.count_changed 信号回调 (H743 上行 [ALARM] N 累计)."""
         self._detected_count = count
         self.detected_label.setText(str(count))
-        # 不在 _on_detected 里 +FP/+TP: 那由 _on_fp_changed 单独做 (避免重复)
+        # TP/FP 累加由 _on_tp_delta / _on_fp_delta 处理 (delta-driven, 不在 _on_detected 里做)
         self._update_rates()
 
-    def _on_fp_changed(self, count: int, is_fp: bool) -> None:
-        """IdsLineParser.fp_changed 信号回调 (H743 上行 alarm 时附带 FP 标记).
+    def _on_tp_delta(self, delta: int, cur_count: int = 0, prob_x1000: int = -1) -> None:
+        """IdsLineParser.tp_delta 信号回调 (Round 23, delta-driven).
+
+        Args:
+            delta: H743 内部 frames_attack 增量 (典型 1, 大 burst 时 > 1).
+                   这 delta 个 H743 内部 alarm 都命中真实 attack (窗内有 binary=1).
+            cur_count: H743 当前累计 frames_attack (供日志/调试用)
+            prob_x1000: H743 输出概率 × 1000 (供日志/调试用)
+        """
+        if delta > 0:
+            self._tp_count += delta
+        self.tp_label.setText(str(self._tp_count))
+        self._update_rates()
+
+    def _on_fp_delta(self, delta: int, cur_count: int = 0, prob_x1000: int = -1) -> None:
+        """IdsLineParser.fp_delta 信号回调 (Round 23, delta-driven).
+
+        Args:
+            delta: H743 内部 frames_attack 增量, 这 delta 个 alarm 命中 normal (窗内全 0).
+            cur_count: H743 当前累计 frames_attack (供日志/调试用)
+            prob_x1000: H743 输出概率 × 1000 (供日志/调试用)
+        """
+        if delta > 0:
+            self._fp_count += delta
+        self.fp_label.setText(str(self._fp_count))
+        self._update_rates()
+
+    def _on_fp_changed_legacy(self, count: int, is_fp: bool) -> None:
+        """IdsLineParser.fp_changed 信号回调 (legacy, deprecated).
+
+        此信号在 Round 23 后只用于向后兼容旧连接, IdsReportPanel 已切换到
+        tp_delta/fp_delta 信号 (delta-driven). 保留方法定义以防外部代码仍 connect.
 
         Args:
             count: H743 当前累计 frames_attack (与 _on_detected 的 count 同源)
             is_fp: True = 最近 16 帧滑动窗口内全 normal → 本次 alarm 算误报
                    False = 最近 16 帧滑动窗口内有 attack → 本次 alarm 算命中
         """
-        # count 跟 _on_detected 重复,这里只更新 TP/FP 计数 + 标签
-        if is_fp:
-            self._fp_count += 1
-        else:
-            self._tp_count += 1
-        self.tp_label.setText(str(self._tp_count))
-        self.fp_label.setText(str(self._fp_count))
+        # ⚠️ Deprecated: 单消息计数, 不准确 (漏 60% 节流吞掉的 alarm)
+        # 不再累加 _tp_count/_fp_count, 仅 emit log (供调试)
+        pass
         self._update_rates()
 
     def _update_rates(self) -> None:
@@ -1139,18 +1196,35 @@ class TestLogger:
         self._last_send_ms = now_ms
 
     def log_alarm(self, alarm_count: int, prob_x1000: Optional[int],
-                  is_fp: Optional[bool], note: str = "") -> None:
-        """记录一次 H743 上行 [ALARM] 事件 (含 TP/FP 分类)."""
+                  is_fp: Optional[bool], running_tp: Optional[int] = None,
+                  running_fp: Optional[int] = None, note: str = "") -> None:
+        """记录一次 H743 上行 [ALARM] 事件 (含 TP/FP 分类).
+
+        ⭐ 第二十三轮 (2026-09-30): 不再自己 increment running_tp/running_fp,
+        改由调用方传入 delta-driven 的正确值 (从 IdsReportPanel._tp_count/_fp_count 读).
+        旧逻辑按 [ALARM] 消息数 +1 会跟 IdsReportPanel 的 delta-driven 计数重复或漏算.
+
+        Args:
+            alarm_count: H743 当前累计 frames_attack (本次 [ALARM] 上行携带的值)
+            prob_x1000: H743 printf 输出的 prob=0.NNN × 1000
+            is_fp: True=误报 (窗内全 normal), False=命中 (窗内有 attack), None=未判定
+                   注: 这是单 [ALARM] 消息级 is_fp (legacy 标签), 不代表 H743 内部 alarm_count 增量
+            running_tp: 当前累计 TP (delta-driven, 从 IdsReportPanel._tp_count 取)
+            running_fp: 当前累计 FP (delta-driven, 从 IdsReportPanel._fp_count 取)
+                        None 表示不更新 (使用调用前的 self.running_tp/running_fp)
+            note: 备注 (如 'prob=0.469')
+        """
         if not self.is_open:
             return
         import time as _t
         now_ms = int(_t.time() * 1000)
         t_event = now_ms - (self._t0_ms or now_ms)
         gap = '' if self._last_send_ms is None else (now_ms - self._last_send_ms)
-        if is_fp is True:
-            self.running_fp += 1
-        elif is_fp is False:
-            self.running_tp += 1
+        # ⭐ 第二十三轮: 调用方负责更新 running_tp/running_fp (避免双计数)
+        if running_tp is not None:
+            self.running_tp = running_tp
+        if running_fp is not None:
+            self.running_fp = running_fp
         self._writer.writerow([
             t_event, 'ALARM', '', '', '',
             alarm_count, prob_x1000 if prob_x1000 is not None else '',
@@ -1792,10 +1866,14 @@ class RTUReplayGUI(QMainWindow):
         """
         if not self.test_logger.is_open:
             return
+        # ⭐ 第二十三轮: 从 IdsReportPanel 读 delta-driven 的累计 TP/FP
+        #   IdsLineParser 已在 _parse_line 先 emit tp_delta/fp_delta, 这里读 _tp_count/_fp_count 已最新.
         self.test_logger.log_alarm(
             alarm_count=count,
             prob_x1000=prob_x1000 if prob_x1000 >= 0 else None,
             is_fp=is_fp,
+            running_tp=self.ids_report._tp_count,
+            running_fp=self.ids_report._fp_count,
             note=f'prob={prob_x1000/1000:.3f}' if prob_x1000 >= 0 else 'no_prob',
         )
 
