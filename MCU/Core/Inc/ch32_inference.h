@@ -1,16 +1,15 @@
 /* ============================================================================
- * ch32_inference.h  --  TCN+SE ch=32 MCU Inference API  (23-dim SCADA, w=16)
+ * ch32_inference.h  --  TCN+SE ch=32 MCU Inference API  (FULL FP32, 23-dim, w=16)
  *                        STM32H743VIT6 (Cortex-M7 @ 480MHz, FPU + DSP) 优化版
  *
- *  ⭐ 2026-10-18 路线 E 迁移: 取代 tflite_micro_runtime.cpp 的 TFLM ref impl.
- *    TFLM ref impl 跑 3-block TCN+SE FP32 model 在 Cortex-M7 上 broken
- *    (5 controlled input 全给常数 0x000485, Round 23 锁定, 已无解).
- *    改用手写 C forward (ch32_inference.c) + QAT INT8 dequant-to-FP32 路径
- *    (跟 h743/ 路线 E 完全一致, parity test bit-perfect rel<1e-7).
- *    完全绕开 TFLM, 不再需要 thirdParty/tflite-micro/*.cc (~150KB Flash 节省).
- * ============================================================================
- *
- * Target:   STM32H743VIT6 (Cortex-M7 @ 480MHz, double FPU + DSP)
+ * ⭐⭐⭐ 2026-10-18 路线 E 迁移 + FP32 部署 (取代 INT8 Hybrid)
+ *   路径:
+ *     训练: PyTorch FP32 -> ONNX FP32 -> SavedModel (跟本文件 bit-perfect rel<1e-7)
+ *     部署: ch32_inference.c 加载 FP32 weights (跟 ONNX / TFLite PC sim 1:1 一致)
+ *   取代原因:
+ *     INT8 Hybrid + T=2.0 + thr=0.5 在 H743 4-min 实测 FPR=14.43% (vs PC sim 2.27%)
+ *     FP32 完全消除 INT8 dequant drift (0.5-2% per layer 累积)
+ *     thr 改回训练默认 0.5, T 改回 1.0 (跟 PyTorch 一致)
  *
  * 模型架构 (与 PyTorch train_quantize_3ch.py ch=32 完全一致):
  *   x (23, 16)
@@ -31,23 +30,12 @@
  *   shape (channels, time_steps), row-major
  *   例: input[ic*16 + t]  = 第 ic 个特征在 t 时刻的值
  *
- * 量化策略:
- *   - 权重 INT8 per-channel symmetric (已 scale/zp 在 weight header)
- *   - 激活 FP32
- *   - BN 已 fold 到 Conv (推理时无需 BN)
- *   - init 时一次性 dequant 到 FP32 RAM, 推理时纯 FP32 conv
- *
- * 用法 (3 步):
- *   1. ch32_init();                       // 启动时调用一次 (~3 ms @ 480 MHz)
- *   2. 填好 x[23*16] 输入窗口             // 一次前向的输入
- *   3. float p = ch32_forward(x, 23*16);  // 返回 [0,1] 异常概率
- *
- * 资源占用 (ch=32 Hybrid INT8, H743 @ -O2 -ffast-math):
- *   - 权重 (dequant 后 FP32):  ~79,892 B  ( 78.02 KB)
- *   - 激活缓冲 (峰值):         ~8,256 B   (  8.06 KB)
- *   - 总 RAM:                  ~88,148 B   ( 86.08 KB)
- *   - Flash (权重 + 代码):    ~160,000 B  ( ~156 KB .h + ~30 KB 代码)
- *   - 推理时间 @ 480 MHz:      ~0.13 ms  (vs F407 0.47ms @ 168MHz)
+ * 资源占用 (ch=32 FP32, H743 @ -O2 -ffast-math):
+ *   - 权重 (FP32, .rodata + RAM 拷贝):  ~80 KB
+ *   - 激活缓冲 (峰值):                  ~8 KB
+ *   - 总 RAM:                          ~88 KB
+ *   - Flash (权重 + 代码):            ~190 KB
+ *   - 推理时间 @ 480 MHz:               ~0.20 ms (FP32 比 INT8 慢 ~50%, 精度优先)
  *
  * 集成到 STM32 HAL 项目:
  *   - 在 main.c 开头 #include "ch32_inference.h"
@@ -57,7 +45,6 @@
  * 编译选项建议 (Keil AC6):
  *   -O2 -ffast-math -funroll-loops -DNDEBUG
  *   (H743: --cpu Cortex-M7.fp.sp --fpu=FPV5-D16)
- *   注意 H743 默认 FPv5-SP-D16 (单精度), 不要误用 fpv5-d16 (双精度会慢)
  *
  * ============================================================================
  */
@@ -89,10 +76,15 @@ extern "C" {
 #define CH32_FEAT_SIZE     (CH32_CH * CH32_WINDOW)            /* 512 */
 #define CH32_SE_REDUCE     (CH32_CH / 8)                      /* 4 (= SE_HIDDEN) */
 
+/* 栈上分配的 buffer max (用于 SE / classifier 临时数组) */
+#define CH32_CH_MAX         32
+#define CH32_SE_HIDDEN_MAX  4
+#define CH32_FC1_OUT_MAX    32
+
 /* --- 公共 API ------------------------------------------------------------ */
 
 /**
- * 初始化: 把 INT8 权重 dequant 成 FP32 到 RAM 缓冲
+ * 初始化: 把 const FP32 权重 memcpy 到 RAM 缓冲
  * 必须在 ch32_forward 之前调用一次
  * 耗时: ~3 ms @ 480 MHz Cortex-M7
  *
@@ -131,7 +123,7 @@ void ch32_dwt_init(void);
  * 内存自检: 返回权重/激活的字节数
  */
 typedef struct {
-    size_t weights_fp32_bytes;   /* dequant 后的 FP32 权重 */
+    size_t weights_fp32_bytes;   /* FP32 权重字节数 */
     size_t input_bytes;          /* 1 个输入窗口 */
     size_t peak_act_bytes;       /* 激活峰值 */
     size_t total_ram_bytes;      /* 总 RAM 占用 (权重 + 激活 + 输入) */
@@ -142,21 +134,19 @@ ch32_mem_info_t ch32_get_mem_info(void);
 /**
  * 取最佳阈值
  *
- * ⭐ 2026-10-18 路线 E: 初始 0.5 (跟 h743/ CH32_TEMPERATURE 配合).
- *   4-min 实测发现 28 FP 全在 prob 0.509-0.888 区间, 跟 ~12 个低 prob TP 混在一起.
- *   4-min 数据 threshold sweep: thr=0.5 F1=0.84 FPR=14.43% / thr=0.7 F1=0.857 FPR=6.70%
- *   改 0.7 期望 FPR 14%→7%, F1 反而 +0.018. 拐点稳定再调.
- *   PC 5-seed FP32 baseline 同样 0.5 sweet spot, 但 H743 实时特征分布跟 PC CSV 有 drift.
+ * ⭐⭐⭐ 2026-10-18 FP32 部署: 改回训练默认 0.5
+ *   INT8 Hybrid 时代因为 dequant drift 推到边界, 改 thr=0.7 才稳住 FPR
+ *   FP32 部署跟 PyTorch / ONNX / TFLite PC sim bit-perfect, 不需要漂移补偿
+ *   训练最佳 thr=0.5 直接可用, 期望 F1 接近 PC sim 0.86, FPR 接近 2.27%
+ *   4-min 实测如仍有 FPR gap, 再做 H743-specific threshold sweep
  */
-#define CH32_BEST_THRESHOLD  0.7f
+#define CH32_BEST_THRESHOLD  0.5f
 
-/* ⭐ 2026-10-13 Round 68 (路线 E): temperature scaling
- *
- *   logit /= CH32_TEMPERATURE 把 INT8 per-channel scale drift 推到饱和区的 logits
- *   压回 [0.5, 0.9) 边界区间, 恢复阈值调优空间.
- *   PC 验证: T=2.0 thr=0.5 → F1=88.14% FPR=2.27% (vs T=1 thr=0.9 → F1=85.59% FPR=6.34%)
- *   关闭: 把 CH32_TEMPERATURE 设成 1.0f 即恢复原行为. */
-#define CH32_TEMPERATURE      2.0f
+/* ⭐⭐⭐ 2026-10-18 FP32 部署: temperature scaling 设成 1.0 (no scaling)
+ *   训练时 PyTorch 没做 T scaling, 部署也保持 T=1.0, 让 logit 跟 ONNX/PyTorch 1:1 一致.
+ *   INT8 Hybrid 时代的 T=2.0 是 dequant drift 经验值, FP32 没这个 drift.
+ *   关闭: 把 CH32_TEMPERATURE 设成 2.0f 即恢复 INT8 Hybrid 行为. */
+#define CH32_TEMPERATURE      1.0f
 
 #ifdef __cplusplus
 }
