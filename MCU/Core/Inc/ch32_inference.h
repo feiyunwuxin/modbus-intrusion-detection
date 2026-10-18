@@ -142,11 +142,13 @@ ch32_mem_info_t ch32_get_mem_info(void);
 /**
  * 取最佳阈值
  *
- * ⭐ 2026-10-18 路线 E: 用 0.5 (跟 h743/ CH32_TEMPERATURE 配合, 取消 0.6 历史默认值)
- *   H743 路线 E 验证: thr=0.5 F1=88.14% FPR=2.27% (vs thr=0.9 F1=85.59% FPR=6.34%)
- *   PC 5-seed FP32 baseline 同样 0.5 sweet spot.
+ * ⭐ 2026-10-18 路线 E: 初始 0.5 (跟 h743/ CH32_TEMPERATURE 配合).
+ *   4-min 实测发现 28 FP 全在 prob 0.509-0.888 区间, 跟 ~12 个低 prob TP 混在一起.
+ *   4-min 数据 threshold sweep: thr=0.5 F1=0.84 FPR=14.43% / thr=0.7 F1=0.857 FPR=6.70%
+ *   改 0.7 期望 FPR 14%→7%, F1 反而 +0.018. 拐点稳定再调.
+ *   PC 5-seed FP32 baseline 同样 0.5 sweet spot, 但 H743 实时特征分布跟 PC CSV 有 drift.
  */
-#define CH32_BEST_THRESHOLD  0.5f
+#define CH32_BEST_THRESHOLD  0.7f
 
 /* ⭐ 2026-10-13 Round 68 (路线 E): temperature scaling
  *
