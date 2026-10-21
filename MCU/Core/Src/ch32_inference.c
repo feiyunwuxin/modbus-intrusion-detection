@@ -24,9 +24,13 @@
 #include "model_v4_se_23dim_ch32_fp32_s42.h"   /* ⭐⭐⭐ FULL FP32, no INT8 scales */
 #include <string.h>
 #include <math.h>
+#include <stdio.h>   /* printf for [DCACHE-DBG] (gated by MODBUS_IDS_DCACHE_INSTRUMENT) */
 
 /* H743 HAL 提供 DWT cycle counter (main.h -> stm32h7xx_hal.h) */
 #include "main.h"
+
+/* ⭐ 2026-10-19 DCache instrumentation: 站点 3 — ch32_forward memcpy(buf_x, x_in) 后 */
+#include "modbus_ids.h"   /* MODBUS_IDS_DCACHE_INSTRUMENT 宏 + g_stats */
 
 /* --- 1. RAM 缓冲:权重 (FP32) + 激活 ---------------------------------- */
 
@@ -87,6 +91,26 @@ float buf_z[CH32_FEAT_SIZE];   /* (32, 16) scratch */
  *   weight: (out_ch, in_ch, kernel)
  *   dilation: d
  *   bias: (out_ch,)
+ *
+ * ⭐⭐⭐ 2026-10-20 BUG FIX: 对齐语义必须是 **对称 same padding**, 跟训练时的
+ *   PyTorch nn.Conv1d(padding=pad, dilation=d) 完全一致:
+ *
+ *     PyTorch:  out[t] = sum_k w[k] * in[t + k*d - pad]      (pad = (k-1)*d/2)
+ *
+ *   旧代码写的是:
+ *
+ *     int t_in = t + (k - pad) * dilation;   // = t + k*d - pad*d  (因果!)
+ *
+ *   d=1 时两者巧合相同 (t-1, t, t+1), 所以 block 0 看起来是对的;
+ *   d=2 时旧代码取 (t-4, t-2, t), 训练模型取 (t-2, t, t+2);
+ *   d=4 时旧代码取 (t-12, t-4, t), 训练模型取 (t-4, t, t+4).
+ *
+ *   ⇒ 旧代码算的根本不是训练出来的那个网络! 实测 1546 个 alarm window
+ *     复现 MAE=0.0005 (完美复现 H743 实测), 而跟 ONNX/PyTorch 的 logit
+ *     偏差最大 25.9, 造成 Recall 只有 61.4%。
+ *
+ *   ⚠ 旧 bug 被 parity_ch32_vs_onnx.py 漏掉的原因: 那个脚本的 Python 复刻
+ *     用的是 t - pad + k*d (正确对称), 从来没跑过真正的 C kernel。
  */
 static inline void conv1d_same(
     const float* in, const float* w, const float* b, float* out,
@@ -99,7 +123,8 @@ static inline void conv1d_same(
             float sum = b[oc];
             for (int ic = 0; ic < in_ch; ic++) {
                 for (int k = 0; k < kernel; k++) {
-                    int t_in = t + (k - pad) * dilation;
+                    /* ⭐ 对称 same padding, 跟 PyTorch nn.Conv1d(padding=pad, dilation=d) 一致 */
+                    int t_in = t + k * dilation - pad;
                     if (t_in < 0 || t_in >= T) continue;
                     sum += w[oc * in_ch * kernel + ic * kernel + k] * in[ic * T + t_in];
                 }
@@ -315,6 +340,20 @@ float ch32_forward(const float* x, size_t len)
 
     /* Block 0: 输入 23 维 -> 输出 32 维,residual = 1x1 conv(23->32) */
     memcpy(buf_x, x_in, CH32_IN_CHANNELS * CH32_WINDOW * sizeof(float));
+
+#if MODBUS_IDS_DCACHE_INSTRUMENT
+    /* ⭐ 2026-10-19 DCache instrumentation: 站点 3 — input 落地后立即 print.
+     *   若 buf_x ch 12-15 出现 garbage (跟站点 1 / 2 不一致),
+     *   → 真因在 ch32_forward 调用链 (memcpy buf_x / stack → buf_x 段 cache 问题).
+     *   若一致 → input OK, 真因在 ch32_forward 内部算法 (算法 bug). */
+    {
+        printf("[DCACHE-DBG w#%u] SITE 3 ch32_forward after memcpy(buf_x): "
+               "ch12_t0=%.4f ch13_t0=%.4f ch14_t0=%.4f ch15_t0=%.4f\r\n",
+               (unsigned)g_stats.windows_total,
+               buf_x[12*CH32_WINDOW+0], buf_x[13*CH32_WINDOW+0],
+               buf_x[14*CH32_WINDOW+0], buf_x[15*CH32_WINDOW+0]);
+    }
+#endif
 
     /* residual = 1x1 conv(23->32) -> 写到 nxt */
     conv1d_1x1(buf_x, w_b0_rs, b_b0_rs, nxt,
