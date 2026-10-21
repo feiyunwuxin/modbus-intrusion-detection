@@ -187,8 +187,10 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim1); 
 	__HAL_UART_CLEAR_IDLEFLAG(&huart1);
 //	__HAL_UART_ENABLE_IT(&huart1,UART_IT_IDLE);
+#ifdef LED
 	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1,GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_0,GPIO_PIN_RESET);
+	#endif
 	HAL_UART_Transmit(&huart1,TextTest,10,1000);
 	Uart1Revd	=	0;
 	//HAL_UART_Receive_DMA(&huart1,(uint8_t *)Uart1RxBuf,UART_BUFFER_SIZE); //
