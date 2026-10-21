@@ -36,6 +36,7 @@ is_unusual_fc / is_response / 6 窗口统计) → sliding_window → TCN+SE.
 from __future__ import annotations
 
 import csv
+import os
 import struct
 import sys
 import time
@@ -47,17 +48,108 @@ import serial
 import serial.tools.list_ports
 from PyQt5.QtCore import Qt, QObject, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QTextCursor
+# ⭐ 第三十二轮 (2026-10-02): QFont 改为按需 import — 测试 dummy 不必都提供,
+#   仅 RxPanel 真正实例化时才需要 QFont (原: 顶部 import 强制要求所有 dummy 提供).
+try:
+    from PyQt5.QtGui import QFont
+except ImportError:
+    QFont = None  # type: ignore[assignment]
+# ⭐ 第四十轮 (2026-10-02): matplotlib 按需 import — 仅 MetricsChartPanel 实例化时才需要.
+#   缺失时降级为 QLabel 占位 (与 QFont lazy import 模式一致).
+try:
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_qt5agg import (
+        FigureCanvasQTAgg as _MplCanvas,
+    )
+    _MPL_AVAILABLE = True
+except ImportError:
+    Figure = None  # type: ignore[assignment]
+    _MplCanvas = None  # type: ignore[assignment]
+    _MPL_AVAILABLE = False
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QGridLayout,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QProgressBar, QPushButton, QSpinBox, QTextEdit,
+    QMessageBox, QProgressBar, QPushButton, QSpinBox, QScrollArea, QTextEdit,
     QVBoxLayout, QWidget,
 )
+from PyQt5.QtGui import QTextCharFormat, QColor
 import datetime
 
 # --- 攻击标签常量 (与 arff 行的 binary label 对应) ----------------------
 ATTACK_LABELS = ['normal', 'nmri', 'cmri', 'msci', 'mpci', 'mfci', 'dos', 'recon']
-DEFAULT_CSV = r"C:\work\Claude\Issue\IanArffDatasetF32.csv"  # ⭐ 2026-09-19 第二轮: 用 ARFF 衍生的高精度 CSV (time 字段保留小数秒), 否则 H743 算 time_diff 跟训练对不上 → 全误报
+# ⭐⭐⭐ 2026-10-21 修正第三十五轮 (2026-10-02) 的数据集选择:
+#   第三十五轮把默认从 IanArffDatasetF32.csv 改回 IanArffDataset.csv, 理由是
+#   "用户要求原始 ARFF CSV, 时间字段是整数秒, H743 算 time_diff 用整秒差也够".
+#   ⚠ 这个前提是错的, 而且改错了对象:
+#     · IanArffDatasetF32.csv == IanArffDatasetRaw1.csv (md5 相同), 才是**原始 ARFF 的
+#       CSV 形态**: 20 列 / "?" 保留 / time 带 6 位小数 (1418682163.170388).
+#     · IanArffDataset.csv 是**退化版**: 22 列 (多 2 个空列) / "?" 被填 0 /
+#       time 被四舍五入成整数秒.
+#
+#   实测代价 (同一 test 网格 3432 window, 部署 C kernel, thr=0.5):
+#     官方训练 npy (亚秒 time)      : FP= 72  FPR= 4.43%  F1=86.86%
+#     换成整数秒 time                : FP=213  FPR=13.09%  F1=84.88%   ← +141 误报
+#   端到端 (H743 网格 200001..274628):
+#     整数秒 IanArffDataset.csv      : FP=377  FPR=16.76%  F1=83.88%
+#     亚秒   IanArffDatasetF32.csv   : FP=133  FPR= 5.91%  F1=86.71%   ← 追平训练管线
+#
+#   根因: 模型的 col15 (time_diff) / col16 (time_since_last_same_addr_func) 都在
+#   KEEP_23 里, 训练时是亚秒精度 (1.5213 / 0.0997 / 1.6062 ...), 部署时喂整数秒
+#   (1 / 0 / 2 / 0 / ...) → train/serve skew, 模型把大量正常帧判成攻击.
+#   固件端无需改动: raw17_decode 用 be_f64 存 double, feature_extractor 也全程
+#   double 算 time_diff (μs 精度), build_raw17_frame 本来就打包 f64 BE 时间戳.
+DEFAULT_CSV = r"C:\work\Claude\Issue\IanArffDatasetF32.csv"
+
+# ⭐ 第二十九轮 (2026-10-02): Windows PyQt5 默认 QGroupBox::title 用 8pt Tahoma,
+#   中文字符顶端/底端常被裁切 ("📋 日志" 中"日"被切, "📥 接收区" 中"接"被切).
+#   修复: 给所有含中文的 QGroupBox 应用统一 QSS, 增大 title subcontrol padding + 上下空间.
+_GROUPBOX_TITLE_QSS = (
+    "QGroupBox { font-weight: bold; margin-top: 12px; }"
+    "QGroupBox::title {"
+    " subcontrol-origin: margin;"
+    " subcontrol-position: top left;"
+    " padding: 2px 8px;"
+    " left: 8px;"
+    "}"
+)
+
+
+def _style_chinese_groupbox(box: 'QGroupBox') -> None:
+    """Apply _GROUPBOX_TITLE_QSS to a QGroupBox whose title contains Chinese chars.
+    Windows PyQt5 default renders the title with 8pt Tahoma, which clips Chinese glyphs.
+    """
+    box.setStyleSheet(_GROUPBOX_TITLE_QSS)
+
+
+# ⭐ 第四十一轮 (2026-10-02): 滚动条 QSS — Windows 默认滚动条太窄, 加宽到 12px,
+#   hover 时变蓝 (与 GUI 整体配色一致), 滚动时显示深色 thumb.
+_SCROLLBAR_QSS = (
+    "QScrollBar:vertical {"
+    "  background: #f0f0f0; width: 12px; margin: 0px;"
+    "  border: 1px solid #d0d0d0;"
+    "}"
+    "QScrollBar::handle:vertical {"
+    "  background: #b0b0b0; border-radius: 4px; min-height: 30px;"
+    "  margin: 2px;"
+    "}"
+    "QScrollBar::handle:vertical:hover {"
+    "  background: #0066cc;"
+    "}"
+    "QScrollBar::handle:vertical:pressed {"
+    "  background: #003366;"
+    "}"
+    "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
+    "  height: 0; background: none;"
+    "}"
+    "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
+    "  background: none;"
+    "}"
+)
+
+
+def _apply_scrollbar_style(scroll: 'QScrollArea') -> None:
+    """应用统一的滚动条样式到 QScrollArea 及其 viewport."""
+    scroll.setStyleSheet(_SCROLLBAR_QSS)
 
 
 # === Modbus RTU Frame (pure, CRC16, standard) =========================
@@ -341,6 +433,9 @@ class ReplayWorker(QThread):
     #     - 正常数 = normal_sent_count   (binary==0 时 +1)
     #   识别攻击次数由 IdsLineParser 从 H743 上行 [ALARM] N 解析, 不在此处.
     sent_stats = pyqtSignal(int, int, int)       # (total, attack, normal)
+    # ⭐ 第五十一轮 (2026-10-09): per-window 统计信号 (16 帧 1 window max-aggregation)
+    #   跟 H743 部署 1:1: 274k 帧 → 17164 windows, 8821 attack windows (max-aggregation 真值)
+    window_stats = pyqtSignal(int, int, int)     # (total_w, attack_w, normal_w)
     # ⭐ 第二十轮 (2026-09-20): 每发一帧 emit 本帧类型 (binary==1?),
     #   让 RTUReplayGUI 通知 IdsLineParser, 用于下次 [ALARM] 时判 TP/FP.
     frame_sent_type = pyqtSignal(bool)
@@ -349,10 +444,9 @@ class ReplayWorker(QThread):
     frame_sent_log = pyqtSignal(int, bool)
 
     def __init__(self, csv_path: str, port: str, baud: int,
-                 attack_filter: Optional[str], speed: float,
-                 loop: bool, verbose: bool = False,
-                 synth_timing: bool = True,
-                 fixed_10ms: bool = False,
+                 attack_filter: Optional[str],
+                 start_frame: int = 0,
+                 verbose: bool = False,
                  interval_ms: int = 0,
                  serial_obj: Optional['serial.Serial'] = None):
         super().__init__()
@@ -360,14 +454,11 @@ class ReplayWorker(QThread):
         self.port = port
         self.baud = baud
         self.attack_filter = attack_filter  # None=all, 'normal', 'mfci', ...
-        self.speed = max(0.01, float(speed)) if speed > 0 else 1.0
-        self.loop = loop
+        # ⭐ 2026-10-01 第二十三轮: 删除 speed/loop/synth_timing/fixed_10ms 参数.
+        #   新增 start_frame: 从过滤后 play_rows[N] 开始发送 (默认 0 = 从头).
+        self.start_frame = max(0, int(start_frame))
         self.verbose = verbose
-        self.synth_timing = synth_timing
-        # ⭐ 第二十一轮 (2026-09-20): 固定 10ms 间隔模式 (诊断 DMA 解析瓶颈用)
-        self.fixed_10ms = fixed_10ms
-        # ⭐ 第二十二轮 (2026-09-28): 1-1000ms 任意 interval (dump 测试用, 避免 4.3KB/alarm dump
-        #   阻塞时撞上下一个 alarm cycle). interval_ms > 0 覆盖 fixed_10ms.
+        # interval_ms > 0 强制固定间隔 (1-1000ms), =0 走 CSV time 自然间隔
         self.interval_ms = max(0, int(interval_ms))
         # ⭐ 第二十一轮 (2026-09-20): 共享外部已开 serial (避免双开 COM 口失败)
         #   None = 自己开 (老路径),  非 None = 用传入的 (新路径, GUI 已开)
@@ -379,6 +470,19 @@ class ReplayWorker(QThread):
         self.attack_sent_count = 0   # ⭐ 累计已发送攻击帧 (cat != 0)
         self.total_sent_count = 0    # ⭐ 第十九轮: 累计总发送帧数 (attack + normal)
         self.normal_sent_count = 0   # ⭐ 第十九轮: 累计正常帧数 (binary == 0)
+        # ⭐ 第五十一轮 (2026-10-09): 模拟器按 16 帧 1 window 统计, 跟 H743 部署 1:1 对齐.
+        #   训练: 16 帧 max-aggregation 决定 1 window label
+        #   部署: H743 16 帧 1 window 1 alarm
+        #   发送: 模拟器 16 帧 max-aggregation 决定 1 window attack (跟训练/部署 1:1)
+        #   Attack KPI 从 60048 frames (per-frame) 变成 8821 windows (per-window, max-aggregation 真值)
+        #   ⭐ 2026-10-09 修正: 60048 attack 帧散在 274628 帧里 (21.86%), max-aggregation 16 帧后
+        #     实际算出 8821 attack windows (51.4% of 17164). 不是之前估算的 3753 (=60048/16 整除,
+        #     假设 attack 帧聚在一起, 实际不是).
+        self.windows_sent_count = 0         # 累计已发送 window 数 (frames_total // 16)
+        self.windows_attack_sent_count = 0  # 累计已发送 attack window 数 (16 帧任一 attack)
+        self.windows_normal_sent_count = 0  # 累计已发送 normal window 数 (16 帧全 normal)
+        self._frames_in_current_window = 0  # 当前 window 已收帧数 (0..15)
+        self._current_window_had_attack = False  # 当前 window 是否有任一 attack 帧
         self.ser: Optional[serial.Serial] = None
 
     def stop(self):
@@ -437,97 +541,131 @@ class ReplayWorker(QThread):
             self.log.emit(f"过滤后保留 {len(play_rows)}/{len(rows)} 行 "
                           f"(filter={attack_filter or 'all'})")
 
-            while not self._stopping:
-                # 关键: 用过滤后第一行的时间当 baseline (CSV time 是 Unix 时间戳)
-                baseline_t = 0.0
-                if play_rows:
-                    try:
-                        baseline_t = float(play_rows[0].get('time', 0) or 0)
-                    except (ValueError, TypeError):
-                        baseline_t = 0.0
-                last_t = baseline_t
+            # ⭐ 2026-10-01 第二十三轮: 删除循环 (while not self._stopping 外层)
+            #   和 loop 收尾分支, 单次跑完即结束.
+            # ⭐ 起始帧: 从 play_rows[start_frame] 开始, 默认 0 = 从头.
+            actual_start = min(self.start_frame, max(0, len(play_rows) - 1))
+            if actual_start != self.start_frame:
+                self.log.emit(f"⚠ 起始帧 {self.start_frame} 超出范围, 修正为 {actual_start}")
+            self.log.emit(f"▶ 起始帧: {actual_start} (共 {len(play_rows)} 行)")
 
-                for i, row in enumerate(play_rows):
-                    if self._stopping:
-                        break
-                    while self._paused and not self._stopping:
-                        time.sleep(0.05)
+            # 关键: 用过滤后起始行的时间当 baseline (CSV time 是 Unix 时间戳)
+            baseline_t = 0.0
+            if play_rows:
+                try:
+                    baseline_t = float(play_rows[actual_start].get('time', 0) or 0)
+                except (ValueError, TypeError):
+                    baseline_t = 0.0
+            last_t = baseline_t
 
-                    # 时间间隔 (相对 baseline → 第一帧 dt=0, 不等)
-                    # ⭐⭐ 第十八轮 (2026-09-19): 取消 synth_timing 合成时序选项.
-                    #   自动回放不需模拟训练分布的 1.5s/0.1s master/slave 交替模式,
-                    #   直接用 CSV `time` 列作为自然间隔, 配合 speed_combo 倍率加速.
-                    # ⭐ 第二十一轮 (2026-09-20): fixed_10ms 模式忽略 CSV time,
-                    #   每帧之间 time.sleep(0.010) 给 H743 DMA 256-byte 缓冲留解析时间.
-                    # ⭐ 第二十二轮 (2026-09-28): interval_ms > 0 时强制固定间隔
-                    #   (1-1000ms spinbox), 覆盖 fixed_10ms. 给 dump 测试用, 避免
-                    #   4.3KB/alarm dump 输出阻塞时撞上下一个 alarm cycle.
-                    if self.interval_ms > 0:
-                        if self.frames_sent > 0:  # 第一帧不睡
-                            time.sleep(self.interval_ms / 1000.0)
-                    elif self.fixed_10ms:
-                        if self.frames_sent > 0:  # 第一帧不睡
-                            time.sleep(0.010)
-                    else:
-                        try:
-                            t = float(row.get('time', 0) or 0)
-                            dt_ms = max(0.0, (t - last_t) * 1000.0 / self.speed)
-                            last_t = t
-                            if dt_ms > 1:
-                                time.sleep(dt_ms / 1000.0)
-                        except (ValueError, TypeError):
-                            pass
-
-                    # 构纯 Modbus RTU 帧 + 发 (PC 双向模拟, H743 被动监听)
-                    try:
-                        frame = build_modbus_rtu_frame(row)
-                        if frame is None:
-                            continue  # 过滤掉的行
-                        self.ser.write(frame)
-                        self.frames_sent += 1
-                        self.bytes_sent += len(frame)
-                        # ⭐⭐ 第十八轮: 攻击判定改用 binary result 列 (Binary=1 = 攻击).
-                        #   CSV header: binary result (0=normal, 1=attack), categorized result (0-7).
-                        #   Binary 是论文标准的二分类标签, 与 H743 二分类 IDS 输出一致.
-                        try:
-                            binary_int = int((row.get('binary result') or '0').strip())
-                        except (ValueError, TypeError):
-                            binary_int = 0
-                        # ⭐⭐ 第十九轮: 累加 3 个 IDS KPI 计数器.
-                        #   攻击次数 increment 规则: binary==1 时 +1 (与论文 Binary 标签一致).
-                        self.total_sent_count += 1
-                        if binary_int == 1:
-                            self.attack_sent_count += 1
-                            self.attack_sent.emit(self.attack_sent_count)
-                        else:
-                            self.normal_sent_count += 1
-                        self.sent_stats.emit(
-                            self.total_sent_count,
-                            self.attack_sent_count,
-                            self.normal_sent_count,
-                        )
-                        # ⭐ 第二十轮: emit 本帧类型, GUI 通知 parser 准备 TP/FP 判定
-                        self.frame_sent_type.emit(binary_int == 1)
-                        # ⭐ 第二十一轮: emit (n_bytes, is_attack) 给 TestLogger 写 SEND 事件
-                        self.frame_sent_log.emit(len(frame), binary_int == 1)
-                        if self.verbose and self.frames_sent % 100 == 1:
-                            self.log.emit(
-                                f"[TX {self.frames_sent}] {len(frame)}B: "
-                                f"{frame.hex(' ')}"
-                            )
-                    except serial.SerialTimeoutException:
-                        self.error.emit(f"写入超时 (row {i})")
-                    except Exception as e:
-                        self.error.emit(f"写入失败: {e}")
-
-                    if i % 50 == 0:
-                        self.progress.emit(i + 1, total, self.frames_sent,
-                                            self.bytes_sent)
-
-                if not self.loop or self._stopping:
+            for i in range(actual_start, len(play_rows)):
+                row = play_rows[i]
+                if self._stopping:
                     break
-                last_t = 0.0
-                self.log.emit("--- 循环播放 ---")
+                while self._paused and not self._stopping:
+                    time.sleep(0.05)
+
+                # 时间间隔: ⭐⭐ 第二十三轮 (2026-10-01): 删除 CSV time × speed 倍率分支,
+                #   只保留 2 种模式:
+                #     • interval_ms > 0  → 强制固定 N ms 间隔 (覆盖 CSV time)
+                #     • interval_ms == 0 → 走 CSV time 自然间隔 (1s 精度整数, ≈ 1帧/秒)
+                if self.interval_ms > 0:
+                    if self.frames_sent > 0:  # 第一帧不睡
+                        time.sleep(self.interval_ms / 1000.0)
+                else:
+                    try:
+                        t = float(row.get('time', 0) or 0)
+                        dt_ms = max(0.0, (t - last_t) * 1000.0)
+                        last_t = t
+                        if dt_ms > 1:
+                            time.sleep(dt_ms / 1000.0)
+                    except (ValueError, TypeError):
+                        pass
+
+                # 构纯 Modbus RTU 帧 + 发 (PC 双向模拟, H743 被动监听)
+                try:
+                    frame = build_modbus_rtu_frame(row)
+                    if frame is None:
+                        continue  # 过滤掉的行
+                    self.ser.write(frame)
+                    self.frames_sent += 1
+                    self.bytes_sent += len(frame)
+                    # ⭐⭐ 第十八轮: 攻击判定改用 binary result 列 (Binary=1 = 攻击).
+                    #   CSV header: binary result (0=normal, 1=attack), categorized result (0-7).
+                    #   Binary 是论文标准的二分类标签, 与 H743 二分类 IDS 输出一致.
+                    try:
+                        binary_int = int((row.get('binary result') or '0').strip())
+                    except (ValueError, TypeError):
+                        binary_int = 0
+                    # ⭐⭐ 第十九轮: 累加 3 个 IDS KPI 计数器.
+                    #   攻击次数 increment 规则: binary==1 时 +1 (与论文 Binary 标签一致).
+                    self.total_sent_count += 1
+                    if binary_int == 1:
+                        self.attack_sent_count += 1
+                        self.attack_sent.emit(self.attack_sent_count)
+                    else:
+                        self.normal_sent_count += 1
+                    self.sent_stats.emit(
+                        self.total_sent_count,
+                        self.attack_sent_count,
+                        self.normal_sent_count,
+                    )
+                    # ⭐ 第五十一轮 (2026-10-09): per-window 累加 (16 帧 max-aggregation).
+                    #   当前帧喂给当前 window, 凑齐 16 帧时评估 1 个 window:
+                    #     - 任一帧 attack → windows_attack_sent_count += 1
+                    #     - 全 normal      → windows_normal_sent_count += 1
+                    #   跟 H743 部署 (Round 50 16 帧 1 window 1 alarm) 1:1 对齐.
+                    #   Attack KPI 从 60048 frames → 8821 windows (max-aggregation 真值, 51.4% of 17164).
+                    #   ⭐ 2026-10-09 修正: 不是简单 60048/16=3753, 实际数据散在 21.86%, 16 帧 max
+                    #     后大多数 window 都有 attack 帧, 实际 8821.
+                    if binary_int == 1:
+                        self._current_window_had_attack = True
+                    self._frames_in_current_window += 1
+                    if self._frames_in_current_window >= 16:
+                        self._frames_in_current_window = 0
+                        self.windows_sent_count += 1
+                        if self._current_window_had_attack:
+                            self.windows_attack_sent_count += 1
+                            win_tag = 'attack'
+                        else:
+                            self.windows_normal_sent_count += 1
+                            win_tag = 'normal'
+                        self._current_window_had_attack = False
+                        # ⭐ 第五十一轮: 凑齐 1 window 时 emit window_stats
+                        self.window_stats.emit(
+                            self.windows_sent_count,
+                            self.windows_attack_sent_count,
+                            self.windows_normal_sent_count,
+                        )
+                        # ⭐⭐ 第五十二轮 b (2026-10-10): 默认 per-window 进度日志, 解决
+                        #   "auto 模式看不到发送日志" 问题. 原 verbose 模式 (每 100 帧 1 条
+                        #   [TX N] hex) 默认不开启, auto 跑 274k 帧时 log_text 完全没实时进度.
+                        #   现在每凑齐 1 window (16 帧) emit 1 条, 跟 per-window 1:1,
+                        #   既不刷屏 (274k 帧 → 17164 条), 又能让用户实时看到 attack/normal
+                        #   分布. verbose 模式 (每 100 帧 [TX N] hex) 仍保留, 供调试用.
+                        self.log.emit(
+                            f"[TX 帧{self.frames_sent:>6}] "
+                            f"window {self.windows_sent_count:>5} ({win_tag})  "
+                            f"累计 {self.windows_attack_sent_count} attack + "
+                            f"{self.windows_normal_sent_count} normal"
+                        )
+                    # ⭐ 第二十轮: emit 本帧类型, GUI 通知 parser 准备 TP/FP 判定
+                    self.frame_sent_type.emit(binary_int == 1)
+                    # ⭐ 第二十一轮: emit (n_bytes, is_attack) 给 TestLogger 写 SEND 事件
+                    self.frame_sent_log.emit(len(frame), binary_int == 1)
+                    if self.verbose and self.frames_sent % 100 == 1:
+                        self.log.emit(
+                            f"[TX {self.frames_sent}] {len(frame)}B: "
+                            f"{frame.hex(' ')}"
+                        )
+                except serial.SerialTimeoutException:
+                    self.error.emit(f"写入超时 (row {i})")
+                except Exception as e:
+                    self.error.emit(f"写入失败: {e}")
+
+                if (i - actual_start) % 50 == 0:
+                    self.progress.emit(i + 1, total, self.frames_sent,
+                                        self.bytes_sent)
 
             self.progress.emit(total, total, self.frames_sent, self.bytes_sent)
             self.finished_ok.emit()
@@ -567,7 +705,11 @@ def _format_ascii_only(data: bytes) -> str:
 
 
 class RxPanel(QWidget):
-    """Hex+ASCII 接收查看器 (清空按钮 + 格式下拉 + 字节计数)."""
+    """Hex+ASCII 接收查看器 (清空按钮 + 格式下拉 + 字节计数).
+
+    ⭐ 2026-10-01 第二十三轮+round24: 加回 HEX 显示 (用户撤回 ASCII-only 决定).
+    ⭐ 第三十一轮 (2026-10-02): 默认改为 ASCII (用户偏好), 可切 hex+ASCII / hex 单独查看.
+    """
 
     cleared = pyqtSignal()
 
@@ -582,7 +724,8 @@ class RxPanel(QWidget):
         self.clear_btn = QPushButton("\U0001f5d1 清空")
         self.clear_btn.clicked.connect(self._on_clear)
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["hex+ASCII", "hex", "ASCII"])
+        # ⭐ 第三十一轮: 默认 ASCII (index 0), 可切 hex / hex+ASCII
+        self.format_combo.addItems(["ASCII", "hex", "hex+ASCII"])
         self.byte_count_label = QLabel("0 bytes")
         toolbar.addWidget(self.clear_btn)
         toolbar.addWidget(QLabel("格式:"))
@@ -595,7 +738,19 @@ class RxPanel(QWidget):
         self.text_edit.setReadOnly(True)
         font = self.text_edit.font()
         font.setFamily("Consolas, Courier New, monospace")
+        font.setPointSize(10)  # ⭐ 第三十二轮: 显式设 10pt, 避免默认 8pt 字符裁切
+        if QFont is not None:
+            font.setStyleHint(QFont.Monospace)  # ⭐ 确保无 Consolas 时降级等宽
         self.text_edit.setFont(font)
+        # ⭐ 第三十二轮 (2026-10-02): 文字显示不全 — 加 padding + 行高, 防字符底端裁切.
+        #   根因: QTextEdit 默认 stylesheet 无 padding, 默认 line-height 太紧,
+        #   Consolas 字符 (g/p/q 下伸部) 底端被裁切, 长行 wrap 后第二行顶部也裁.
+        self.text_edit.setStyleSheet(
+            "QTextEdit { padding: 4px 6px; line-height: 1.4em; }"
+            "QTextEdit:focus { border-color: #66afe9; }"
+        )
+        self.text_edit.setLineWrapMode(QTextEdit.WidgetWidth)  # 默认值, 但显式声明
+        # 不强制 NoWrap, hex+ASCII 长行按 widget 宽度 wrap
         outer.addWidget(self.text_edit, stretch=1)
 
     def _on_clear(self):
@@ -608,6 +763,7 @@ class RxPanel(QWidget):
         if not data:
             return
         ts = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        # ⭐ 第二十三轮+round24: 按 format_combo 选择显示格式
         fmt = self.format_combo.currentText()
         if fmt == "hex":
             body = _format_hex_only(data)
@@ -615,7 +771,9 @@ class RxPanel(QWidget):
             body = _format_ascii_only(data)
         else:
             body = _format_hex_ascii(data)
-        self.text_edit.append(f"[{ts}] RX ({len(data)} B):\n{body}")
+        # ⭐ 第三十一轮 (2026-10-02): 时间和内容放同一行 (用空格分隔, 不换行)
+        #   旧格式 "[时间 + 字节数]\n[内容]" → 新格式 "[时间 + 字节数]  [内容]"
+        self.text_edit.append(f"[{ts}] RX ({len(data)} B): {body}")
         self._byte_count += len(data)
         self.byte_count_label.setText(f"{self._byte_count} bytes")
 
@@ -653,7 +811,20 @@ class IdsLineParser(QObject):
     count_changed = pyqtSignal(int)            # [ALARM] N 当前累计 count
     fp_changed    = pyqtSignal(int, bool)      # (count, is_fp) — True=误报 (FP)
     # ⭐ 第二十一轮: 增加 prob 字段信号 (含 H743 上行的 prob=0.NNN 1000 倍值)
-    alarm_with_prob = pyqtSignal(int, int, bool)  # (count, prob_x1000, is_fp) — legacy 单消息
+    alarm_with_prob = pyqtSignal(int, int, bool, int)  # (count, prob_x1000, is_fp, h743_frame) — ⭐ 第六十一轮 + frame
+    # ⭐ 第六十五轮 (2026-10-13): frame→binary 标注信号. GUI 监听此信号, 在 RX 区域
+    #   追加 "[ALARM] frame=K → 实际是 attack/normal" 备注, 让用户实时看到 H743
+    #   判到的帧是 attack 还是 normal, 不必事后查 CSV 对照. (count, prob_x1000,
+    #   label, h743_frame). label ∈ {"attack", "normal", "?"}.
+    alarm_annotated = pyqtSignal(int, int, str, int)  # (count, prob_x1000, label, h743_frame)
+    # ⭐ 2026-10-13 Round 69: per-window 路由修复.
+    #   IdsLineParser 自身有 _window_eval (line 840) 但只接收 on_alarm_with_frame, 不接收
+    #   per-frame attack ground truth (那条信号连到 ids_report._window_eval).
+    #   ids_report._window_eval 跟训练 1:1, 是 summary 真正读的对象, 但它收不到 alarm.
+    #   结果: summary TP/FP 永远是 0. 解法: IdsLineParser 解析到 h743_frame 时 emit 此信号,
+    #   main_window 把信号喂到 ids_report._window_eval.on_alarm_with_frame, 让 IdsReportPanel
+    #   的 WindowEvaluator 同时看到 attack 状态 + alarm 状态, 正确算 TP/FP.
+    alarm_frame_index = pyqtSignal(int)  # h743_frame, 每个内部 alarm 发一次 (1 个 [ALARM] 可能 emit delta 次)
 
     # ⭐ 第二十三轮 (2026-09-30): delta-driven TP/FP 信号
     #   H743 固件 modbus_ids.c:271 节流 (MIN_GAP_FRAMES=4): 每次判 attack frames_attack++,
@@ -665,25 +836,59 @@ class IdsLineParser(QObject):
 
     # ⭐ 第二十二轮: 滑动窗口大小 (H743 TCN+SE 训练时 window=16)
     _SW_SIZE = 16
+    # ⭐ 第五十轮 (2026-10-09): 移除 _CLASSIFY_WINDOW, 改用 WindowEvaluator per-window 评估.
+    #   H743 部署改成 non-overlapping (16 帧 1 次推理, 1 window 1 alarm),
+    #   跟 PC 训练 preprocess_v2_scada.py reshape(n//16, 16, -1) 1:1 对齐.
+    #   评估单元 = 1 个 16 帧 window, 不再是 1 帧或 1 alarm vs 1 帧.
+    #   历史 (per-alarm 评估窗口演变, 已废弃):
+    #     Round 27 (window=5): 工业 IDS 常见做法, F1=0.90, Recall 94%
+    #     Round 46 (window=2): 用户"晚 1 周期也记 TP" → 当年为收紧窗口
+    #     Round 47 (window=16): "部署跟训练一致" max-aggregation 1:1
+    #     Round 48 (window=1): "窗口缩小到 1" 严格 per-frame
+    #     Round 49 (window=2): "窗口改为 2" 容忍 lag 0-1
+    #     Round 50 (本轮, per-window 替换 per-alarm): "在 H743 上按 PC 方式部署"
 
     _ALARM_RE = _re.compile(rb'\[ALARM\]\s+(\d+)')
     _PROB_RE  = _re.compile(rb'prob=0\.(\d{1,3})')
+    # ⭐ 第六十一轮 (2026-10-11): H743 firmware 现在发 frame=N, PC 端用其精确归属
+    #   alarm 到 window (消除 37ms pipeline lag 把 alarm 推到下个 window 的错位).
+    #   PC 端 _PROB_RE 已存在但 H743 之前不发 prob, 现 Round 61 一起补发.
+    _FRAME_RE = _re.compile(rb'frame=(\d+)')
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._buf = bytearray()
-        # ⭐ 第二十二轮 (2026-09-30): 滑动窗口 (deque maxlen=16) 跟踪最近 16 帧 binary.
-        #   H743 IDS 推理基于 sliding window=16 累积特征, ALARM 反映整窗口.
-        #   当 [ALARM] 上行时, 应检查最近 16 帧内是否有 attack (binary=1):
-        #     - 任一帧 attack → TP (本次报警命中)
-        #     - 全 normal      → FP (误报)
-        #   旧逻辑只看最后一帧, attack burst 内除首帧外都误标 FP.
-        self._window: "deque[bool]" = deque(maxlen=self._SW_SIZE)
-        # ⭐ 第二十三轮: 跟踪 H743 内部 frames_attack (alarm_count) 用于算 delta
+        # ⭐ 第五十轮 (2026-10-09): 改用 WindowEvaluator per-window 评估.
+        #   H743 部署改成 16 帧 1 window 1 次推理, 1 window 1 alarm (跟 PC 训练 1:1).
+        #   评估粒度 = 1 个 16 帧 window, 而不是 1 帧 vs 1 alarm.
+        #   WindowEvaluator 内部维护:
+        #     - _frame_count: 累计 PC 发送帧数
+        #     - _current_window_attack: 当前 16 帧窗是否有 attack (ground truth)
+        #     - _recent_alarm_frames: 最近 16 帧内 H743 上行的 alarm 位置
+        #   凑齐 16 帧时 WindowEvaluator 内部评估 (TP/FP/TN/FN), 自动重置窗.
+        self._window_eval = WindowEvaluator()
+        # 移除 _tp_budget: per-window 评估不需要 budget cap
+        #   (H743 1 window 1 alarm, 不存在 over-fire, 因为 non-overlapping 1:1 对齐训练)
+        # 保留 _last_alarm_count: 仍用于 [ALARM] 消息的 delta 计算
         self._last_alarm_count: Optional[int] = None
+        # ⭐ 第五十轮: 初始化 _last_emit_tp/fp, 避免 dummy QObject 走 getattr 报 _DummyMethod
+        self._last_emit_tp: int = 0
+        self._last_emit_fp: int = 0
+        # ⭐ 第六十三轮 (2026-10-12): lag 补偿. 记录每 PC 发送帧的 unix-ms 时间戳,
+        #   [ALARM] 上行时算 arrival_t - send_t = lag_ms, 传给 on_alarm_with_frame
+        #   反向 shift window 归属. 只保留最近 _FRAME_TS_CAP 个 frame 的 timestamp
+        #   (FIFO 内存上限), 避免长时间跑测试后字典无限增长.
+        self._pc_frame_count: int = 0
+        self._frame_send_ts: "dict[int, int]" = {}
+        self._FRAME_TS_CAP = 256
+        # ⭐ 第六十五轮 (2026-10-13): frame → binary 映射. 记录每 PC 发送帧的 ground
+        #   truth (0=normal, 1=attack), [ALARM] 上行时查 h743_frame 对应帧的 binary,
+        #   走 alarm_annotated 信号在 RX 区域追加 "attack"/"normal" 备注. 用户能直接
+        #   看到 H743 实际判到的是哪一帧, 不必事后查 CSV 对照.
+        self._pc_frame_binary: "dict[int, int]" = {}
 
     def set_last_was_attack(self, val: Optional[bool]) -> None:
-        """PC GUI 每次发完一帧后调用,推送该帧 binary 到滑动窗口.
+        """PC GUI 每次发完一帧后调用, 推送该帧 binary 给 WindowEvaluator.
 
         Args:
             val: True=attack (binary==1), False=normal (binary==0),
@@ -692,15 +897,47 @@ class IdsLineParser(QObject):
         if val is None:
             self.reset_last_was_attack()
             return
-        # 兼容旧 API: val=True/False 都推入窗口
+        # 兼容旧 API: val=True/False 都喂给 WindowEvaluator
         # 旧名 set_last_was_attack 仍保留以兼容 frame_sent_type.connect(...)
-        self._window.append(bool(val))
+        self._window_eval.on_frame(bool(val))
 
     def reset_last_was_attack(self) -> None:
-        """重置 PC 滑动窗口 (测试开始前/手动清零时调用)."""
-        self._window.clear()
+        """重置 PC 评估状态 (测试开始前/手动清零时调用)."""
+        self._window_eval.reset()
         # ⭐ 第二十三轮: 同时重置 alarm_count 跟踪
         self._last_alarm_count = None
+        # ⭐ 第六十三轮 (2026-10-12): lag 补偿 timestamp 状态也一并重置
+        self._pc_frame_count = 0
+        self._frame_send_ts.clear()
+        # ⭐ 第六十五轮 (2026-10-13): frame→binary 映射同步重置, 避免 stale label
+        self._pc_frame_binary.clear()
+
+    def _on_pc_frame_sent(self, is_attack: bool) -> None:
+        """⭐ 第六十三轮 (2026-10-12): 镜像 worker.frame_sent_type, 记每 PC 发送帧的时间戳.
+
+        用于 [ALARM] 上行时计算 lag_ms = arrival_t - send_t, 传给 on_alarm_with_frame
+        反向 shift window 归属. 跟 set_last_was_attack 共用 frame_sent_type 信号 (RTUReplayGUI
+        多订阅 fan-out), 不需要扩展现有信号签名.
+
+        ⭐ 第六十五轮 (2026-10-13): 同时记 frame_idx → binary 映射, 供 alarm_annotated
+        信号查 h743_frame 的 ground truth 标签 (attack / normal). 同样 FIFO 截断
+        _pc_frame_binary, 跟 _frame_send_ts 共享 _FRAME_TS_CAP 上限.
+
+        Args:
+            is_attack: True=attack frame (binary=1), False=normal (binary=0). 参数本身不
+                       用于 lag 补偿逻辑, 仅作为存在性哨兵 (signal-driven 调用).
+        """
+        self._pc_frame_count += 1
+        self._frame_send_ts[self._pc_frame_count] = int(time.time() * 1000)
+        # ⭐ 第六十五轮: 同步记 binary 标签
+        self._pc_frame_binary[self._pc_frame_count] = 1 if is_attack else 0
+        # FIFO 截断, 避免长时间跑测试后字典无限增长 (only need recent frames for lag lookup)
+        if len(self._frame_send_ts) > self._FRAME_TS_CAP:
+            excess = len(self._frame_send_ts) - self._FRAME_TS_CAP
+            oldest = sorted(self._frame_send_ts.keys())[:excess]
+            for k in oldest:
+                del self._frame_send_ts[k]
+                self._pc_frame_binary.pop(k, None)  # ⭐ 第六十五轮: 同步清掉 binary
 
     def feed(self, data: bytes) -> None:
         if not data:
@@ -732,7 +969,52 @@ class IdsLineParser(QObject):
         #   → 截取 3 位整数作为 prob_x1000, 范围 [0, 1000]. 未匹配则 -1.
         prob_match = self._PROB_RE.search(line)
         prob_x1000 = int(prob_match.group(1)) if prob_match else -1
-        # count_changed 始终 emit (兼容旧 IdsReportPanel._on_detected 显示 Detected KPI)
+        # ⭐ 第六十一轮 (2026-10-11): 解析 frame=K (H743 firmware 现在的 printf 包含
+        #   frames_total). 这是 H743 端的权威 frame 编号, 直接用来 attribute window,
+        #   消除 PC 端 _frame_count-1 近似路径引入的 0.9-frame lag 错位.
+        frame_match = self._FRAME_RE.search(line)
+        if frame_match:
+            try:
+                h743_frame: int = int(frame_match.group(1))
+            except ValueError:
+                h743_frame = 0
+        else:
+            h743_frame = 0  # legacy 旧 firmware, 不发 frame
+        # ⭐ 第六十五轮 (2026-10-13): 查 h743_frame 对应 ground truth 标签.
+        #   H743 训练时用 window-level max-aggregation: 16 帧里任一 attack → 整窗 attack.
+        #   部署时 H743 报 alarm 表示 "当前 16 帧 window 是 attack". 所以标注应该按
+        #   window-level 判断, 不是单帧.
+        #
+        #   ⚠ 帧号说明: 实测 logs/test_20261013-001719 显示 h743_frame 与 PC
+        #   running_total 几乎 1:1, H743 略 lag 1-2 帧 (alarm h743=48 时 PC=49,
+        #   alarm h743=64 时 PC=66, alarm h743=80 时 PC=81). 用 h743_frame 直接
+        #   当 PC frame index, 窗口扫描 1-2 帧 lag 在 window=16 范围内可忽略.
+        if h743_frame > 0:
+            # 直接 1:1 映射, 容忍 H743 1-2 帧 lag
+            # ⭐⭐ 2026-10-21: 跟 WindowEvaluator.on_alarm_with_frame 同步修正 +1 抖动.
+            #   H743 的窗口末帧恒为 16 的倍数, frame%16 != 0 说明是迟报 1 帧, 窗口号退 1.
+            W = (h743_frame - 1) // 16
+            if h743_frame % 16 != 0:
+                W -= 1
+            # 扫 window W 的 16 帧, 看有没有 attack
+            window_has_attack = False
+            window_has_normal = False
+            for offset in range(16):
+                pc_idx = W * 16 + offset + 1
+                bin_ = self._pc_frame_binary.get(pc_idx, -1)
+                if bin_ == 1:
+                    window_has_attack = True
+                elif bin_ == 0:
+                    window_has_normal = True
+            if window_has_attack:
+                label = "attack"  # 整个 window 是 attack (max-aggregation 1:1)
+            elif window_has_normal:
+                label = "normal"  # window 全 normal
+            else:
+                label = "?"
+            self.alarm_annotated.emit(count, prob_x1000, label, h743_frame)
+        # count_changed 始终 emit (IdsReportPanel._on_detected 用此信号更新 Detected KPI
+        #   = H743 frames_attack delta).
         self.count_changed.emit(count)
         # ⭐ 第二十三轮 (2026-09-30): delta-driven TP/FP 计数
         #   H743 固件 modbus_ids.c:271 节流 (MIN_GAP_FRAMES=4): 每次判 attack frames_attack++,
@@ -748,20 +1030,314 @@ class IdsLineParser(QObject):
                 delta = 1  # 异常 (H743 重启/计数回退), 保守按 1 处理
         self._last_alarm_count = count
         # ⭐ 第二十二轮 (2026-09-30): 滑动窗口评估 TP/FP (H743 推理基于 SW=16)
-        #   - 窗口内任一帧 attack (binary=1) → TP (本次报警命中真实攻击)
-        #   - 窗口内全 normal (binary=0)       → FP (本次报警是误报)
-        #   - 窗口未填满 (< 16 帧)            → 不判定 (避免 ramp-up 期误分类)
-        # 第二十三轮: 用 delta 替代 1, 让 H743 内部每个 alarm 都正确标签
-        if len(self._window) >= self._SW_SIZE:
-            is_fp = not any(self._window)   # True=FP (全 normal), False=TP (有 attack)
-            # 新信号: delta-driven (推荐使用, 反映 H743 内部真实 alarm_count 增量)
-            if is_fp:
-                self.fp_delta.emit(delta, count, prob_x1000)
+        # ⭐ 第二十四轮 (2026-10-01): 改为逐帧回放 — 用每个内部 alarm 对应的预测帧
+        #   binary 分类, 而不是窗内是否有 attack. 修复 Round 22 错标 bug:
+        #   H743 attack 流尾部接下来 15 个 normal 帧仍报警 (窗内还有 attack),
+        #   这些 delayed alarms 被错标 TP, 实际预测帧是 normal, 应算 FP.
+        #   Round 23 delta-driven 放大 bug: burst 内所有内部 alarm 共用一个 is_fp,
+        #   错标的 TP 乘以 delta 倍数累加. Option A 真正逐帧分类, 完美修复.
+        #
+        #   索引规则: H743 frames_attack 序号 [last+1, count] 对应 PC 最近 delta 个发送帧
+        #   _binary_history[-delta..-1] 是最近 delta 帧的 binary 序列.
+        #   第 i 个内部 alarm (i=0..delta-1) 对应 _binary_history[-(delta-i)].
+        #   如果 binary_history 不够 (H743 远超 PC 发送速度, 极端情况), 保守按
+        #   "current frame" (window 最后一个) 分类.
+        if self._window_eval._frame_count > 0:
+            # ⭐ 第五十轮 (2026-10-09): 改用 WindowEvaluator per-window 路径.
+            #   每个 H743 内部 alarm (delta 个) 调 on_alarm, 凑齐 16 帧时
+            #   WindowEvaluator 自动评估 TP/FP/TN/FN (跟训练 max-aggregation 1:1).
+            #   emit tp_delta/fp_delta 仍保留以兼容 IdsReportPanel 旧 UI 路径.
+            #
+            # ⭐ 第六十一轮 (2026-10-11): H743 firmware 现在发 frame=K, 用 K 作 H743 权威
+            #   frame 编号, 走 _direct_alarms 精确路径, 替代 _recent_alarm_frames 近似.
+            #   delta 个内部 alarm 均匀映射到 [K-delta+1, K], 避免 legacy 路径的
+            #   0.9-frame lag 错位导致的 FP inflation (实测 2001 → 期望 ~600).
+            if h743_frame > 0:
+                # 新 firmware 路径: 用 H743 frame 编号精确 tag window (Round 61).
+                # ⭐ 第六十三轮 (2026-10-12): 取消 lag 补偿. 95.3% alarms lag>=40ms 时目标
+                #   window 已 evaluate, _direct_alarms.add(W) 永远 stale. lag_ms tracking
+                #   (_frame_send_ts / _on_pc_frame_sent) 保留仅供未来诊断.
+                # ⭐ 2026-10-13 Round 69: 同时 emit alarm_frame_index 信号, 让 main_window
+                #   转发到 ids_report._window_eval.on_alarm_with_frame, 修复 per-window
+                #   summary TP/FP=0 bug (IdsReportPanel 的 WindowEvaluator 之前收不到 alarm).
+                for i in range(delta):
+                    # 第 i 个 (0-indexed) 内部 alarm → frame (K - (delta-1) + i)
+                    fr = h743_frame - (delta - 1) + i
+                    if fr < 1:
+                        fr = 1  # 防御: 不允许 frame<=0
+                    self._window_eval.on_alarm_with_frame(fr)
+                    self.alarm_frame_index.emit(fr)
             else:
-                self.tp_delta.emit(delta, count, prob_x1000)
-            # Legacy 信号 (单消息级, deprecated, 保留以兼容旧连接)
-            self.fp_changed.emit(count, is_fp)
-            self.alarm_with_prob.emit(count, prob_x1000, is_fp)
+                # Legacy 旧 firmware 路径: 仍用 _frame_count-1 近似 (不优化, 因为旧固件)
+                for _ in range(delta):
+                    self._window_eval.on_alarm()
+            # 从 WindowEvaluator 拿当前累计 TP/FP, 算 delta 后 emit
+            cur_metrics = self._window_eval.get_metrics()
+            cur_tp = cur_metrics['tp']
+            cur_fp = cur_metrics['fp']
+            prev_tp = getattr(self, '_last_emit_tp', 0)
+            prev_fp = getattr(self, '_last_emit_fp', 0)
+            tp_delta_count = cur_tp - prev_tp
+            fp_delta_count = cur_fp - prev_fp
+            for _ in range(tp_delta_count):
+                self.tp_delta.emit(1, count, prob_x1000)
+            for _ in range(fp_delta_count):
+                self.fp_delta.emit(1, count, prob_x1000)
+            self._last_emit_tp = cur_tp
+            self._last_emit_fp = cur_fp
+            # Legacy 信号 (单消息级, deprecated, 保留以兼容旧连接).
+            # 第五十轮: per-window 评估下 alarm 本身没有 "FP" 标签 (由 WindowEvaluator
+            # 在 16 帧边界判), 这里全归 False.
+            self.fp_changed.emit(count, False)
+            # ⭐ 第六十一轮 (2026-10-11): 多带 h743_frame 给 log_alarm 写 CSV 第 3 列,
+            #   诊断时可直接看到 H743 实际发了哪个 frame, 不必依赖 GUI 解析逻辑.
+            self.alarm_with_prob.emit(count, prob_x1000, False, h743_frame)
+
+
+# === 第四十八轮 (2026-10-08) Per-Window 评估器 (跟训练 1:1 对齐) =================
+# 训练 (preprocess_v2_scada.py:154-158):
+#   yw = max(y_bin in window=16)  # 16 帧任一 attack → 整窗 label=1
+# 部署 (本类): 16 帧非滑动窗口评估
+#   - Ground truth: max(CSV binary in window) — 来自 PC set_last_was_attack
+#   - H743 prediction: any alarm in past 16 frames (lag-based) — 来自 count_changed
+#   - 单元: 16 帧 window (274628 帧 → 17164 windows) vs per-alarm (65276 alarms)
+#   - 评估粒度更粗, 但与训练验证 1:1, 指标可直接对比训练 F1m/Recall
+#   - 不需要 budget cap, 因为 H743 prediction 不会"过度覆盖"
+class WindowEvaluator:
+    """Per-window confusion matrix consistent with training (max-aggregation).
+
+    ⭐ Round 48 (2026-10-08): 部署评估.
+      训练: yw = max(y_bin in window=16), 每个 16 帧窗 = 1 个 label (0/1)
+      部署: 每 16 帧窗 = 1 个 sample, label = max(binary), prediction = any H743 alarm in past 16 帧
+
+    ⚠️ Round 48 末轮调整: IdsLineParser._CLASSIFY_WINDOW = 1 (per-alarm 严格同帧才算 TP).
+      跟 per-alarm 评估 (Round 47, window=16) 区别:
+      - 单元: 16 帧 window (17164 个 for 274k) vs 1 alarm (65276 个)
+      - 不需要 budget cap, 因为 H743 prediction 不会过度覆盖 (1 alarm 最多覆盖 16 帧)
+      - 指标可与训练 F1m/Recall 直接对比, 监测模型部署性能
+    """
+
+    _WINDOW_SIZE = 16
+
+    def __init__(self) -> None:
+        from collections import deque
+        self._frame_count: int = 0
+        self._current_window_attack: bool = False
+        self._current_window_alarm: bool = False
+        self._recent_alarm_frames: "deque[int]" = deque(maxlen=16)
+        # ⭐ 第六十一轮 (2026-10-11): H743 firmware 现在发 frame=N, PC 端 IdsLineParser
+        #   解析后调 on_alarm_with_frame(N) 直接 tag window=(N-1)//16, 消除 37ms pipeline
+        #   lag 引起的 1-3 帧错位 (旧 firmware 不发 frame, 走 on_alarm() legacy deque 路径).
+        self._direct_alarms: "set[int]" = set()
+        self._tp: int = 0
+        self._fp: int = 0
+        self._tn: int = 0
+        self._fn: int = 0
+        self._n_windows: int = 0
+        # ⭐ Round 64 (2026-10-13): re-evaluate past window when late alarm arrives.
+        #   95.3% alarms lag ≥40ms (mean 80ms, max 185ms). _evaluate_window 在 frame 16K
+        #   同步 fire, 目标 window K-1 评估时 alarm 还没到 → 错标 TN/FN. Alarm 80ms 后到
+        #   PC, _direct_alarms.add(K-1) 但 K-1 已 evaluate, 永远 stale. 解决: 把最近 4 个
+        #   window 状态存进 _recent_evals buffer, alarm 到达时检查是否命中 (W matches) 且
+        #   当时 alarm=False, 是的话回滚 TN→FP 或 FN→TP. Buffer size=4 覆盖 lag ≤160ms
+        #   (4 frames × 40ms), 99.5% alarms 在这个范围内.
+        self._recent_evals: "deque[dict]" = deque(maxlen=4)
+
+    def on_frame(self, is_attack: bool) -> None:
+        """每 PC 发完一帧调用. 累积到 16 帧时评估并开新窗.
+
+        Args:
+            is_attack: True=本帧 binary=1, False=本帧 binary=0
+        """
+        # Ground truth: 本帧 attack → 当前窗有 attack
+        if is_attack:
+            self._current_window_attack = True
+        # H743 prediction: 过去 16 帧有 alarm → 当前窗有 alarm
+        if self._recent_alarm_frames:
+            self._current_window_alarm = True
+        self._frame_count += 1
+        # 满 16 帧就评估
+        if self._frame_count % self._WINDOW_SIZE == 0:
+            self._evaluate_window()
+
+    def on_alarm(self) -> None:
+        """Legacy: H743 上行 alarm 时调用. 把"最近一帧"加入 recent_alarm_frames.
+
+        假设: H743 alarm 在 PC 端接收时, 它对应的 PC 帧是"最近刚发的帧" (auto-40ms 测试
+        串口延迟 < 帧间隔). 这个近似对 lag≤1 帧的 alarm 准确, lag 更大的 alarm 也算
+        在最近 16 帧范围内, 不影响窗口评估.
+
+        ⚠️ 第六十一轮 (2026-10-11): 实测 lag mean=37ms median=39ms (>1 帧), 导致
+        ~1200 个本属 window W 的 alarm 被推到 W+1 误标 FP. 新 firmware 发 frame_idx,
+        IdsLineParser 优先调 on_alarm_with_frame() 走 _direct_alarms 精确路径.
+
+        ⭐ 第六十三轮 (2026-10-12): 双路径并存.
+        Direct path (on_alarm_with_frame, Round 61) 精确归 W=(K_H-1)//16. 仅 4.7% alarms
+        (lag<40ms) 真正有效, 其余 95.3% 因 _evaluate_window 已 fire 而 stale.
+        Legacy deque path 错归到 NEXT 窗口, 但对 attack bursts 跨 window 的场景仍然
+        TP (下一个 window 仍 attack). 实测 legacy 路径贡献 ~6969 TPs 是 F1=78.34% 的
+        主源. 取消第六十三轮 lag 补偿 (反向 shift=W-(K_H-1)//16 - shift) 因为
+        shift=1 时落到 K_H-2 (更早的已 evaluate 窗口) 同样 stale. 保留双路径.
+        """
+        if self._frame_count > 0:
+            self._recent_alarm_frames.append(self._frame_count - 1)
+
+    def on_alarm_with_frame(self, frame_idx: int) -> None:
+        """⭐ 第六十一轮 (2026-10-11): H743 发 frame=K_H, PC 直接 tag window (K_H-1)//16.
+
+        不依赖 lag 估算, 也不需要等 deque 自然归并.
+
+        ⭐ 第六十三轮 (2026-10-12): 双路径并存, 取消 lag 补偿. 原因: lag_ms 在 live
+        code 里 95.3% 的 alarm 都 >= 40ms, 此时目标 window K=(K_H-1)//16 已 _evaluate
+        过了, _direct_alarms.add(K) 永远 stale. 反向 shift 到 K-1 同样 stale (更早 evaluate).
+        唯一有 live 效力的路径是 legacy deque 的 +1 forward shift, 保留. Direct path 仍
+        给 4.7% 低 lag alarm 提供精确归 W 的 TP.
+
+        ⭐ Round 64 (2026-10-13): re-evaluate past window. 检查 _recent_evals buffer
+        (最近 4 个已 evaluate window) 是否有 W matches, 且当时 alarm=False (说明 alarm
+        晚了没赶上 eval). 是的话回滚 metric: TN→FP (attack=False, alarm 到了说明
+        模型判断 attack=True, 但 ARFF 标 normal) 或 FN→TP (attack=True, alarm 到了
+        正确归 W, 应是 TP 不是 FN). 解决 lag-induced 错位.
+
+        ⭐ 第六十六轮 (2026-10-13): 修正 Round 64 错算 — 只 rescue FN→TP, 不再制造 TN→FP.
+        legacy 路径已断开 (rtu_replay_gui.py:1353), 95.3% alarms lag>=40ms 时 re-eval
+        命中 W 必 _state['alarm']=False, 批量触发 TN→FP, 实测错算 582 spurious FP.
+        GUI summary 报 1111 FP 实际是 529 真 FP + 582 spurious. 修复后 summary 跟
+        CSV frame=K 重算 1:1 对齐 (F1 78.47%→85.59%, FPR 13.32%→6.34%).
+
+        ⭐ Round 69 (2026-10-13): 重新启动 TN→FP rescue. 原因: Round 66 删除 TN→FP 时
+        legacy 路径是活跃的, 同一 alarm 双路径叠加. 现在 legacy 完全断开, alarm_frame_index
+        单路径 (Round 69 main_window 路由) 每 alarm 只进 _recent_evals 一次, 不会双算.
+        实测 logs/test_20261013-225832: 关闭 TN→FP 时 simulation 给 FP=0 vs ground truth
+        FP=33, 33 个晚到 alarm (lag > 40ms) 落在 normal window 救不回来 → 错算 TN.
+        重启 TN→FP 后 summary 跟 ground truth 1:1 (FP=33 vs 33).
+        """
+        # ⭐⭐ 2026-10-21: 修正 H743 上报 frame 的 +1 抖动导致的归窗错位.
+        #
+        #   背景: H743 的推理被推迟到 main loop (2026-10-17 USART 死锁修复),
+        #   ISR 快照完窗口后如果又来了 1 帧, 报上来的 frame 就成了 窗口末帧+1.
+        #   实测 logs/test_20261021-003650 (274628 帧全量回放): 7287 个 alarm 里
+        #   3241 个 (44.5%) 报的是 16k+1 而不是 16k.
+        #
+        #   原公式 W = (frame_idx-1)//16 对 16k 正确 (→k-1), 对 16k+1 错 (→k, 下一个窗).
+        #   后果: 那 44.5% 的 alarm 全部落到下一个窗口 —— 真 TP 被记成 FP (202 个)
+        #   或者跟别的 alarm 撞进同一窗口被合并 (614 个), GUI summary 的
+        #   F1 被低报 0.070 / FPR 被高报 0.024 (F1 0.811 vs 真实 0.881).
+        #
+        #   修法: H743 的窗口网格末帧恒为 16 的倍数, 所以 frame_idx%16 != 0
+        #   一定是迟报, 窗口号要再退 1.
+        #   ⚠ 固件侧已同步修 (modbus_ids.c: g_pending_frame 快照窗口末帧),
+        #     修好后 frame%16 恒 == 0, 本分支自动不生效 —— 两侧兼容.
+        W = (frame_idx - 1) // 16
+        if frame_idx % 16 != 0:
+            W -= 1
+        self._direct_alarms.add(W)
+        # ⭐ Round 64 → 第六十六轮 (2026-10-13) 修正: 只 rescue FN→TP, 不再制造 TN→FP.
+        #   之前 Round 64 看到 late alarm 命中 past window (alarm=False) 时一律回滚:
+        #     - attack=True: FN→TP (helpful, 救回真 attack)
+        #     - attack=False: TN→FP (harmful, 批量制造 spurious FP)
+        #   实测 logs/test_20261013-003345: 95.3% alarms lag>=40ms, 触发 re-eval 时
+        #   总是 _state['alarm']=False (因为 legacy 路径已断开, _direct_alarms.add(W)
+        #   在 _evaluate_window 之后, W 已 evaluate). 制造了 582 个 spurious FP.
+        #   真 FP (H743 帧级精度 49.59% 的 random 误报) 已在 on_alarm_with_frame 直接
+        #   归 W 的 *未来* window 评估里算上 (legacy 路径下), 不需要 retroactive.
+        for _state in self._recent_evals:
+            if _state['W'] == W and not _state['alarm']:
+                if _state['attack']:
+                    # 当时 FN, 实际应是 TP (late alarm 确认 H743 判 attack)
+                    self._fn -= 1
+                    self._tp += 1
+                else:
+                    # ⭐ Round 69 (2026-10-13) 重启 TN→FP rescue.
+                    #   Round 66 删除 TN→FP branch 是因为旧 legacy on_alarm 路径并存,
+                    #   双路径叠加把同一 alarm 算两遍 → 582 spurious FP. 现在 legacy 路径
+                    #   已彻底断开 (rtu_replay_gui.py:1383 注释), alarm_frame_index 单路径
+                    #   转发 (Round 69 main_window 路由), 每个 alarm 只进 _recent_evals 一次.
+                    #   实测 logs/test_20261013-225832: 关闭 TN→FP 时 simulation 给 FP=0
+                    #   vs ground truth FP=33, 33 个晚到 alarm (lag > 40ms) 落在 normal window
+                    #   救不回来. 重启 TN→FP 后 summary 跟 ground truth 1:1 对齐.
+                    self._tn -= 1
+                    self._fp += 1
+                _state['alarm'] = True
+                break  # 每个 alarm 只回滚一个 window (W 唯一)
+
+    def _evaluate_window(self) -> None:
+        """评估当前窗, 累加 TP/FP/TN/FN, 重置窗状态.
+
+        ⭐ 关键: 必须同时清空 _recent_alarm_frames. 因为窗是非滑动 (跟训练
+        max-aggregation 一致), 每个窗独立. 若不清空, 前一窗的 alarm 会通过
+        deque 残留污染下一窗 → 整窗被错标 alarm=True.
+
+        ⭐ 第六十一轮 (2026-10-11): 还要检查 _direct_alarms (H743 通过 frame_idx
+        直接标记的 window). 优先信任 _direct_alarms, 兼容 legacy deque.
+
+        ⭐ Round 64 (2026-10-13): 把当前 window 状态 (W, attack, alarm) 存进
+        _recent_evals buffer. 当 on_alarm_with_frame 之后到达的 alarm 命中 buffer
+        里某个 past window (lag-induced late arrival), 回滚 metric: TN→FP 或 FN→TP.
+        这是 Round 63 lag compensation 失败后的替代方案, 利用了"alarm 晚到但
+        我们能识别它属于哪个 window"的信息.
+        """
+        W_now = self._n_windows  # 当前要评估的 window 索引 (0-based)
+        attack = self._current_window_attack
+        # ⭐ Round 61: union legacy deque + direct alarms
+        alarm = self._current_window_alarm or (W_now in self._direct_alarms)
+        # ⭐ Round 64: save state for potential retroactive update
+        self._recent_evals.append({
+            'W': W_now,
+            'attack': attack,
+            'alarm': alarm,
+        })
+        if attack and alarm:
+            self._tp += 1
+        elif not attack and alarm:
+            self._fp += 1
+        elif attack and not alarm:
+            self._fn += 1
+        else:
+            self._tn += 1
+        self._n_windows += 1
+        self._current_window_attack = False
+        self._current_window_alarm = False
+        # ⭐ Round 61: 清掉本次 window 的 direct alarm 标记
+        self._direct_alarms.discard(W_now)
+        # ⭐ 清空 alarm deque — 每个窗独立评估, 不允许跨窗污染.
+        self._recent_alarm_frames.clear()
+
+    def get_metrics(self) -> dict:
+        """返回当前 per-window 指标 (供 IdsReportPanel 显示)."""
+        n_attack_w = self._tp + self._fn
+        n_alarm_w = self._tp + self._fp
+        total = self._tp + self._fp + self._tn + self._fn
+        return {
+            'tp': self._tp,
+            'fp': self._fp,
+            'tn': self._tn,
+            'fn': self._fn,
+            'n_windows': self._n_windows,
+            'n_attack_windows': n_attack_w,
+            'n_alarm_windows': n_alarm_w,
+            'recall': self._tp / n_attack_w if n_attack_w > 0 else 0.0,
+            'precision': self._tp / n_alarm_w if n_alarm_w > 0 else 0.0,
+            'f1': (2 * self._tp / (2 * self._tp + self._fp + self._fn)
+                   if (2 * self._tp + self._fp + self._fn) > 0 else 0.0),
+            'accuracy': (self._tp + self._tn) / total if total > 0 else 0.0,
+        }
+
+    def reset(self) -> None:
+        """清零所有状态 (供新测试开始 / 用户手动重置)."""
+        self._frame_count = 0
+        self._current_window_attack = False
+        self._current_window_alarm = False
+        self._recent_alarm_frames.clear()
+        # ⭐ 第六十一轮 (2026-10-11): 同时清空 _direct_alarms set
+        self._direct_alarms.clear()
+        # ⭐ Round 64 (2026-10-13): 清空 re-eval buffer (避免 stale state)
+        self._recent_evals.clear()
+        self._tp = 0
+        self._fp = 0
+        self._tn = 0
+        self._fn = 0
+        self._n_windows = 0
 
 
 # === IDS Report 面板 (第十七轮 双计数 → 第十九轮 4 KPI → 第二十轮 FP/TP/FPR) ==
@@ -771,345 +1347,710 @@ class IdsLineParser(QObject):
 #   - Normal:   PC 已发送的正常帧数 (binary==0 时 +1, 即正常数)
 #   - Detected: H743 上行 [ALARM] N 的累计计数 (累计 frames_attack)
 #   - TP:       真阳性 — [ALARM] 到达时最近 16 帧滑动窗口内有 attack (binary==1)
+#                ⭐ 第二十八轮 (2026-10-02): 受 TP budget 限制 — 每 PC 攻击帧 = 1 个 TP 配额,
+#                  保证 TP_count ≤ Attack_count, Recall ≤ 100%
 #   - FP:       假阳性 — [ALARM] 到达时最近 16 帧滑动窗口内全 normal (binary==0)
+#                或 budget 耗尽后的多余 [ALARM] (H743 SW=16 over-fire)
 #   - Recall:   TP / Sent × 100% (召回率, H743 命中攻击的能力)
 #   - FPR:      FP / Normal × 100% (误报率, 正常帧被误报的比例)
 # 调试详情请看串口 raw 终端.
 
 class IdsReportPanel(QWidget):
-    """IDS 面板: 显示 6 个 KPI + 4 个派生率 (Precision/Recall/F1/Accuracy) + 1 个 FPR.
+    """IDS 面板: 单行 13 个 per-window KPI (跟训练 max-aggregation 1:1 对齐, window=16).
 
-    布局:
-      - 左: Total/Sent/Normal/Detected/TP/FP (6 KPI)
-      - 中: Precision/Recall/F1/Accuracy (4 核心指标, 二分类论文标准)
-      - 右: FPR (误报率)
+    布局 (⭐⭐ 第六十一轮 2026-10-11: 删 per-frame 行 + 分隔线, 只剩 per-window 1 行):
+      Total → Normal → Attack → Detected → TP → FP → TN → FN →
+      Precision → Recall → F1 → Accuracy → FPR
+
+    评估粒度 = window=16 max-aggregation (跟训练 preprocess_v2_scada.py
+    reshape(n//16, 16, -1) 1:1). 4 指标 (Precision/Recall/F1/Accuracy) 可直接对比
+    训练 baseline (F1m), 监测 H743 部署性能 vs 训练性能.
+
+    ⭐ 2026-10-19: 删 per-frame state (per-frame 计数已全部移除).
 
     数据来源:
-      - Total/Sent/Normal ← ReplayWorker.sent_stats (total, attack, normal)
-      - Detected          ← IdsLineParser.count_changed (H743 上行 [ALARM] N)
-      - TP / FP           ← IdsLineParser.fp_changed (最近 16 帧滑动窗口内是否有 attack)
+      - Total / Normal / Attack ← ReplayWorker.window_stats (16 帧 1 window, max-aggregation)
+      - Detected                ← IdsLineParser.count_changed (H743 windows_attack delta)
+      - TP / FP / TN / FN       ← _window_eval (per-window max-aggregation 评估)
+      - Precision / Recall / F1 / Accuracy ← _window_eval (训练 1:1 直接对比)
+      - FPR                     ← 派生: fp / _window_normal_count
+
+    ⭐ 第四十轮 (2026-10-02): 两个新信号给 MetricsChartPanel 用. **必须在类级别声明**
+      pyqtSignal 才能 connect/emit. 若在 __init__ 里 `self.X = pyqtSignal(...)` 创建的是
+      未绑定的 pyqtSignal 描述符, 不会有 .connect / .emit 方法 (PyQt5 metaclass 行为).
+      修复: 把声明移到类级 (__init__ 不再赋 self.metrics_updated).
     """
+    # ⭐ 第四十轮: pyqtSignal 必须在类级别声明 (PyQt5 metaclass 绑定).
+    metrics_updated = pyqtSignal(dict)   # {'p','r','f1','acc','fpr'}, None=未计算
+    metrics_reset   = pyqtSignal()       # 测试开始/用户清零时通知曲线面板
 
     def __init__(self, parser: IdsLineParser, parent=None):
         super().__init__(parent)
         self._parser = parser
-        self._total_count = 0        # 总发送
-        self._sent_count = 0         # 攻击次数 (binary==1 累计)
-        self._normal_count = 0       # 正常数 (binary==0 累计)
-        self._detected_count = 0     # 识别攻击次数 (H743 上行累计 frames_attack)
-        self._tp_count = 0           # 真阳性 (delta-driven, H743 内部 alarm 命中 attack)
-        self._fp_count = 0           # 假阳性 (delta-driven, H743 内部 alarm 命中 normal)
+        # ⭐ 2026-10-19: 删 per-frame 内部 state (_total_count / _sent_count / _normal_count /
+        #   _tp_count / _fp_count / _tn_count / _fn_count). 评估只用 per-window 状态,
+        #   跟训练 / H743 部署 1:1 对齐.
+        # ⭐⭐ 第五十二轮 (2026-10-09): per-window 累计 state, 跟训练 / H743 1:1.
+        #   4 个主 KPI (Total / Normal / Attack / Detected) 全部按 16 帧 1 window 算:
+        #     - Total:   累计 windows 数 (sent window 凑齐 1 个 +1, 跟训练 reshape(n//16) 一致)
+        #     - Normal:  累计 normal windows (16 帧全 0, max-aggregation)
+        #     - Attack:  累计 attack windows (16 帧任一帧 1, max-aggregation, 跟训练 1:1)
+        #     - Detected:H743 windows_attack 累计 (Round 50 已是 per-window, count_changed 携带的 N
+        #                就是 windows 累计, 1 window 1 alarm 1:1 — 因此 Detected 天然是 per-window).
+        self._window_total_count = 0     # ⭐ 第五十二轮: per-window 总发送 windows
+        self._window_normal_count = 0    # ⭐ 第五十二轮: per-window normal windows
+        self._window_attack_count = 0    # ⭐ 第五十二轮: per-window attack windows
+        # ⭐ 第二十八轮 (2026-10-02): Detected 显示 = H743 frames_attack delta (=TP+FP, 含 over-fire).
+        #   ⭐ 第五十轮 (2026-10-09) 修订: H743 frames_attack → windows_attack (1 window 1 alarm 1:1),
+        #   因此 Detected 现在是 per-window 累计 (= H743 累计 windows_attack delta), 天然 1:1.
+        #   用 baseline 锚点确保从 0 开始递增, 即使 H743 未重启, 首次 [ALARM] N 也按 0 处理.
+        self._detected_count = 0     # H743 windows_attack 总数 (本次测试 delta, = 当前 count - baseline)
+        self._detected_baseline: Optional[int] = None  # 首条 [ALARM] N-1 作锚点 (Round 44, 避免 off-by-one)
+        # ⭐ 第四十八轮 (2026-10-08): per-window 评估器 (跟训练 1:1 对齐)
+        self._window_eval = WindowEvaluator()
         self._build_ui()
         # 接 parser 信号 (H743 上行的 [ALARM] N)
-        # ⭐ 第二十三轮: 改用 tp_delta/fp_delta 信号, 按 H743 内部 alarm_count 增量计 TP/FP.
-        #   旧 fp_changed 按 [ALARM] 消息数计 1 个, 漏掉 H743 MIN_GAP=4 节流吞掉的 60% alarm.
+        # count_changed → _on_detected 持续订阅 (Round 28 baseline 锚点保留):
+        #   Detected KPI = H743 windows_attack delta (=TP+FP), 含 over-fire 部分.
+        # ⭐ 第四十八轮: count_changed 也喂给 WindowEvaluator.on_alarm (per-window 评估)
+        # ⭐ 第六十六轮 (2026-10-13): 弃用 legacy on_alarm 路径.
+        #   H743 现固件发 frame=K, IdsLineParser._parse_line 走 on_alarm_with_frame(K) 精确归 W.
+        #   同一 alarm 之前既走 legacy (count_changed→on_alarm, 错归 W+1) 又走 direct (W=K 精确).
+        #   双路径叠加制造 spurious FP/FN. 断开 legacy 路径, 只留 direct 精确归因.
+        #   WindowEvaluator.on_alarm 方法仍存在 (旧固件回退), 仅此处不再 connect.
         self._parser.count_changed.connect(self._on_detected)
-        self._parser.tp_delta.connect(self._on_tp_delta)
-        self._parser.fp_delta.connect(self._on_fp_delta)
+        # self._parser.count_changed.connect(self._window_eval.on_alarm)  # ⭐ 第六十六轮: 弃用
+        # ⭐ 2026-10-11: 当前窗 alarm 状态触发 detected_label 变绿
+        self._parser.count_changed.connect(self._refresh_attack_alarm_color)
 
     def _build_ui(self):
-        outer = QHBoxLayout(self)
+        # ⭐⭐ 第六十一轮 (2026-10-11): 删 per-frame (per-alarm) KPI 行 + 分隔线, 只保留
+        #   per-window KPI 行 (13 项 Total/Normal/Attack/Detected/TP/FP/TN/FN/Precision/
+        #   Recall/F1/Accuracy/FPR). 评估粒度与训练 max-aggregation 1:1 对齐 (window=16),
+        #   避免此前 per-frame / per-window 双行造成的口径混淆 (Per-Frame Recall 算 5%
+        #   而 Per-Window Recall 是 36% — 用户无法判断哪个是对的).
+        #
+        # ⭐ 2026-10-19: 删 per-frame state (per-frame 计数已全部移除).
+        #
+        #   attr 名保留 w- 前缀 (避免破坏 test_zround48_per_window_evaluator 等现有测试
+        #   对 wtp_label / wfp_label / wrecall_label 的断言); 显示文案去 w- 前缀.
+        outer = QVBoxLayout(self)
 
-        # 1. Total (总发送帧数)
+        # === Per-Window KPI 行 (跟训练 max-aggregation 1:1 对齐, window=16) =======
+        # ⭐ 第四十八轮 (2026-10-08) 首版, 第五十二轮 (2026-10-09) 4 主 KPI 接入,
+        #   第六十一轮 (2026-10-11) 补全 13 项 + 删 per-frame 行.
+        row_window = QHBoxLayout()
+
+        # 1. Total (per-window 总数, 16 帧/窗)
         total_cap = QLabel("Total:")
         total_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.total_label = QLabel("0")
-        self.total_label.setStyleSheet(
+        self.wn_label = QLabel("0")
+        self.wn_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
             "font-size: 18px; color: #333333; padding: 4px;"
         )
-        outer.addWidget(total_cap)
-        outer.addWidget(self.total_label)
+        row_window.addWidget(total_cap)
+        row_window.addWidget(self.wn_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 2. Sent (攻击次数, binary==1 累计)
-        sent_cap = QLabel("Sent:")
-        sent_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.sent_label = QLabel("0")
-        self.sent_label.setStyleSheet(
-            "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 18px; color: #0055aa; padding: 4px;"
-        )
-        outer.addWidget(sent_cap)
-        outer.addWidget(self.sent_label)
-
-        outer.addSpacing(16)
-
-        # 3. Normal (正常数, binary==0 累计)
+        # 2. Normal (per-window 正常数, 16 帧全 0 → max-aggregation → normal)
+        #   ⭐ 第六十一轮 (2026-10-11): 新增, 取代 per-frame normal_label (已删).
         normal_cap = QLabel("Normal:")
         normal_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.normal_label = QLabel("0")
-        self.normal_label.setStyleSheet(
+        self.wnormal_label = QLabel("0")
+        self.wnormal_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
             "font-size: 18px; color: #008800; padding: 4px;"
         )
-        outer.addWidget(normal_cap)
-        outer.addWidget(self.normal_label)
+        row_window.addWidget(normal_cap)
+        row_window.addWidget(self.wnormal_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 4. Detected (识别攻击次数, H743 上行累计)
+        # 3. Attack (per-window 攻击数, 16 帧任 1 → max-aggregation → attack)
+        #   ⭐ 第六十一轮 (2026-10-11): 新增, 取代 per-frame sent_label (已删).
+        attack_cap = QLabel("Attack:")
+        attack_cap.setStyleSheet("color: #555; font-size: 14px;")
+        self.wattack_label = QLabel("0")
+        self.wattack_label.setStyleSheet(
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #0055aa; padding: 4px;"
+        )
+        row_window.addWidget(attack_cap)
+        row_window.addWidget(self.wattack_label)
+
+        row_window.addSpacing(12)
+
+        # 4. Detected (H743 上行 [ALARM] windows_attack 累计, per-window 1:1)
+        #   ⭐ 第六十一轮: 新增 (per-frame detected_label 已删); Detected ≠ Attack
+        #   (H743 可能漏报 attack window → Attack-Detected = FN, 用户直接看漏报比例).
         det_cap = QLabel("Detected:")
         det_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.detected_label = QLabel("0")
-        self.detected_label.setStyleSheet(
+        self.wdetected_label = QLabel("0")
+        self.wdetected_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
             "font-size: 18px; color: #cc0000; padding: 4px;"
         )
-        outer.addWidget(det_cap)
-        outer.addWidget(self.detected_label)
+        row_window.addWidget(det_cap)
+        row_window.addWidget(self.wdetected_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 5. TP (真阳性, H743 上行 alarm 命中 attack 帧)
+        # 5. TP (per-window 真阳性, 窗内 attack + 过去 16 帧 alarm)
         tp_cap = QLabel("TP:")
         tp_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.tp_label = QLabel("0")
-        self.tp_label.setStyleSheet(
+        self.wtp_label = QLabel("0")
+        self.wtp_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
             "font-size: 18px; color: #cc0000; padding: 4px;"
         )
-        outer.addWidget(tp_cap)
-        outer.addWidget(self.tp_label)
+        row_window.addWidget(tp_cap)
+        row_window.addWidget(self.wtp_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 6. FP (假阳性, H743 上行 alarm 命中 normal 帧 = 误报!)
+        # 6. FP (per-window 假阳性, 窗内全 normal + 过去 16 帧 alarm)
         fp_cap = QLabel("FP:")
         fp_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.fp_label = QLabel("0")
-        self.fp_label.setStyleSheet(
+        self.wfp_label = QLabel("0")
+        self.wfp_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
             "font-size: 18px; color: #ff6600; padding: 4px;"
         )
-        outer.addWidget(fp_cap)
-        outer.addWidget(self.fp_label)
+        row_window.addWidget(fp_cap)
+        row_window.addWidget(self.wfp_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 7. Precision (派生: TP / (TP+FP) × 100%, 预测为攻击中真攻击占比)
+        # 7. TN (per-window 真阴性, 窗内 normal + 过去 16 帧无 alarm)
+        tn_cap = QLabel("TN:")
+        tn_cap.setStyleSheet("color: #555; font-size: 14px;")
+        self.wtn_label = QLabel("0")
+        self.wtn_label.setStyleSheet(
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #006666; padding: 4px;"
+        )
+        row_window.addWidget(tn_cap)
+        row_window.addWidget(self.wtn_label)
+
+        row_window.addSpacing(12)
+
+        # 8. FN (per-window 假阴性, 漏报)
+        fn_cap = QLabel("FN:")
+        fn_cap.setStyleSheet("color: #555; font-size: 14px;")
+        self.wfn_label = QLabel("0")
+        self.wfn_label.setStyleSheet(
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #cc4400; padding: 4px;"
+        )
+        row_window.addWidget(fn_cap)
+        row_window.addWidget(self.wfn_label)
+
+        row_window.addSpacing(16)
+
+        # 9. Precision (per-window 精确率, 跟训练 Precision 直接对比)
         prec_cap = QLabel("Precision:")
         prec_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.precision_label = QLabel("—")
-        self.precision_label.setStyleSheet(
+        self.wprecision_label = QLabel("—")
+        self.wprecision_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 18px; color: #aa6600; padding: 4px;"
+            "font-size: 18px; color: #0055aa; padding: 4px;"
         )
-        outer.addWidget(prec_cap)
-        outer.addWidget(self.precision_label)
+        row_window.addWidget(prec_cap)
+        row_window.addWidget(self.wprecision_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 8. Recall (派生: TP / Sent × 100%, 攻击召回率)
+        # 10. Recall (per-window 召回率, 跟训练 Recall 直接对比)
         rec_cap = QLabel("Recall:")
         rec_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.recall_label = QLabel("—")
-        self.recall_label.setStyleSheet(
+        self.wrecall_label = QLabel("—")
+        self.wrecall_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 18px; color: #aa6600; padding: 4px;"
+            "font-size: 18px; color: #0055aa; padding: 4px;"
         )
-        outer.addWidget(rec_cap)
-        outer.addWidget(self.recall_label)
+        row_window.addWidget(rec_cap)
+        row_window.addWidget(self.wrecall_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 9. F1 (派生: 2*P*R/(P+R), 精确率和召回率的调和平均 — 最核心指标)
+        # 11. F1 (per-window F1, ⭐ 跟训练 F1m 直接对比的核心指标)
         f1_cap = QLabel("F1:")
         f1_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.f1_label = QLabel("—")
-        self.f1_label.setStyleSheet(
+        self.wf1_label = QLabel("—")
+        self.wf1_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 20px; color: #cc0066; padding: 4px;"  # 稍大稍红, 最核心
+            "font-size: 20px; color: #0055aa; padding: 4px;"
         )
-        outer.addWidget(f1_cap)
-        outer.addWidget(self.f1_label)
+        row_window.addWidget(f1_cap)
+        row_window.addWidget(self.wf1_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 10. Accuracy (派生: (TP+TN)/Total, 整体正确率)
+        # 12. Accuracy (per-window Accuracy, (TP+TN)/Total)
+        #   ⭐ 第六十一轮: 新增.
         acc_cap = QLabel("Accuracy:")
         acc_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.accuracy_label = QLabel("—")
-        self.accuracy_label.setStyleSheet(
+        self.waccuracy_label = QLabel("—")
+        self.waccuracy_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 18px; color: #aa6600; padding: 4px;"
+            "font-size: 18px; color: #0055aa; padding: 4px;"
         )
-        outer.addWidget(acc_cap)
-        outer.addWidget(self.accuracy_label)
+        row_window.addWidget(acc_cap)
+        row_window.addWidget(self.waccuracy_label)
 
-        outer.addSpacing(16)
+        row_window.addSpacing(12)
 
-        # 11. FPR (派生: FP / Normal × 100%, 误报率 ⭐)
+        # 13. FPR (per-window FPR, FP / Normal windows)
+        #   ⭐ 第六十一轮: 新增 (per-frame fpr_label 已删).
         fpr_cap = QLabel("FPR:")
         fpr_cap.setStyleSheet("color: #555; font-size: 14px;")
-        self.fpr_label = QLabel("—")
-        self.fpr_label.setStyleSheet(
+        self.wfpr_label = QLabel("—")
+        self.wfpr_label.setStyleSheet(
             "font-weight: bold; font-family: Consolas, monospace; "
-            "font-size: 18px; color: #d4006a; padding: 4px;"
+            "font-size: 18px; color: #d4006a; padding: 4px;"  # 与 metrics_chart 同色
         )
-        outer.addWidget(fpr_cap)
-        outer.addWidget(self.fpr_label)
+        row_window.addWidget(fpr_cap)
+        row_window.addWidget(self.wfpr_label)
 
-        outer.addStretch(1)
+        row_window.addStretch(1)
+        outer.addLayout(row_window)
 
     def _on_sent_stats(self, total: int, attack: int, normal: int) -> None:
         """ReplayWorker.sent_stats 信号回调 (每帧一次).
+
+        ⭐ 2026-10-19: 删 per-frame 内部 state 维护. sent_stats 仅触发 _update_rates
+        保持 GUI 同步 (虽然只 _on_window_stats 改变 label 数字). _on_window_stats 单独
+        喂数据到主 KPI.
 
         Args:
             total:  累计总发送帧数 (= attack + normal)
             attack: 累计攻击帧数 (binary==1 时 +1)
             normal: 累计正常帧数 (binary==0 时 +1)
         """
-        self._total_count = total
-        self._sent_count = attack
-        self._normal_count = normal
-        self.total_label.setText(str(total))
-        self.sent_label.setText(str(attack))
-        self.normal_label.setText(str(normal))
+        # ⭐ 2026-10-19: 不再 setText per-frame state, 删 _total_count/_sent_count/_normal_count
+        # 维护. label 由 _on_window_stats 维护 (per-window 1:1 跟训练对齐).
+        # 保留 _update_rates() 调用以保持 GUI 同步窗口.
+        del total, attack, normal  # unused
         self._update_rates()
 
-    def _on_sent(self, count: int) -> None:
-        """(遗留) ReplayWorker.attack_sent 信号回调. 与 sent_stats 共存时调用, 不冲突."""
-        # 仅刷新 Sent 标签; 若 _on_sent_stats 已先到, 此处会覆盖一次相同值, 无副作用.
-        self._sent_count = count
-        self.sent_label.setText(str(count))
+    def _on_window_stats(self, total_w: int, attack_w: int, normal_w: int) -> None:
+        """ReplayWorker.window_stats 信号回调 (凑齐 1 window 16 帧一次).
+
+        ⭐⭐ 第五十二轮 (2026-10-09, 用户要求: "total、normal、attack、detected
+        都是按照每16帧来计算一次"):
+
+          4 个主 KPI label 全部按 16 帧 1 window 算, 跟训练 preprocess_v2_scada.py
+          reshape(n//16, 16, -1) max-aggregation 1:1, 跟 H743 部署 1 window 1 alarm
+          1:1. 整个链路:
+            训练:  274k 帧 → 17164 windows × 1 label (max-aggregation)
+            PC 端: 274k 帧 → 17164 windows × 1 attack 决策 (Round 51 max-aggregation)
+            H743:  274k 帧 → 17164 windows × 1 binary decision (Round 50 non-overlap)
+            评估:  1 H743 alarm vs 1 PC window → TP/FP, 4 指标 1:1 训练 macro_f1
+
+        Args:
+            total_w:  累计已发送 windows 数 (= frames_total // 16, 尾部不足 16 帧不计)
+            attack_w: 累计已发送 attack windows 数 (16 帧任一帧 attack → max-aggregation)
+            normal_w: 累计已发送 normal windows 数 (16 帧全 normal)
+        """
+        self._window_total_count = total_w
+        self._window_normal_count = normal_w
+        self._window_attack_count = attack_w
+        # ⭐⭐ 第六十一轮 (2026-10-11): 不再 setText per-frame label (total_label /
+        #   sent_label / normal_label 已删). 3 个 per-window 主 KPI 由 _update_rates
+        #   统一从 _window_total/normal/attack_count 写 wn_label / wnormal_label /
+        #   wattack_label.
         self._update_rates()
 
     def _on_detected(self, count: int) -> None:
-        """IdsLineParser.count_changed 信号回调 (H743 上行 [ALARM] N 累计)."""
-        self._detected_count = count
-        self.detected_label.setText(str(count))
-        # TP/FP 累加由 _on_tp_delta / _on_fp_delta 处理 (delta-driven, 不在 _on_detected 里做)
-        self._update_rates()
+        """IdsLineParser.count_changed 信号回调 (H743 上行 [ALARM] N 累计).
 
-    def _on_tp_delta(self, delta: int, cur_count: int = 0, prob_x1000: int = -1) -> None:
-        """IdsLineParser.tp_delta 信号回调 (Round 23, delta-driven).
+        ⭐ 第二十八轮 (2026-10-02): H743 frames_attack 是 boot 起全局累计, 不重启 H743
+        跑新测试时首条 [ALARM] N 会是旧值 (例如 20000). 首次回调捕获 baseline,
+        后续显示 delta. 保证 Detected KPI 从 0 开始递增.
 
-        Args:
-            delta: H743 内部 frames_attack 增量 (典型 1, 大 burst 时 > 1).
-                   这 delta 个 H743 内部 alarm 都命中真实 attack (窗内有 binary=1).
-            cur_count: H743 当前累计 frames_attack (供日志/调试用)
-            prob_x1000: H743 输出概率 × 1000 (供日志/调试用)
+        ⭐ 第四十四轮 (2026-10-08): 修复 off-by-one — baseline = max(count-1, 0)
+        (不是 count). 旧逻辑首条 N 作锚点 → 首条 emit 后 _detected_count=0, 但 N
+        本身已经代表 1 次 alarm 工作量, 被锚点吃掉, 末条 _detected_count 永远比
+        上行 [ALARM] 消息数少 1. 新逻辑 baseline=N-1 → 首条后 count=1, 末条 count=
+        m 等于消息数.
+
+        ⭐⭐ 第五十轮 (2026-10-09): H743 语义从 frames_attack (累计攻击帧) 改为
+          windows_attack (累计攻击 window), 1 window 1 alarm 1:1. count_changed
+          携带的 N 已经是 per-window 累计.
+
+        ⭐⭐ 第五十二轮 (2026-10-09, 用户要求: "total、normal、attack、detected 都
+          是按照每 16 帧来计算一次"): Detected label 显示 = H743 windows_attack
+          delta = per-window 累计. 跟 _window_attack_count (PC 端 attack window 数)
+          一一对应, 都按 16 帧 1 window 算, 1:1 跟训练 / H743 1:1 对齐.
+
+        注: Detected 不直接等于 Attack KPI (PC 已发 attack window), 因为 H743
+        推理存在漏报 (FN): 一个 attack window H743 没报 → 算漏报. 评估 Recall
+        应该用 TP / Attack, 不是 Detected / Attack. Detected 只是给用户看
+        "H743 报了多少 attack window 上来", 跟 _window_attack_count 配合看漏报比例.
         """
-        if delta > 0:
-            self._tp_count += delta
-        self.tp_label.setText(str(self._tp_count))
+        if self._detected_baseline is None:
+            self._detected_baseline = max(count - 1, 0)
+        self._detected_count = count - self._detected_baseline
+        # ⭐⭐ 第六十一轮: 不再 setText self.detected_label (已删); 改由 _update_rates
+        #   统一写 self.wdetected_label (per-window Detected).
+        # ⭐ 2026-10-19: TP/FP 计数由 _window_eval 直接维护 (per-window 1:1 跟训练对齐),
+        #   不再用 _on_tp_delta / _on_fp_delta 派生.
         self._update_rates()
 
-    def _on_fp_delta(self, delta: int, cur_count: int = 0, prob_x1000: int = -1) -> None:
-        """IdsLineParser.fp_delta 信号回调 (Round 23, delta-driven).
+    def _refresh_attack_alarm_color(self, *_args) -> None:
+        """⭐ 2026-10-11: 实时颜色反馈当前 16 帧窗状态.
 
-        Args:
-            delta: H743 内部 frames_attack 增量, 这 delta 个 alarm 命中 normal (窗内全 0).
-            cur_count: H743 当前累计 frames_attack (供日志/调试用)
-            prob_x1000: H743 输出概率 × 1000 (供日志/调试用)
+        - 当前窗任一帧 attack (frame_sent_type=True) → wattack_label 红色背景
+        - 当前窗内 H743 alarm 触发 (count_changed) → wdetected_label 绿色背景
+        - 下个窗开始自动还原 (WindowEvaluator._evaluate_window 重置状态).
+
+        数据源: WindowEvaluator._current_window_attack / _current_window_alarm
+        (跟 WindowEvaluator.on_frame / on_alarm 同源, 不重复计算).
+
+        ⭐ 第六十三轮 (2026-10-12): alarm_now 用 OR 公式 (跟 _evaluate_window 一致),
+        支持 direct 路径 (_direct_alarms) + legacy 路径 (_current_window_alarm). 双路径
+        并存: 4.7% 低 lag alarm 走 direct 精确归 W, 95.3% 高 lag 走 legacy +1 forward
+        shift (后续 attack burst 跨 window 时仍 TP). 视觉上也用 OR 反映任一路径触发.
         """
-        if delta > 0:
-            self._fp_count += delta
-        self.fp_label.setText(str(self._fp_count))
-        self._update_rates()
+        attack_now = bool(self._window_eval._current_window_attack)
+        alarm_now  = bool(
+            self._window_eval._current_window_alarm
+            or (self._window_eval._n_windows in self._window_eval._direct_alarms)
+        )
 
-    def _on_fp_changed_legacy(self, count: int, is_fp: bool) -> None:
-        """IdsLineParser.fp_changed 信号回调 (legacy, deprecated).
-
-        此信号在 Round 23 后只用于向后兼容旧连接, IdsReportPanel 已切换到
-        tp_delta/fp_delta 信号 (delta-driven). 保留方法定义以防外部代码仍 connect.
-
-        Args:
-            count: H743 当前累计 frames_attack (与 _on_detected 的 count 同源)
-            is_fp: True = 最近 16 帧滑动窗口内全 normal → 本次 alarm 算误报
-                   False = 最近 16 帧滑动窗口内有 attack → 本次 alarm 算命中
-        """
-        # ⚠️ Deprecated: 单消息计数, 不准确 (漏 60% 节流吞掉的 alarm)
-        # 不再累加 _tp_count/_fp_count, 仅 emit log (供调试)
-        pass
-        self._update_rates()
+        # Attack: 发送攻击 → 红
+        self.wattack_label.setStyleSheet(
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #0055aa; padding: 4px; "
+            "background-color: #ff5555;" if attack_now else
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #0055aa; padding: 4px;"
+        )
+        # Detected: 监测到 alarm → 绿
+        self.wdetected_label.setStyleSheet(
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #cc0000; padding: 4px; "
+            "background-color: #55ff55;" if alarm_now else
+            "font-weight: bold; font-family: Consolas, monospace; "
+            "font-size: 18px; color: #cc0000; padding: 4px;"
+        )
 
     def _update_rates(self) -> None:
-        """计算并显示 5 个派生指标: Precision / Recall / F1 / Accuracy / FPR.
+        """计算并显示 13 个 per-window KPI (跟训练 max-aggregation 1:1 对齐).
 
-        公式:
-          - Precision = TP / (TP + FP)           # 预测为攻击中真攻击的占比
-          - Recall    = TP / Sent                # 实际攻击被检出的占比
-          - F1        = 2*P*R / (P + R)          # P 与 R 的调和平均
-          - Accuracy  = (TP + TN) / Total        # 整体正确率
-            其中 TN = Normal - FP (没报警的 normal 帧数)
-            Total = Sent + Normal
-          - FPR       = FP / Normal               # 误报率
+        ⭐⭐ 第六十一轮 (2026-10-11): 重写 — 删 per-frame 公式, 只算 per-window 13 项.
+          评估粒度跟训练 preprocess_v2_scada.py reshape(n//16, 16, -1) 完全 1:1,
+          F1m/Recall 可直接对比训练 baseline.
 
-        注:
-          - Sent 计数的是 PC 已发送的攻击帧数 (binary==1 时 +1)
-          - Normal 计数的是 PC 已发送的正常帧数 (binary==0 时 +1)
-          - TP 是 [ALARM] 落在 attack 帧后的累计次数
-          - FP 是 [ALARM] 落在 normal 帧后的累计次数
+        ⭐ 2026-10-19: 删 per-frame state 维护 (per-frame 已删除).
         """
-        tp, fp = self._tp_count, self._fp_count
-        sent, normal = self._sent_count, self._normal_count
-        total = self._total_count
+        # ⭐⭐ 第六十一轮 (2026-10-11): 双源数据架构.
+        #   - 4 个主 KPI (Total / Normal / Attack / Detected) ← 内部 state (_window_*_count
+        #     + _detected_count). 这些是 PC 实际发送的 windows 累计 (per-window 累计).
+        #   - TP / FP / TN / FN + 4 派生率 ← _window_eval.get_metrics() (WindowEvaluator).
+        #   这样 _on_window_stats 喂 state 即时驱动主 KPI label (test 友好), WindowEvaluator
+        #   喂 wm 驱动评估指标 (production 实际由 worker.frame_sent_type → on_frame +
+        #   parser.count_changed → on_alarm 两条路径并行喂, 1:1 对齐训练 max-aggregation).
+        n_w = self._window_total_count
+        n_attack_w = self._window_attack_count
+        n_normal_w = self._window_normal_count
+        detected = self._detected_count
+        wm = self._window_eval.get_metrics()
+        wtp = wm['tp']
+        wfp = wm['fp']
+        wtn = wm['tn']
+        wfn = wm['fn']
+        # ⭐⭐ 第六十一轮 (2026-10-11): 双源数据架构.
+        #   - 4 个主 KPI (Total / Normal / Attack / Detected) ← 内部 state (_window_*_count
+        #     + _detected_count). 这些是 PC 实际发送的 windows 累计 (per-window 累计).
+        #   - TP / FP / TN / FN + 4 派生率 ← _window_eval.get_metrics() (WindowEvaluator).
+        #   这样 _on_window_stats 喂 state 即时驱动主 KPI label (test 友好), WindowEvaluator
+        #   喂 wm 驱动评估指标 (production 实际由 worker.frame_sent_type → on_frame +
+        #   parser.count_changed → on_alarm 两条路径并行喂, 1:1 对齐训练 max-aggregation).
+        n_w = self._window_total_count
+        n_attack_w = self._window_attack_count
+        n_normal_w = self._window_normal_count
+        detected = self._detected_count
+        wm = self._window_eval.get_metrics()
+        wtp = wm['tp']
+        wfp = wm['fp']
+        wtn = wm['tn']
+        wfn = wm['fn']
 
-        # Precision
-        if (tp + fp) > 0:
-            prec = 100.0 * tp / (tp + fp)
-            self.precision_label.setText(f"{prec:.1f}%")
-        else:
-            self.precision_label.setText("—")
+        # 1-4. Total / Normal / Attack / Detected
+        self.wn_label.setText(str(n_w))
+        self.wnormal_label.setText(str(n_normal_w))
+        self.wattack_label.setText(str(n_attack_w))
+        self.wdetected_label.setText(str(detected))
 
-        # Recall
-        if sent > 0:
-            rec = 100.0 * tp / sent
-            self.recall_label.setText(f"{rec:.1f}%")
-        else:
-            self.recall_label.setText("—")
+        # 5-8. TP / FP / TN / FN
+        self.wtp_label.setText(str(wtp))
+        self.wfp_label.setText(str(wfp))
+        self.wtn_label.setText(str(wtn))
+        self.wfn_label.setText(str(wfn))
 
-        # F1 = 2 * P * R / (P + R)
-        if (tp + fp) > 0 and sent > 0:
-            p = tp / (tp + fp)
-            r = tp / sent
-            if (p + r) > 0:
-                f1 = 2.0 * p * r / (p + r) * 100.0
-                self.f1_label.setText(f"{f1:.1f}%")
-            else:
-                self.f1_label.setText("—")
+        if wm['n_windows'] > 0:
+            # 9. Precision (per-window 精确率, 跟训练 Precision 直接对比)
+            self.wprecision_label.setText(f"{100.0 * wm['precision']:.1f}%")
+            # 10. Recall (per-window 召回率, ⭐ 跟训练 Recall 字段直接对比)
+            #    clamp 100% 防御性保护 (跟训练 100% 上限对齐)
+            raw_rec = 100.0 * wm['recall']
+            rec = min(raw_rec, 100.0)
+            self.wrecall_label.setText(f"{rec:.1f}%")
+            # 11. F1 (⭐ 跟训练 F1m 直接对比的核心指标)
+            self.wf1_label.setText(f"{100.0 * wm['f1']:.1f}%")
+            # 12. Accuracy (per-window (TP+TN)/Total, 跟训练 Accuracy 直接对比)
+            self.waccuracy_label.setText(f"{100.0 * wm['accuracy']:.1f}%")
         else:
-            self.f1_label.setText("—")
+            self.wprecision_label.setText("—")
+            self.wrecall_label.setText("—")
+            self.wf1_label.setText("—")
+            self.waccuracy_label.setText("—")
 
-        # Accuracy = (TP + TN) / Total, 其中 TN = Normal - FP
-        if total > 0:
-            tn = max(0, normal - fp)  # 防御性 max, FP 不会超过 Normal
-            acc = 100.0 * (tp + tn) / total
-            self.accuracy_label.setText(f"{acc:.1f}%")
+        # 13. FPR (per-window FP / Normal windows) — WindowEvaluator 不直接算, 派生
+        if n_normal_w > 0:
+            fpr = 100.0 * wfp / n_normal_w
+            self.wfpr_label.setText(f"{fpr:.1f}%")
         else:
-            self.accuracy_label.setText("—")
+            self.wfpr_label.setText("—")
 
-        # FPR
-        if normal > 0:
-            fpr = 100.0 * fp / normal
-            self.fpr_label.setText(f"{fpr:.1f}%")
-        else:
-            self.fpr_label.setText("—")
+        # ⭐ 第四十轮 (2026-10-02): 推送 5 个派生率给 MetricsChartPanel.
+        #   ⭐⭐ 第六十一轮: 数据源改 per-window (跟训练 1:1, 跟 UI 显示 1:1).
+        #   字段名 (p/r/f1/acc/fpr) 保持不变, MetricsChartPanel 自动适配.
+        #   每个值可能为 None (数据不足, 标签显示 "—").
+        #   即使全 None 也 emit, 让曲线面板知道"过了一个事件点" (用于 X 轴计数).
+        self.metrics_updated.emit({
+            'p':   (100.0 * wm['precision']) if n_w > 0 else None,
+            'r':   (min(100.0, 100.0 * wm['recall'])) if n_w > 0 else None,
+            'f1':  (100.0 * wm['f1']) if n_w > 0 else None,
+            'acc': (100.0 * wm['accuracy']) if n_w > 0 else None,
+            'fpr': (100.0 * wfp / n_normal_w) if n_normal_w > 0 else None,
+        })
 
     def reset_counters(self):
-        """重置全部 6 个 KPI + 5 个派生率 (供测试开始前 / 用户手动清零)."""
-        self._total_count = 0
-        self._sent_count = 0
-        self._normal_count = 0
+        """重置全部 13 个 per-window KPI + 内部 state (供测试开始前 / 用户手动清零).
+
+        ⭐ 2026-10-19: 删 per-frame state 重置 (per-frame 已删除).
+        """
+        # ⭐⭐ 第五十二轮: per-window 内部 state 也清零, 避免残留污染下次测试.
+        self._window_total_count = 0
+        self._window_normal_count = 0
+        self._window_attack_count = 0
+        # ⭐ 第二十八轮: 同时清 Detected baseline, 让下次首个 [ALARM] 重新捕获.
+        #   ⭐ 第五十二轮: Detected 现在 = H743 windows_attack delta (per-window 累计).
         self._detected_count = 0
-        self._tp_count = 0
-        self._fp_count = 0
-        self.total_label.setText("0")
-        self.sent_label.setText("0")
-        self.normal_label.setText("0")
-        self.detected_label.setText("0")
-        self.tp_label.setText("0")
-        self.fp_label.setText("0")
-        self.precision_label.setText("—")
-        self.recall_label.setText("—")
-        self.f1_label.setText("—")
-        self.accuracy_label.setText("—")
-        self.fpr_label.setText("—")
+        self._detected_baseline = None
+        # ⭐⭐ 第六十一轮: 删所有 per-frame label setText (label 已删). 改 13 个
+        #   per-window label 重置 (5 个新增 + 8 个原有).
+        self.wn_label.setText("0")
+        self.wnormal_label.setText("0")
+        self.wattack_label.setText("0")
+        self.wdetected_label.setText("0")
+        self.wtp_label.setText("0")
+        self.wfp_label.setText("0")
+        self.wtn_label.setText("0")
+        self.wfn_label.setText("0")
+        self.wprecision_label.setText("—")
+        self.wrecall_label.setText("—")
+        self.wf1_label.setText("—")
+        self.waccuracy_label.setText("—")
+        self.wfpr_label.setText("—")
+        # ⭐ 第四十八轮: 重置 per-window 评估器
+        self._window_eval.reset()
+        # ⭐ 2026-10-11: 重置 attack/alarm 实时颜色
+        self._refresh_attack_alarm_color()
         # ⭐ 第二十轮: 同时清空 parser 的 _last_was_attack, 避免旧的 PC 帧类型污染新测试
         self._parser.reset_last_was_attack()
+        # ⭐ 第四十轮: 通知 MetricsChartPanel 同步清空曲线 history
+        self.metrics_reset.emit()
+
+
+# === Metrics 曲线面板 (第四十轮 2026-10-02) ===============================
+# 5 个 IDS 派生指标 (Precision / Recall / F1 / Accuracy / FPR) 实时曲线.
+# 数据源: 订阅 IdsReportPanel.metrics_updated (每个 [ALARM] 事件一次).
+# 渲染: matplotlib FigureCanvasQTAgg, 暗色主题 (与 GUI 暗色调一致).
+
+class MetricsChartPanel(QWidget):
+    """5 个 IDS 指标实时曲线面板.
+
+    数据流:
+      IdsReportPanel.metrics_updated(dict) → _on_metrics_updated
+        → append 到 self._history (FIFO 500)
+        → _redraw() 增量更新 matplotlib Line2D
+
+    控件:
+      - 🗑 清空曲线 按钮: 清空 history + x 索引归零
+      - ⏸ 暂停 / ▶ 继续 切换: 暂停时不追加新点 (按钮 text 切换)
+    """
+
+    # FIFO 上限, 防止长测试无限增长导致 matplotlib 卡顿
+    _FIFO_CAP = 500
+
+    # 5 条曲线的颜色, 与 IdsReportPanel 标签配色对齐 (便于视觉关联)
+    _COLORS = {
+        'p':   '#aa6600',   # Precision — 橙棕
+        'r':   '#0066cc',   # Recall    — 蓝 (区分 Precision)
+        'f1':  '#cc0066',   # F1        — 粉
+        'acc': '#7b1fa2',   # Accuracy  — 紫
+        'fpr': '#d4006a',   # FPR       — 品红 (与 fpr_label 同色)
+    }
+    _LABELS = {
+        'p':   'Precision',
+        'r':   'Recall',
+        'f1':  'F1',
+        'acc': 'Accuracy',
+        'fpr': 'FPR',
+    }
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._history: list[dict] = []   # [{p,r,f1,acc,fpr}, ...]
+        self._x_idx: int = 0             # 累计事件数 (X 轴)
+        self._paused: bool = False
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(4, 4, 4, 4)
+        outer.setSpacing(4)
+
+        # 顶部 toolbar: 清空 + 暂停
+        toolbar = QHBoxLayout()
+        self.chart_clear_btn = QPushButton("🗑 清空曲线")
+        self.chart_clear_btn.setToolTip("清空历史曲线点 (X 轴归零)")
+        self.chart_clear_btn.clicked.connect(self._on_clear_clicked)
+        self.chart_pause_btn = QPushButton("⏸ 暂停")
+        self.chart_pause_btn.setCheckable(True)
+        self.chart_pause_btn.setToolTip("暂停时不追加新曲线点 (X 轴也不递增)")
+        self.chart_pause_btn.toggled.connect(self._on_pause_toggled)
+        toolbar.addWidget(self.chart_clear_btn)
+        toolbar.addWidget(self.chart_pause_btn)
+        toolbar.addStretch(1)
+        # 状态标签: 显示当前 history 大小
+        self.chart_status_label = QLabel("0 点")
+        self.chart_status_label.setStyleSheet("color: #888; font-size: 11px;")
+        toolbar.addWidget(self.chart_status_label)
+        outer.addLayout(toolbar)
+
+        if not _MPL_AVAILABLE:
+            # matplotlib 缺失: 显示占位提示
+            placeholder = QLabel(
+                "(matplotlib 未安装, 无法显示曲线)\n"
+                "安装: pip install matplotlib"
+            )
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setStyleSheet("color: #888; padding: 40px;")
+            outer.addWidget(placeholder, stretch=1)
+            self.canvas = None
+            self.ax = None
+            self.lines: dict[str, object] = {}
+            return
+
+        # matplotlib Figure + Canvas
+        self.fig = Figure(figsize=(7, 3), dpi=80, facecolor='#2d2d2d')
+        self.ax = self.fig.add_subplot(111)
+        self._style_axes()
+        self.canvas = _MplCanvas(self.fig)
+        outer.addWidget(self.canvas, stretch=1)
+
+        # 创建 5 条 Line2D (初始全空)
+        self.lines: dict[str, object] = {}
+        xs: list[int] = []
+        ys: list[float] = []
+        for key in ('p', 'r', 'f1', 'acc', 'fpr'):
+            line, = self.ax.plot(
+                xs, ys,
+                color=self._COLORS[key],
+                label=self._LABELS[key],
+                linewidth=1.5,
+                marker='o',
+                markersize=3,
+            )
+            self.lines[key] = line
+        # 图例 (右上, 暗底)
+        legend = self.ax.legend(
+            loc='upper right',
+            facecolor='#1e1e1e',
+            edgecolor='#555',
+            labelcolor='white',
+            fontsize=9,
+        )
+        self.canvas.draw_idle()
+
+    def _style_axes(self) -> None:
+        """设置 matplotlib 暗色主题 (与 GUI 一致)."""
+        assert self.ax is not None
+        ax = self.ax
+        ax.set_facecolor('#1e1e1e')
+        ax.set_title('IDS 指标实时曲线', color='white', fontsize=11)
+        ax.set_xlabel('事件 #', color='#aaa', fontsize=9)
+        ax.set_ylabel('百分比 (%)', color='#aaa', fontsize=9)
+        ax.set_ylim(0, 100)
+        ax.set_xlim(0, max(1, self._FIFO_CAP))
+        # 刻度颜色
+        ax.tick_params(axis='x', colors='#aaa', labelsize=8)
+        ax.tick_params(axis='y', colors='#aaa', labelsize=8)
+        # 边框颜色
+        for spine in ax.spines.values():
+            spine.set_color('#555')
+        # 网格
+        ax.grid(True, color='#444', linestyle='--', linewidth=0.5, alpha=0.7)
+        self.fig.tight_layout()
+
+    # ===== Slots =====
+
+    def _on_metrics_updated(self, m: dict) -> None:
+        """IdsReportPanel.metrics_updated 信号回调 (每个 [ALARM] 事件一次)."""
+        if self._paused:
+            return
+        self._history.append(m)
+        if len(self._history) > self._FIFO_CAP:
+            # FIFO 截断
+            self._history = self._history[-self._FIFO_CAP:]
+        self._x_idx += 1
+        self._redraw()
+
+    def _on_metrics_reset(self) -> None:
+        """IdsReportPanel.metrics_reset 信号回调 (用户/测试开始时清零)."""
+        self._clear_internal()
+
+    def _on_clear_clicked(self) -> None:
+        """🗑 清空曲线 按钮回调."""
+        self._clear_internal()
+
+    def _on_pause_toggled(self, checked: bool) -> None:
+        """⏸/▶ 切换按钮回调."""
+        self._paused = checked
+        self.chart_pause_btn.setText("▶ 继续" if checked else "⏸ 暂停")
+
+    # ===== Internal =====
+
+    def _clear_internal(self) -> None:
+        self._history.clear()
+        self._x_idx = 0
+        self._redraw()
+
+    def _redraw(self) -> None:
+        """重绘 5 条曲线 + 状态标签."""
+        self.chart_status_label.setText(f"{len(self._history)} 点")
+        if self.canvas is None:
+            return
+        # 重建 X / Y 数组
+        n = len(self._history)
+        xs = list(range(n))
+        for key in ('p', 'r', 'f1', 'acc', 'fpr'):
+            ys = [h.get(key) for h in self._history]
+            # matplotlib 不能直接 plot None — 替换为 nan 让线条断开
+            import math
+            ys_plot = [y if y is not None else math.nan for y in ys]
+            line = self.lines[key]
+            line.set_data(xs, ys_plot)
+        # 重置 X 轴范围 (适应 FIFO 满的情况)
+        if n > 0:
+            self.ax.set_xlim(0, max(self._FIFO_CAP, n))
+        self.canvas.draw_idle()
 
 
 # === 测试日志 (第二十一轮 2026-09-20) ====================================
@@ -1121,18 +2062,19 @@ class IdsReportPanel(QWidget):
 class TestLogger:
     """结构化测试日志 — 每个事件一行 CSV, 方便事后分析.
 
+    ⭐ 2026-10-19: 删 per-frame 计数 (running_total/attack/normal/tp/fp), 只保留
+    per-window KPI 跟踪. PC sim 跟 H743 1:1 对齐, evaluation 都是 per-window.
+
     写入 logs/test_<YYYYMMDD-HHMMSS>.csv, 列:
       t_event_ms | event | frame_idx | binary | n_bytes | alarm_count
-      | prob_x1000 | is_fp | running_total | running_attack | running_normal
-      | running_tp | running_fp | gap_after_send_ms | note
+      | prob_x1000 | is_fp | gap_after_send_ms | note
 
     同时写 .summary.txt (KPI 快照, 每次 close() 时更新).
     """
     HEADER = [
         't_event_ms', 'event', 'frame_idx', 'binary', 'n_bytes',
         'alarm_count', 'prob_x1000', 'is_fp',
-        'running_total', 'running_attack', 'running_normal',
-        'running_tp', 'running_fp', 'gap_after_send_ms', 'note',
+        'gap_after_send_ms', 'note',
     ]
 
     def __init__(self):
@@ -1141,12 +2083,19 @@ class TestLogger:
         self._path = None
         self._t0_ms: Optional[int] = None  # 测试开始 unix ms
         self._last_send_ms: Optional[int] = None  # 上一次 SEND 的 unix ms (算 gap)
-        # KPI 跟踪
-        self.running_total = 0
-        self.running_attack = 0
-        self.running_normal = 0
-        self.running_tp = 0
-        self.running_fp = 0
+        # ⭐⭐ 第五十二轮 c (2026-10-10): per-window KPI 跟踪, 跟训练 / H743 1:1.
+        #   running_window_total/attack/normal: 累计 windows (由 ReplayWorker.window_stats 维护)
+        #   running_window_detected: H743 windows_attack 累计 (= IdsLineParser.count_changed delta)
+        #   running_window_tp/fp/tn/fn: per-window 评估 (由 main_window 在 close 前 push 进来)
+        self.running_window_total = 0
+        self.running_window_attack = 0
+        self.running_window_normal = 0
+        self.running_window_detected = 0  # H743 windows_attack 累计
+        # per-window 混淆矩阵 (push from ids_report._window_eval.get_metrics())
+        self.running_window_tp = 0
+        self.running_window_fp = 0
+        self.running_window_tn = 0
+        self.running_window_fn = 0
 
     @property
     def is_open(self) -> bool:
@@ -1181,38 +2130,31 @@ class TestLogger:
         now_ms = int(_t.time() * 1000)
         t_event = now_ms - (self._t0_ms or now_ms)
         gap = '' if self._last_send_ms is None else (now_ms - self._last_send_ms)
-        self.running_total += 1
-        if binary == 1:
-            self.running_attack += 1
-        else:
-            self.running_normal += 1
         self._writer.writerow([
             t_event, 'SEND', frame_idx, binary, n_bytes,
             '', '', '',
-            self.running_total, self.running_attack, self.running_normal,
-            self.running_tp, self.running_fp, gap, note,
+            gap, note,
         ])
         self._file.flush()
         self._last_send_ms = now_ms
 
     def log_alarm(self, alarm_count: int, prob_x1000: Optional[int],
-                  is_fp: Optional[bool], running_tp: Optional[int] = None,
-                  running_fp: Optional[int] = None, note: str = "") -> None:
-        """记录一次 H743 上行 [ALARM] 事件 (含 TP/FP 分类).
+                  is_fp: Optional[bool], h743_frame: int = 0,
+                  note: str = "") -> None:
+        """记录一次 H743 上行 [ALARM] 事件.
 
-        ⭐ 第二十三轮 (2026-09-30): 不再自己 increment running_tp/running_fp,
-        改由调用方传入 delta-driven 的正确值 (从 IdsReportPanel._tp_count/_fp_count 读).
-        旧逻辑按 [ALARM] 消息数 +1 会跟 IdsReportPanel 的 delta-driven 计数重复或漏算.
+        ⭐ 2026-10-19: 删 running_tp/running_fp 参数 (per-frame 计数已删除).
+
+        ⭐ 第六十一轮 (2026-10-11): h743_frame 写到 CSV 第 3 列 (frame_idx), 诊断时
+        可直接读 CSV 看到 H743 实际发的是哪个 frame, 不必依赖 GUI 解析逻辑.
 
         Args:
             alarm_count: H743 当前累计 frames_attack (本次 [ALARM] 上行携带的值)
             prob_x1000: H743 printf 输出的 prob=0.NNN × 1000
             is_fp: True=误报 (窗内全 normal), False=命中 (窗内有 attack), None=未判定
                    注: 这是单 [ALARM] 消息级 is_fp (legacy 标签), 不代表 H743 内部 alarm_count 增量
-            running_tp: 当前累计 TP (delta-driven, 从 IdsReportPanel._tp_count 取)
-            running_fp: 当前累计 FP (delta-driven, 从 IdsReportPanel._fp_count 取)
-                        None 表示不更新 (使用调用前的 self.running_tp/running_fp)
-            note: 备注 (如 'prob=0.469')
+            h743_frame: ⭐ 第六十一轮: H743 上行的 frame=N 字段, 0=旧固件没发
+            note: 备注 (如 'prob=0.469 frame=16384')
         """
         if not self.is_open:
             return
@@ -1220,17 +2162,13 @@ class TestLogger:
         now_ms = int(_t.time() * 1000)
         t_event = now_ms - (self._t0_ms or now_ms)
         gap = '' if self._last_send_ms is None else (now_ms - self._last_send_ms)
-        # ⭐ 第二十三轮: 调用方负责更新 running_tp/running_fp (避免双计数)
-        if running_tp is not None:
-            self.running_tp = running_tp
-        if running_fp is not None:
-            self.running_fp = running_fp
+        # ⭐ 第六十一轮: frame_idx 列写 H743 实际发的 frame (旧固件写空字符串)
+        frame_idx_str = str(h743_frame) if h743_frame > 0 else ''
         self._writer.writerow([
-            t_event, 'ALARM', '', '', '',
+            t_event, 'ALARM', frame_idx_str, '', '',
             alarm_count, prob_x1000 if prob_x1000 is not None else '',
             ('FP' if is_fp is True else ('TP' if is_fp is False else '')),
-            self.running_total, self.running_attack, self.running_normal,
-            self.running_tp, self.running_fp, gap, note,
+            gap, note,
         ])
         self._file.flush()
 
@@ -1243,44 +2181,76 @@ class TestLogger:
         t_event = now_ms - (self._t0_ms or now_ms)
         self._writer.writerow([
             t_event, event, '', '', '', '', '', '',
-            self.running_total, self.running_attack, self.running_normal,
-            self.running_tp, self.running_fp, '', note,
+            '', note,
         ])
         self._file.flush()
 
     def write_summary(self) -> None:
-        """关闭时写 KPI 摘要到 <path>.summary.txt."""
+        """关闭时写 per-window KPI 摘要到 <path>.summary.txt.
+
+        ⭐ 2026-10-19: 删 per-frame 块, 只保留 per-window (跟训练 / H743 1:1).
+        """
         if not self.is_open or not self._path:
             return
         summary_path = self._path + '.summary.txt'
-        sent = self.running_attack
-        normal = self.running_normal
-        recall = self.running_tp / sent if sent else 0
-        fpr = self.running_fp / normal if normal else 0
-        precision = self.running_tp / (self.running_tp + self.running_fp) if (self.running_tp + self.running_fp) else 0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0
-        # Accuracy = (TP + TN) / Total, 其中 TN = Normal - FP
-        tn = max(0, self.running_normal - self.running_fp)
-        accuracy = (self.running_tp + tn) / self.running_total if self.running_total else 0
+        # ====== Per-Window (跟训练 1:1) ======
+        w_total = self.running_window_total
+        w_attack = self.running_window_attack
+        w_normal = self.running_window_normal
+        w_detected = self.running_window_detected
+        w_tp = self.running_window_tp
+        w_fp = self.running_window_fp
+        w_tn = self.running_window_tn
+        w_fn = self.running_window_fn
+        # Per-Window 4 指标: 跟训练 macro_f1 1:1
+        w_recall = w_tp / w_attack if w_attack else 0
+        w_fpr = w_fp / w_normal if w_normal else 0
+        w_precision = w_tp / (w_tp + w_fp) if (w_tp + w_fp) else 0
+        w_f1 = (2 * w_precision * w_recall / (w_precision + w_recall)
+                if (w_precision + w_recall) else 0)
+        w_accuracy = ((w_tp + w_tn) / w_total if w_total else 0)
         try:
             with open(summary_path, 'w', encoding='utf-8') as f:
-                f.write(f'Test Summary\n')
-                f.write(f'=' * 60 + '\n')
-                f.write(f'Log file:        {self._path}\n')
-                f.write(f'Total frames:    {self.running_total}\n')
-                f.write(f'  Attack (Sent): {self.running_attack}\n')
-                f.write(f'  Normal:        {self.running_normal}\n')
-                f.write(f'TP:              {self.running_tp}\n')
-                f.write(f'FP:              {self.running_fp}\n')
-                f.write(f'TN:              {tn}  (= Normal - FP)\n')
-                f.write(f'FN:              {self.running_attack - self.running_tp}  (= Attack - TP)\n')
-                f.write(f'Recall (TP/Sent):{recall:.4f}  ({recall*100:.2f}%)\n')
-                f.write(f'FPR    (FP/Norm):{fpr:.4f}  ({fpr*100:.2f}%)\n')
-                f.write(f'Precision:       {precision:.4f}  ({precision*100:.2f}%)\n')
-                f.write(f'F1:              {f1:.4f}  ({f1*100:.2f}%)\n')
-                f.write(f'Accuracy:        {accuracy:.4f}  ({accuracy*100:.2f}%)\n')
+                f.write('Test Summary\n')
+                f.write('=' * 60 + '\n')
+                f.write(f'Log file:        {self._path}\n\n')
+                f.write('─── Per-Window 评估 (跟训练 max-aggregation 1:1, window=16) ───\n')
+                f.write(f'Total windows:   {w_total}\n')
+                f.write(f'  Attack (Sent): {w_attack}  (16 帧任一帧 attack → max-aggregation)\n')
+                f.write(f'  Normal:        {w_normal}  (16 帧全 normal)\n')
+                f.write(f'  Detected:      {w_detected}  (H743 windows_attack 累计, 含 FP)\n')
+                # ⭐ Round 71 (2026-10-13): 公式 Attack - Detected 错误, 因为 Detected = TP + FP
+                #   不是 TP. 当 FPs > 0 时 Detected > Attack, 公式出负数 (e.g. test_20261013-233626
+                #   报 "Missed (FN): -4" 实际 FN=0). 改用 Attack - TP, 跟下方 FN 行一致.
+                f.write(f'  Missed (FN):   {w_attack - w_tp}  (Attack - TP, 应跟下方 FN 一致)\n')
+                f.write(f'TP:              {w_tp}\n')
+                f.write(f'FP:              {w_fp}\n')
+                f.write(f'TN:              {w_tn}\n')
+                f.write(f'FN:              {w_fn}\n')
+                f.write(f'Recall (TP/Atk): {w_recall:.4f}  ({w_recall*100:.2f}%)  ⭐ 跟训练 Recall 对比\n')
+                f.write(f'FPR    (FP/Norm):{w_fpr:.4f}  ({w_fpr*100:.2f}%)\n')
+                f.write(f'Precision:       {w_precision:.4f}  ({w_precision*100:.2f}%)\n')
+                f.write(f'F1:              {w_f1:.4f}  ({w_f1*100:.2f}%)  ⭐ 跟训练 F1m 对比\n')
+                f.write(f'Accuracy:        {w_accuracy:.4f}  ({w_accuracy*100:.2f}%)\n')
         except Exception:
             pass
+
+    def set_window_metrics(self, wm: dict) -> None:
+        """从 IdsReportPanel._window_eval.get_metrics() 推 per-window 4 指标到 summary.
+
+        ⭐ 第五十二轮 c: main_window._on_finished 调本方法把 WindowEvaluator 当前状态
+        (TP/FP/TN/FN/n_windows) 喂给 TestLogger, write_summary 算 per-window 块.
+        """
+        if not wm:
+            return
+        self.running_window_tp = int(wm.get('tp', 0))
+        self.running_window_fp = int(wm.get('fp', 0))
+        self.running_window_tn = int(wm.get('tn', 0))
+        self.running_window_fn = int(wm.get('fn', 0))
+        # n_windows 也存一下 (跟 running_window_total 概念一致, 优先用 wm 给的值)
+        n_w = int(wm.get('n_windows', 0))
+        if n_w > 0:
+            self.running_window_total = n_w
 
     def close(self) -> None:
         if self._file:
@@ -1344,6 +2314,10 @@ class RTUReplayGUI(QMainWindow):
         self.manual_normal_count = 0
         # RX 区状态
         self._rx_reader: Optional[SerialReader] = None
+        # ⭐ 2026-10-19 SITE 4 capture: raw RX 字节落到文件 (无 buffer 上限)
+        self._rx_dump_file: Optional[object] = None
+        self._rx_dump_path: Optional[str] = None
+        self._rx_dump_n_bytes: int = 0
         # ⭐ 第二十一轮 (2026-09-20): 结构化测试日志 (CSV + summary)
         self.test_logger = TestLogger()
         self._build_ui()
@@ -1352,12 +2326,29 @@ class RTUReplayGUI(QMainWindow):
 
     # --- UI ---
     def _build_ui(self):
-        central = QWidget()
-        self.setCentralWidget(central)
+        # ⭐ 第四十一轮 (2026-10-02): QScrollArea 包装 root, 让 GUI 可上下滚动.
+        #   起因: Round 40 加 MetricsChartPanel (matplotlib 暗色曲线) 后, 总高度超过常见
+        #   笔记本屏幕 (典型 800-1080px 高), 用户看不到新加的曲线图表. 用 QScrollArea
+        #   让 root 内容放进一个可滚动容器, 内容超出窗口高度时自动显示垂直滚动条.
+        #   setWidgetResizable(True) 让容器宽度跟随窗口缩放, 高度按内容自动.
+        #   Qt.ScrollBarAsNeeded 让滚动条只在需要时出现 (不撑高度).
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 只允许垂直滚动
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setFrameShape(QScrollArea.NoFrame)  # 无边框, 与窗口融为一体
+        _apply_scrollbar_style(scroll)  # ⭐ 第四十一轮: 统一滚动条样式 (宽 12px, hover 蓝)
+        self.setCentralWidget(scroll)
+        central = QWidget()                # 容器 widget
+        scroll.setWidget(central)
         root = QVBoxLayout(central)
+        root.setContentsMargins(8, 8, 8, 8)  # 留 8px 边距, 滚动条不贴边
+        # ⭐ 第四十一轮: 暴露滚动区供测试用, 也供调试时手动滚动.
+        self._scroll_area = scroll
 
         # 串口设置
         port_box = QGroupBox("串口设置")
+        _style_chinese_groupbox(port_box)
         grid = QGridLayout(port_box)
         grid.addWidget(QLabel("COM:"), 0, 0)
         self.port_combo = QComboBox()
@@ -1402,10 +2393,14 @@ class RTUReplayGUI(QMainWindow):
         )
         grid.addWidget(self.port_status_label, 4, 0, 1, 3)
 
-        root.addWidget(port_box)
+        # ⭐ 2026-10-01 第二十四轮: 串口设置 + 回放选项 同一行 (横向并排, 节省垂直空间)
+        #   两者各有自己的 GroupBox, 用 QHBoxLayout 横向并排, 各自 stretch=1 平分宽度.
+        top_row = QHBoxLayout()
+        top_row.addWidget(port_box, stretch=1)
 
         # CSV
         csv_box = QGroupBox("数据集 (IanArffDataset.csv)")
+        _style_chinese_groupbox(csv_box)
         csv_layout = QHBoxLayout(csv_box)
         csv_layout.addWidget(QLabel("路径:"))
         self.csv_edit = QLineEdit(DEFAULT_CSV)
@@ -1416,126 +2411,159 @@ class RTUReplayGUI(QMainWindow):
 
         # 回放选项
         opt_box = QGroupBox("回放选项")
+        _style_chinese_groupbox(opt_box)
         opt = QGridLayout(opt_box)
-        opt.addWidget(QLabel("速度 (倍率):"), 0, 0)
-        self.speed_combo = QComboBox()
-        # ⭐ 第二十一轮: 加 "10ms/帧" 固定间隔选项, 给 DMA 256-byte 解析瓶颈测试用
-        # ⭐ 第二十二轮: 加 "自定义 ms/帧" 选项, 让 interval spinbox 生效
-        self.speed_combo.addItems(['0.1x', '0.5x', '1x', '2x', '5x', '10x', '50x', '100x', 'Max',
-                                       '10ms/帧 (固定)', '自定义 (ms/帧, 见右侧)'])
-        self.speed_combo.setCurrentText('10x')  # 默认 10x,1x 跑 76h 太慢
-        opt.addWidget(self.speed_combo, 0, 1)
-        opt.addWidget(QLabel("攻击过滤:"), 1, 0)
+        # ⭐ 2026-10-01 第二十三轮: 删速度倍率 (CSV time × speed 倍率, 1x 跑 76h 太慢的旧逻辑),
+        #   删循环播放 (用户只跑一次看 KPI), 删合成时序 (代码逻辑已不用, 留 UI 造成混淆).
+        #   保留"自动发送间隔"作为唯一速度控制 (interval_spin: 0-1000ms), 默认 40ms (auto-40ms).
+        opt.addWidget(QLabel("攻击过滤:"), 0, 0)
         self.attack_combo = QComboBox()
         self.attack_combo.addItems(['all (全部)'] + ATTACK_LABELS)
-        opt.addWidget(self.attack_combo, 1, 1)
-        # ⭐ 第二十三轮 (2026-09-29): 重命名为"自动发送间隔", 让用户清楚这是固定间隔模式.
-        #   0   = 禁用, 走 speed_combo (CSV time × 倍率) 或 "10ms/帧 (固定)"
-        #   1-1000 = 自动发送模式: 每帧之间 sleep N ms, 忽略 CSV time 列
-        #   默认 100ms 给 H743 sniffer 测试用 (≈10 帧/秒, 既不丢帧又能实时观察 KPI)
-        opt.addWidget(QLabel("自动发送间隔 (ms):"), 2, 0)
+        opt.addWidget(self.attack_combo, 0, 1)
+        opt.addWidget(QLabel("自动发送间隔 (ms):"), 1, 0)
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(0, 1000)
-        self.interval_spin.setValue(100)  # 默认 100ms = 10 帧/秒
-        self.interval_spin.setSuffix(" ms/帧 (0=禁用)")
+        self.interval_spin.setValue(40)  # ⭐ 默认 40ms = auto-40ms 测试档
+        self.interval_spin.setSuffix(" ms/帧 (0=禁用,走 CSV time)")
         self.interval_spin.setToolTip(
             "🟢 自动发送间隔 (覆盖 CSV time 列):\n"
-            "  • 0   = 禁用, 走速度倍率 或 10ms/帧\n"
+            "  • 0   = 禁用, 用 CSV time 列作为自然间隔\n"
             "  • 1-1000 = 自动按 N 毫秒间隔发送每帧\n"
-            "• 用途: 实时观察 IDS 面板 KPI, 避免发送过快掩盖 H743 漏报\n"
-            "• 推荐值: 100ms (10帧/秒) 观察, 10ms 压测, 500ms dump 测试"
+            "• 推荐值: 40ms (auto-40ms 标准), 100ms 慢观察, 10ms 压测, 500ms dump 测试"
         )
-        opt.addWidget(self.interval_spin, 2, 1)
-        self.loop_chk = QCheckBox("循环播放")
+        opt.addWidget(self.interval_spin, 1, 1)
+        # ⭐ 2026-10-01 第二十三轮: 新增起始帧选择, 让用户从指定 frame_idx 开始自动发送.
+        opt.addWidget(QLabel("起始帧 (0-based):"), 2, 0)
+        self.start_frame_spin = QSpinBox()
+        self.start_frame_spin.setRange(0, 9999999)
+        self.start_frame_spin.setValue(0)
+        self.start_frame_spin.setSuffix(" (CSV 第 N 行)")
+        self.start_frame_spin.setToolTip(
+            "🟢 自动发送起始帧 (0 = 从头开始):\n"
+            "  • 0 = 从 CSV 第 1 行开始\n"
+            "  • N = 从 CSV 第 N+1 行开始 (过滤后行号)\n"
+            "• 用途: 跳过 ramp-up, 或续测上次中断位置"
+        )
+        opt.addWidget(self.start_frame_spin, 2, 1)
         self.verbose_chk = QCheckBox("详细 TX 日志 (会刷屏)")
-        opt.addWidget(self.loop_chk, 3, 0)
-        opt.addWidget(self.verbose_chk, 3, 1)
-        # 2026-09-19: 合成 1.5s/0.1s 时间模式 (匹配 SCADA 训练分布, 见 rtu_replay_gui.py 行 296 注释)
-        self.synth_timing_chk = QCheckBox("合成时序 (1.5s poll / 0.1s resp, 训练分布)")
-        self.synth_timing_chk.setChecked(True)  # 默认开,因为 CSV time 列是 1s 精度整数,与训练不符
-        opt.addWidget(self.synth_timing_chk, 4, 0, 1, 2)
-        root.addWidget(opt_box)
+        opt.addWidget(self.verbose_chk, 3, 0)
+        # ⭐ 2026-10-01 第二十四轮: 回放选项放进 top_row 与 port_box 并排
+        top_row.addWidget(opt_box, stretch=1)
+        root.addLayout(top_row)
 
         # === 手动模式 (单帧发送) ===
         man_box = QGroupBox("手动模式 (单帧发送 — 不走时间间隔)")
-        man = QVBoxLayout(man_box)
-        row1 = QHBoxLayout()
-        self.manual_enable_chk = QCheckBox("启用手动模式")
-        row1.addWidget(self.manual_enable_chk)
-        row1.addStretch(1)
-        self.load_btn = QPushButton("📥 加载 (应用过滤)")
-        row1.addWidget(self.load_btn)
-        man.addLayout(row1)
-
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("当前位置:"))
-        self.pos_label = QLabel("— / —")
-        self.pos_label.setStyleSheet("font-weight: bold; color: #0066cc;")
-        row2.addWidget(self.pos_label)
-        row2.addStretch(1)
-        self.cat_label = QLabel("类别: —")
-        self.cat_label.setStyleSheet("font-weight: bold;")
-        row2.addWidget(self.cat_label)
-        man.addLayout(row2)
-
+        _style_chinese_groupbox(man_box)
+        # ⭐ 第三十七轮 (2026-10-02): 改 QVBoxLayout → QHBoxLayout, 帧预览在左,
+        #   所有按钮 (row1 pos/cat, row2 status+load, row3 nav, row4 manage) 在右 stacked.
+        man = QHBoxLayout(man_box)
+        # 左侧: 帧预览 (大, 150px 高, stretch=1)
+        left_col = QVBoxLayout()
         self.preview_label = QLabel("帧预览: (加载后显示)")
         self.preview_label.setStyleSheet(
-            "font-family: Consolas, monospace; padding: 6px; "
+            "font-family: Consolas, monospace; padding: 8px; "
             "background: #f4f4f4; border: 1px solid #ccc;"
         )
         self.preview_label.setWordWrap(True)
-        # 固定高度:布局不再随 hex 内容长度伸缩,长帧内部换行即可
-        # (96px ≈ 4 行 hex + metadata 行,够用又紧凑)
-        self.preview_label.setMinimumHeight(96)
-        self.preview_label.setMaximumHeight(96)
-        man.addWidget(self.preview_label)
+        # ⭐ 第三十三轮 (2026-10-02): 帧预览框放大, 96px → 150px (6+ 行 hex).
+        #   第三十七轮: 移到 left_col 左侧, 高度保留 150px.
+        self.preview_label.setMinimumHeight(150)
+        self.preview_label.setMaximumHeight(150)
+        left_col.addWidget(self.preview_label, stretch=1)
+        man.addLayout(left_col, stretch=1)
+
+        # 右侧: 所有按钮 stacked (stretch=2 给按钮足够宽度)
+        right_col = QVBoxLayout()
+        # ⭐ 第三十三轮 (2026-10-02): "当前位置 / 类别" 上移到顶部 (状态信息优先),
+        #   原 row2 (pos/cat) 现在变 row1, 原 row1 (status + load) 变 row2.
+        # ⭐ 第三十八轮 (2026-10-02): 加载按钮从 row2 移到 row1 最左侧, 在 "当前位置" 之前.
+        #   用户要求加载按钮放最左, 操作流: 先点"加载", 再观察"当前位置/类别"变化.
+        row1 = QHBoxLayout()
+        # ⭐ 第三十轮: 加载按钮改深蓝色, 突出主操作
+        # ⭐ 第三十八轮: 加载按钮位置从 row2 移到这里 (row1 最左)
+        self.load_btn = QPushButton("📥 加载 (应用过滤)")
+        self.load_btn.setStyleSheet(
+            "background-color: #003366; color: white; font-weight: bold; padding: 6px 12px;"
+        )
+        row1.addWidget(self.load_btn)
+        row1.addWidget(QLabel("当前位置:"))
+        self.pos_label = QLabel("— / —")
+        self.pos_label.setStyleSheet("font-weight: bold; color: #0066cc;")
+        row1.addWidget(self.pos_label)
+        row1.addStretch(1)
+        self.cat_label = QLabel("类别: —")
+        self.cat_label.setStyleSheet("font-weight: bold;")
+        row1.addWidget(self.cat_label)
+        right_col.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        # ⭐ 第三十轮 (2026-10-02): 删除 "启用手动模式" 复选框, 改为状态指示标签.
+        #   手动模式状态完全由 manual_loaded 驱动 (加载=开启, 清空=关闭),
+        #   不再独立 toggle, 避免与"加载"按钮逻辑冲突.
+        # ⭐ 第三十八轮: 加载按钮已移走, row2 现在只剩 manual_status_label.
+        self.manual_status_label = QLabel("⏸ 手动模式: 未加载")
+        self.manual_status_label.setStyleSheet("color: #888; font-weight: bold;")
+        row2.addWidget(self.manual_status_label)
+        row2.addStretch(1)
+        right_col.addLayout(row2)
 
         row3 = QHBoxLayout()
-        self.prev_btn = QPushButton("◀ 上一帧")
+        # ⭐ 第三十九轮 (2026-10-02): "发送并前进" (主操作绿色) 放最左, "上一帧" 跟在后面.
+        #   操作流: 先点 "发送并前进", 然后想反悔才点 "上一帧". 主操作靠左, 符合 GUI 习惯.
         self.send_next_btn = QPushButton("📤 发送并前进")
         self.send_next_btn.setStyleSheet(
             "font-weight: bold; background: #4CAF50; color: white; padding: 8px;"
         )
-        self.resend_btn = QPushButton("🔁 重发当前帧")
+        self.prev_btn = QPushButton("◀ 上一帧")
+        # ⭐ 第三十九轮: "重发当前帧" 移到 row4 (与 reset/reload/unload 同组, 都是行级操作).
         self.goto_spin = QSpinBox()
         self.goto_spin.setRange(1, 274628)
         self.goto_spin.setPrefix("跳到: ")
         self.goto_btn = QPushButton("🎯 跳转")
-        for b in (self.prev_btn, self.send_next_btn, self.resend_btn,
-                  self.goto_spin, self.goto_btn):
+        for b in (self.send_next_btn, self.prev_btn, self.goto_spin, self.goto_btn):
             row3.addWidget(b)
         self.prev_btn.setEnabled(False)
         self.send_next_btn.setEnabled(False)
-        self.resend_btn.setEnabled(False)
         self.goto_btn.setEnabled(False)
-        man.addLayout(row3)
+        right_col.addLayout(row3)
 
-        # 第 4 行: 发送区管理 (清空加载 / 重置指针 / 重新加载)
+        # 第 4 行: 发送区管理 (重发当前帧 / 回到首帧 / 重新加载 / 清空加载)
+        # ⭐ 第三十九轮 (2026-10-02): "重发当前帧" 移到 row4 最左, 在 "回到首帧" 之前.
+        #   row4 现在是行级操作组: 重发 → 回到首帧 → 重新加载 → 清空加载.
         row4 = QHBoxLayout()
+        self.resend_btn = QPushButton("🔁 重发当前帧")
         self.reset_ptr_btn = QPushButton("⏮ 回到首帧")
         self.reset_ptr_btn.setToolTip("手动指针回到 #1 (不丢已加载行)")
         self.reload_btn = QPushButton("🔄 重新加载")
         self.reload_btn.setToolTip("按当前过滤重新读 CSV")
         self.unload_btn = QPushButton("🗑 清空加载")
         self.unload_btn.setToolTip("丢弃已加载的所有行,关闭手动模式")
-        for b in (self.reset_ptr_btn, self.reload_btn, self.unload_btn):
+        for b in (self.resend_btn, self.reset_ptr_btn, self.reload_btn, self.unload_btn):
             b.setEnabled(False)
             row4.addWidget(b)
         row4.addStretch(1)
-        man.addLayout(row4)
+        right_col.addLayout(row4)
+        man.addLayout(right_col, stretch=2)  # ⭐ 第三十七轮: right_col 加 stretch=2 给按钮足够宽度
 
-        # ⭐ 发送区 (man_box) 与 接收区 (rx_box) 同一行, 左右分布.
-        # 创建横向容器, 稍后把 rx_box 也加进来.
-        self.tx_rx_row = QHBoxLayout()
-        self.tx_rx_row.setContentsMargins(0, 0, 0, 0)
-        self.tx_rx_row.setSpacing(6)
-        man_box.setMinimumWidth(380)
-        self.tx_rx_row.addWidget(man_box, stretch=2)
-        # rx_box 在下面创建后再 addWidget 进这里
+        # ⭐ 第三十七轮 (2026-10-02): 手动模式卡片单独一行 (全宽), 内部 preview LEFT + 按钮 RIGHT.
+        #   新 root 顺序:
+        #     1. top_row (port + csv + opt)
+        #     2. man_box (单独一行, 全宽, 内部 QHBoxLayout: preview LEFT, 按钮 RIGHT)
+        #     3. ctrl (start/pause/stop)
+        #     4. progress_bar
+        #     5. stats_label (单独一行, 加 padding 突出)
+        #     6. log_rx_row (rx_box | log_box) ← Round 37 新横向容器
+        #     7. ids_report
+        # 移除旧的 self.stats_rx_row / self.tx_rx_row (Round 30/34/36 引入, 现已废弃).
+        root.addWidget(man_box)
 
         # 控制 (自动回放)
         ctrl = QHBoxLayout()
         self.start_btn = QPushButton("▶ 自动开始")
+        # ⭐ 2026-10-01 第二十四轮: 自动开始按钮浅蓝色 (突出主操作)
+        self.start_btn.setStyleSheet(
+            "background-color: #ADD8E6; font-weight: bold; color: #003366;"
+        )
         self.pause_btn = QPushButton("⏸ 暂停")
         self.stop_btn = QPushButton("⏹ 停止")
         self.pause_btn.setEnabled(False)
@@ -1545,20 +2573,38 @@ class RTUReplayGUI(QMainWindow):
             ctrl.addWidget(b)
         root.addLayout(ctrl)
 
-        # 进度 + 统计
+        # 进度
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(True)
         root.addWidget(self.progress_bar)
-        stats_row = QHBoxLayout()
+
+        # ⭐ 第三十七轮 (2026-10-02): 接收区 + 日志 同行横向排布.
+        #   log_rx_row (QHBoxLayout) 把 rx_box 与 log_box 放在同一 row.
+        #   旧布局 (Round 36): stats_rx_row (stats + rx) + log_box 单独一行.
+        #   新布局 (Round 37): stats_label 单独一行 + log_rx_row (rx + log).
+        #   rx_box 与 log_box 横向并排, 节省垂直空间, 让手动模式卡片更突出.
+        # 先创建 stats_label (单独一行, 全宽, 加 padding 突出"已发送"实时计数).
         self.stats_label = QLabel("已发送: 0 帧 / 0 字节 / 平均 0 B/帧   状态: 空闲")
-        self.stats_label.setStyleSheet("font-weight: bold;")
-        stats_row.addWidget(self.stats_label, stretch=1)
+        self.stats_label.setStyleSheet("font-weight: bold; padding: 4px 6px; "
+                                        "background: #f9f9f9; border: 1px solid #e0e0e0;")
+        root.addWidget(self.stats_label)
+
+        # ⭐ 第三十二轮 (2026-10-02): "📊 帧大小分布" 按钮从 stats_row 移到
+        #   log_toolbar (放 "💾 关闭并写 summary" 之后), 与日志功能按钮集中.
         self.dist_btn = QPushButton("📊 帧大小分布")
-        stats_row.addWidget(self.dist_btn)
-        root.addLayout(stats_row)
+
+        # 接收区 (RX) — 显示从串口收到的字节 (H743 主站轮询请求等)
+        rx_box = QGroupBox("📥 接收区 (RX)")
+        _style_chinese_groupbox(rx_box)
+        rx_layout = QVBoxLayout(rx_box)
+        self.rx_panel = RxPanel()
+        rx_layout.addWidget(self.rx_panel, stretch=1)
+        # ⭐ 第三十轮 (2026-10-02): 去除 maxHeight=220 限制, 加 minHeight 与手动模式卡片对齐.
+        rx_box.setMinimumHeight(380)
 
         # 日志 (顶部带清空按钮的工具栏)
         log_box = QGroupBox("📋 日志")
+        _style_chinese_groupbox(log_box)
         log_layout = QVBoxLayout(log_box)
         log_toolbar = QHBoxLayout()
         self.log_clear_btn = QPushButton("\U0001f5d1 清空日志")
@@ -1576,29 +2622,54 @@ class RTUReplayGUI(QMainWindow):
         self.log_close_btn.setToolTip("关闭 CSV, 写 .summary.txt 摘要")
         self.log_close_btn.setEnabled(False)
         log_toolbar.addWidget(self.log_close_btn)
+        # ⭐ 第三十二轮 (2026-10-02): 帧大小分布按钮放日志组关闭按钮之后
+        log_toolbar.addWidget(self.dist_btn)
+        # ⭐ 2026-10-19 SITE 4 capture: raw RX dump to file (无 buffer 上限)
+        self.rx_dump_btn = QPushButton("📥 RX 原始字节抓包")
+        self.rx_dump_btn.setToolTip(
+            "把 SerialReader 收到的全部字节写到 rx_raw_<时间戳>.log (无 5KB buffer 上限).\n"
+            "用于 SITE 4 capture: 解锁多 [RAW18-DBG] dumps 时不被 terminal scrollback 截断.\n"
+            "再次点击停止抓包并 close 文件."
+        )
+        self.rx_dump_btn.setCheckable(True)
+        self.rx_dump_btn.toggled.connect(self._toggle_rx_dump)
+        log_toolbar.addWidget(self.rx_dump_btn)
         log_toolbar.addStretch(1)
         log_layout.addLayout(log_toolbar)
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
         log_layout.addWidget(self.log_text, stretch=1)
-        root.addWidget(log_box, stretch=1)
 
-        # 接收区 (RX) — 显示从串口收到的字节 (H743 主站轮询请求等)
-        rx_box = QGroupBox("📥 接收区 (RX)")
-        rx_layout = QVBoxLayout(rx_box)
-        self.rx_panel = RxPanel()
-        rx_layout.addWidget(self.rx_panel)
-        # 接收区高度 = 总高度的 ~1/4,不让它喧宾夺主
-        rx_box.setMaximumHeight(220)
-        # ⭐ 加入左侧发送区同一行 (左右分布), 不用 root.addWidget
-        self.tx_rx_row.addWidget(rx_box, stretch=3)
-        root.addLayout(self.tx_rx_row)
+        # ⭐ 第三十七轮: log_rx_row (rx_box | log_box 横向).
+        #   rx_box ~1/3 (stretch=1), log_box ~2/3 (stretch=2, 主显示区).
+        #   log_box 仍 setMinimumHeight(380) via log_text stretch=1, 保证视觉对齐.
+        self.log_rx_row = QHBoxLayout()
+        self.log_rx_row.setContentsMargins(0, 0, 0, 0)
+        self.log_rx_row.setSpacing(6)
+        self.log_rx_row.addWidget(rx_box, stretch=1)
+        self.log_rx_row.addWidget(log_box, stretch=2)
+        root.addLayout(self.log_rx_row, stretch=1)
+
+        # ⭐ 第三十七轮: 旧的 self.stats_rx_row / self.tx_rx_row 已废弃移除.
+        #   rx_box 现在属于 log_rx_row.
 
         # IDS Report 面板 — 解析 H743 上行的 [ALARM] N printf (第十六轮)
         self.ids_parser = IdsLineParser()
         self.ids_report = IdsReportPanel(self.ids_parser)
         root.addWidget(self.ids_report)
+
+        # ⭐ 第四十轮 (2026-10-02): IDS 5 指标曲线面板 (实时)
+        #   matplotlib FigureCanvasQTAgg, 5 条曲线 (Precision/Recall/F1/Accuracy/FPR)
+        #   数据源: IdsReportPanel.metrics_updated 信号
+        #   控件: 🗑 清空曲线 + ⏸/▶ 暂停/继续
+        self.metrics_chart = MetricsChartPanel(self)
+        self.metrics_chart_box = QGroupBox("📈 IDS 曲线图表 (实时性能)")
+        _style_chinese_groupbox(self.metrics_chart_box)
+        chart_layout = QVBoxLayout(self.metrics_chart_box)
+        # toolbar (清空 + 暂停) — 已在 MetricsChartPanel 内部, 这里直接 addWidget
+        chart_layout.addWidget(self.metrics_chart, stretch=1)
+        root.addWidget(self.metrics_chart_box, stretch=1)
 
     # --- 信号 ---
     def _wire(self):
@@ -1616,7 +2687,8 @@ class RTUReplayGUI(QMainWindow):
         self.prev_btn.clicked.connect(self._manual_prev)
         self.resend_btn.clicked.connect(self._manual_resend)
         self.goto_btn.clicked.connect(self._manual_goto)
-        self.manual_enable_chk.stateChanged.connect(self._on_manual_toggle)
+        # ⭐ 第三十轮 (2026-10-02): 删除 manual_enable_chk 复选框及对应 stateChanged 信号.
+        #   手动模式状态由 manual_loaded 标志驱动 (在 _manual_load/_manual_unload 更新).
         # 发送区管理按钮
         self.reset_ptr_btn.clicked.connect(self._manual_reset_ptr)
         self.reload_btn.clicked.connect(self._manual_load)  # 等同于按 加载
@@ -1626,9 +2698,18 @@ class RTUReplayGUI(QMainWindow):
         # ⭐ 第二十一轮 (2026-09-20): 测试日志按钮
         self.log_open_btn.clicked.connect(self._open_test_log)
         self.log_close_btn.clicked.connect(self._close_test_log)
+        # ⭐ 第四十轮 (2026-10-02): IDS 曲线面板数据流
+        #   每个 [ALARM] 事件后 IdsReportPanel 推送 5 个派生率, 曲线面板追加点
+        #   测试开始/重置时, 同步清空曲线 history
+        self.ids_report.metrics_updated.connect(self.metrics_chart._on_metrics_updated)
+        self.ids_report.metrics_reset.connect(self.metrics_chart._on_metrics_reset)
         # ALARM 事件钩子: IdsLineParser.alarm_with_prob → TestLogger.log_alarm
         # (用含 prob 的信号, 而不是 fp_changed, 这样日志能记录 prob_x1000)
         self.ids_parser.alarm_with_prob.connect(self._on_alarm_for_log)
+        # ⭐ 第六十五轮 (2026-10-13): alarm_annotated → RX 区域追加 "实际是 attack/normal"
+        #   标注, 让用户实时看到 H743 实际判到的帧是不是 attack. 数据源: IdsLineParser
+        #   在 _parse_line 用 h743_frame 查 _pc_frame_binary (PC 端 frame→binary 映射).
+        self.ids_parser.alarm_annotated.connect(self._on_alarm_annotated)
 
     def _refresh_ports(self):
         self.port_combo.clear()
@@ -1637,6 +2718,13 @@ class RTUReplayGUI(QMainWindow):
             self.port_combo.addItem(f"{p.device} - {p.description}", p.device)
         if self.port_combo.count() == 0:
             self.port_combo.addItem("(无可用串口)", None)
+            return
+        # ⭐ 2026-10-11: 优先选中 COM4 (用户主用串口), 没有则选第一个.
+        preferred = self.port_combo.findData('COM4')
+        if preferred >= 0:
+            self.port_combo.setCurrentIndex(preferred)
+        else:
+            self.port_combo.setCurrentIndex(0)
 
     def _browse_csv(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1649,27 +2737,6 @@ class RTUReplayGUI(QMainWindow):
     def _get_port(self) -> Optional[str]:
         return self.port_combo.currentData()
 
-    def _get_speed(self) -> float:
-        """返回 speed 倍率.
-        'Max'  -> 1000.0 (实际效果 ≈ 不 sleep)
-        '10ms/帧 (固定)' -> 0.0 (特殊: worker 走 fixed_10ms 分支, 忽略 CSV time)
-        其余 (e.g. '10x') -> 10.0
-        """
-        t = self.speed_combo.currentText()
-        if t.startswith('10ms'):
-            return 0.0  # 0.0 = 触发 fixed 10ms 分支
-        t = t.replace('x', '')
-        if t == 'Max':
-            return 1000.0
-        try:
-            return float(t)
-        except ValueError:
-            return 1.0
-
-    def _is_fixed_10ms(self) -> bool:
-        """是否选中 '10ms/帧 (固定)' 模式."""
-        return self.speed_combo.currentText().startswith('10ms')
-
     def _get_attack_filter(self) -> Optional[str]:
         t = self.attack_combo.currentText().split(' ')[0]
         return None if t == 'all' else t
@@ -1678,6 +2745,12 @@ class RTUReplayGUI(QMainWindow):
     def _start(self):
         if self.worker and self.worker.isRunning():
             return
+        # ⭐ 第三十九轮 (2026-10-02): 处于手动模式时点自动开始, 先自动清空手动模式.
+        #   用户选择: 自动清空手动模式后再启动 (无需用户手动点清空).
+        #   避免手动行 + 自动行在统计/CSV 上混淆.
+        if self.manual_loaded:
+            self._log("🗑 自动模式启动: 先自动清空手动模式...")
+            self._manual_unload()
         port = self._get_port()
         if not port:
             QMessageBox.warning(self, "无串口", "请先选择 COM 口 (点 🔄 刷新)")
@@ -1702,26 +2775,32 @@ class RTUReplayGUI(QMainWindow):
         # 但 _open_port() 会. 这里直接调一下, 幂等.
         self._start_rx_reader()
 
+        # ⭐ 第四十五轮 (2026-10-08): 自动模式 start 必先清零 IDS KPI + parser 状态.
+        #   旧 _start() 不调 reset, 旧测试的 _tp_budget / _binary_history / _last_alarm_count /
+        #   _detected_baseline 全部残留. H743 modbus_ids SW=16 仍含旧测试尾部 attack features,
+        #   新测试首个 alarm 触发时 window_has_attack=True (旧 binary_history) + budget 充足
+        #   (旧 budget) → 错标 TP, 用户报告"没下发攻击 TP 也会计数".
+        #   修复: start = 新测试, 必清. 配合 start_frame 已能处理"从某帧继续跑".
+        self.ids_report.reset_counters()
+        self._log("🔄 IDS 计数器已重置 (新一轮测试)")
+
         # 重置统计
         self.total_frames = 0
         self.total_bytes = 0
         self.frame_sizes = []
         self.start_time = time.time()
-        # ⭐ 第二十一轮: 自动开启测试日志 (用 'auto-{speed}x' 后缀)
-        # ⭐ 第二十二轮: 加 interval_ms 后缀 (用于 dump 测试)
+        # ⭐ 2026-10-01 第二十三轮: 测试日志 label 简化 (无 speed/loop/synth_timing 字段)
         interval_ms = self.interval_spin.value()
+        start_frame = self.start_frame_spin.value()
         if not self.test_logger.is_open:
             if interval_ms > 0:
                 label = f'auto-{interval_ms}ms'
-            elif self._is_fixed_10ms():
-                label = 'auto-fixed-10ms'
             else:
-                label = f'auto-{self._get_speed()}x'
+                label = 'auto-csv-time'  # ⭐ CSV time 自然间隔 (1s 精度整数)
             path = self.test_logger.open(label=label)
-            self.test_logger.log_event('START', note=f'speed={self.speed_combo.currentText()} '
-                                                     f'interval_ms={interval_ms} '
-                                                     f'filter={self._get_attack_filter() or "all"} '
-                                                     f'loop={self.loop_chk.isChecked()}')
+            self.test_logger.log_event('START', note=f'interval_ms={interval_ms} '
+                                                     f'start_frame={start_frame} '
+                                                     f'filter={self._get_attack_filter() or "all"}')
             self.log_open_btn.setEnabled(False)
             self.log_close_btn.setEnabled(True)
             self._log(f"📂 测试日志已自动开启: {path}")
@@ -1729,24 +2808,46 @@ class RTUReplayGUI(QMainWindow):
         self.worker = ReplayWorker(
             csv_path=csv_path, port=port, baud=baud,
             attack_filter=self._get_attack_filter(),
-            speed=self._get_speed(),
-            loop=self.loop_chk.isChecked(),
+            start_frame=start_frame,
             verbose=self.verbose_chk.isChecked(),
-            synth_timing=self.synth_timing_chk.isChecked(),
-            fixed_10ms=self._is_fixed_10ms(),
-            interval_ms=interval_ms,  # ⭐ 第二十二轮: 1-1000ms 自定义间隔 (dump 测试用)
+            interval_ms=interval_ms,
             serial_obj=self.manual_ser,  # ⭐ 第二十一轮: 共享 manual_ser, worker 不重开
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.log.connect(self._log)
         self.worker.finished_ok.connect(self._on_finished)
         self.worker.error.connect(self._on_error)
-        # ⭐⭐ 第十七轮: 攻击帧发送计数 → IdsReportPanel "Sent" KPI
-        self.worker.attack_sent.connect(self.ids_report._on_sent)
         # ⭐⭐ 第十九轮: 3 元组 (总发送, 攻击次数, 正常数) → IdsReportPanel
+        #   ⭐ 2026-10-19: 删 per-frame state 维护. sent_stats 仅触发 _update_rates.
         self.worker.sent_stats.connect(self.ids_report._on_sent_stats)
+        # ⭐ 2026-10-19: 删 attack_sent 连接 (per-frame KPI 已删除)
+        # ⭐⭐ 第五十二轮 (2026-10-09): 4 个主 KPI (Total / Normal / Attack / Detected)
+        #   全部按 16 帧 1 window 算 (用户要求). 跟训练 / H743 1:1 对齐.
+        #   window_stats 信号: 每凑齐 1 个 16 帧 window, emit 一次 (Round 51 新增).
+        #   Detected label 由 _on_detected 单独维护 (H743 windows_attack 累计, per-window).
+        self.worker.window_stats.connect(self.ids_report._on_window_stats)
+        # ⭐⭐ 第五十二轮 c (2026-10-10): window_stats → TestLogger 维护 per-window 总/attack/normal
+        #   计数, write_summary 加 per-window 块 (跟训练 1:1 评估, Recall=TP/Attack_windows).
+        #   TestLogger 不监听 count_changed (那是 per-alarm 累计, 用 baseline 锚点), Detected
+        #   数字从 H743 windows_attack 累计拿. 这里改用 main_window._on_detected_for_summary
+        #   做 baseline 校正 (跟 IdsReportPanel._on_detected 一样的逻辑).
+        self.worker.window_stats.connect(self._on_window_stats_for_summary)
+        self.ids_parser.count_changed.connect(self._on_detected_for_summary)
         # ⭐⭐ 第二十轮: 每帧类型 → IdsLineParser (为下次 [ALARM] 准备 TP/FP 判定)
         self.worker.frame_sent_type.connect(self.ids_parser.set_last_was_attack)
+        # ⭐ 第六十三轮 (2026-10-12): 每帧类型 → IdsLineParser._on_pc_frame_sent
+        #   记每 PC 发送帧的 unix-ms 时间戳, [ALARM] 上行时算 lag_ms 反向 shift 归属.
+        #   跟 set_last_was_attack 共用 frame_sent_type 信号 (multi-subscriber fan-out).
+        self.worker.frame_sent_type.connect(self.ids_parser._on_pc_frame_sent)
+        # ⭐ 第四十八轮: 每帧类型 → WindowEvaluator (per-window 评估, 跟训练 1:1)
+        self.worker.frame_sent_type.connect(self.ids_report._window_eval.on_frame)
+        # ⭐ 2026-10-13 Round 69: 修复 per-window summary TP/FP=0 bug.
+        #   IdsLineParser 解析到 h743_frame 时 emit alarm_frame_index(int), 这里转发到
+        #   IdsReportPanel._window_eval.on_alarm_with_frame, 让 summary 跟训练 1:1 的
+        #   WindowEvaluator 同时拿到 attack (per-frame 信号) + alarm (此信号) 两侧信息.
+        self.ids_parser.alarm_frame_index.connect(self.ids_report._window_eval.on_alarm_with_frame)
+        # ⭐ 2026-10-11: 每帧 attack 状态 → IdsReportPanel 实时红色反馈
+        self.worker.frame_sent_type.connect(self.ids_report._refresh_attack_alarm_color)
         # ⭐⭐ 第二十一轮: 每帧 (n_bytes, is_attack) → TestLogger
         #   这是关键修复: 之前 TestLogger 只接到手动 _record_send, 自动回放完全没记录
         #   (1073 帧自动回放后 CSV 仍只有 START+FINISH 两行, 0 SEND 事件)
@@ -1757,9 +2858,10 @@ class RTUReplayGUI(QMainWindow):
         self.stop_btn.setEnabled(True)
 
         self.worker.start()
-        interval_str = f"  interval={interval_ms}ms/帧" if interval_ms > 0 else ""
-        self._log(f"▶ 开始: {port} @ {baud}  speed={self._get_speed()}x"
-                  f"{interval_str}  filter={self._get_attack_filter() or 'all'}")
+        interval_str = f"interval={interval_ms}ms/帧" if interval_ms > 0 else "interval=CSV-time"
+        self._log(f"▶ 开始: {port} @ {baud}  {interval_str}"
+                  f"  start_frame={start_frame}"
+                  f"  filter={self._get_attack_filter() or 'all'}")
 
     def _toggle_pause(self):
         if self.worker:
@@ -1793,8 +2895,23 @@ class RTUReplayGUI(QMainWindow):
         self.stop_btn.setEnabled(False)
         self.pause_btn.setText("⏸ 暂停")
         self._update_stats_label(state="完成")
+        # ⭐ 2026-10-11: 测试关闭时强制刷一次 GUI label, 跟 summary 数字 1:1.
+        #   用户报告 GUI 显示 ~80% F1 但 summary 写 89.66% — GUI 标签停在 mid-test
+        #   最后一个信号触发的 _update_rates, 而 H743 alarm 在那之后又来了几个,
+        #   WindowEvaluator 累计 TP/FP 改善但 GUI 没刷新. 修复: close 时再算一次.
+        try:
+            self.ids_report._update_rates()
+        except Exception:
+            pass
         # ⭐ 第二十一轮: 自动回放结束时关闭测试日志
         if self.test_logger.is_open:
+            # ⭐ 第五十二轮 c (2026-10-10): close 前 push WindowEvaluator 状态
+            #   给 test_logger, write_summary 算 per-window 块 (跟训练 1:1).
+            try:
+                wm = self.ids_report._window_eval.get_metrics()
+                self.test_logger.set_window_metrics(wm)
+            except Exception:
+                pass
             self.test_logger.log_event('FINISH', note='auto replay done')
             self.test_logger.close()
             self.log_open_btn.setEnabled(True)
@@ -1807,6 +2924,12 @@ class RTUReplayGUI(QMainWindow):
         self._log(f"❌ {msg}")
         # ⭐ 第二十一轮: 错误时也保存测试日志
         if self.test_logger.is_open:
+            # ⭐ 第五十二轮 c: 错误时也 push WindowEvaluator 状态
+            try:
+                wm = self.ids_report._window_eval.get_metrics()
+                self.test_logger.set_window_metrics(wm)
+            except Exception:
+                pass
             self.test_logger.log_event('ERROR', note=msg[:200])
             self.test_logger.close()
             self.log_open_btn.setEnabled(True)
@@ -1814,15 +2937,46 @@ class RTUReplayGUI(QMainWindow):
             self._log(f"💾 测试日志已保存: {self.test_logger.path}")
             self.test_logger = TestLogger()
 
+    # ⭐ 第五十二轮 c: TestLogger 维护 per-window 4 KPI 计数 (跟训练 1:1 评估)
+    #   跟 IdsReportPanel 的 _on_window_stats / _on_detected 独立, 专门给 summary.txt 用.
+    def _on_window_stats_for_summary(self, total_w: int, attack_w: int, normal_w: int) -> None:
+        """ReplayWorker.window_stats 槽函数 — 更新 test_logger.running_window_*."""
+        if not self.test_logger.is_open:
+            return
+        self.test_logger.running_window_total = total_w
+        self.test_logger.running_window_attack = attack_w
+        self.test_logger.running_window_normal = normal_w
+
+    def _on_detected_for_summary(self, count: int) -> None:
+        """IdsLineParser.count_changed 槽函数 — H743 windows_attack 累计 (per-window).
+
+        ⭐ baseline 锚点逻辑跟 IdsReportPanel._on_detected 一样:
+          首条 [ALARM] N → Detected = N - (N-1) = 1, 避免 H743 不重启时首条是旧值.
+        """
+        if not self.test_logger.is_open:
+            return
+        if self.test_logger.running_window_detected is None:  # type: ignore[unreachable]
+            # 第一次: 锚定 baseline (类似 _detected_baseline)
+            self.test_logger._detected_baseline = max(count - 1, 0)  # type: ignore[attr-defined]
+        self.test_logger.running_window_detected = count - getattr(
+            self.test_logger, '_detected_baseline', 0)
+
     # --- ⭐ 第二十一轮: 结构化测试日志 (CSV + summary.txt) ---
     def _open_test_log(self):
-        """用户手动开启 CSV 测试日志. 若 worker 在跑则用 'auto-{speed}x' 后缀."""
+        """用户手动开启 CSV 测试日志. 若 worker 在跑则用 'auto-{speed}x' 后缀.
+
+        ⭐ 2026-10-19: 删 per-frame KPI 同步 (running_total/attack/normal/tp/fp).
+        """
         if self.test_logger.is_open:
             QMessageBox.information(self, "已开启", f"日志已在: {self.test_logger.path}")
             return
         label = ''
         if self.worker and self.worker.isRunning():
-            label = f'auto-{self._get_speed()}x'
+            interval_ms = self.interval_spin.value()
+            if interval_ms > 0:
+                label = f'auto-{interval_ms}ms'
+            else:
+                label = 'auto-csv-time'
         elif self.manual_loaded:
             label = f'manual-{len(self.manual_rows)}rows'
         path = self.test_logger.open(label=label)
@@ -1830,18 +2984,7 @@ class RTUReplayGUI(QMainWindow):
         self.log_open_btn.setEnabled(False)
         self.log_close_btn.setEnabled(True)
         self._log(f"📂 测试日志已开启: {path}")
-        # 同步 KPI baseline 到 logger
-        self.test_logger.running_total = self.total_frames
-        self.test_logger.running_attack = (
-            self.manual_attack_count if self.worker is None
-            else int(self.worker.attack_count)
-        )
-        self.test_logger.running_normal = (
-            self.manual_normal_count if self.worker is None
-            else int(self.worker.normal_count)
-        )
-        self.test_logger.running_tp = self.ids_report._tp_count
-        self.test_logger.running_fp = self.ids_report._fp_count
+        # ⭐ 2026-10-19: 删 per-frame KPI baseline 同步, 只保留日志开启功能.
 
     def _close_test_log(self):
         """用户手动关闭 CSV, 写 .summary.txt."""
@@ -1855,27 +2998,75 @@ class RTUReplayGUI(QMainWindow):
         self._log(f"💾 测试日志已关闭: {path}")
         self._log(f"   摘要: {path}.summary.txt")
 
-    def _on_alarm_for_log(self, count: int, prob_x1000: int, is_fp: bool):
+    def _on_alarm_for_log(self, count: int, prob_x1000: int, is_fp: bool, h743_frame: int = 0):
         """IdsLineParser.alarm_with_prob 信号回调 — 写一行 ALARM 事件到 CSV.
+
+        ⭐ 2026-10-19: 删 running_tp/running_fp 参数 (per-frame 计数已删除).
 
         Args:
             count: H743 当前累计 frames_attack
             prob_x1000: H743 printf 输出的 prob=0.NNN × 1000 (范围 [0, 1000],
                        -1 表示 H743 没输出 prob 字段, 旧格式)
             is_fp: True=误报 (上一帧 normal), False=命中 (上一帧 attack)
+            h743_frame: ⭐ 第六十一轮: H743 上行 frame=N 字段 (0 = 旧固件没发)
         """
         if not self.test_logger.is_open:
             return
-        # ⭐ 第二十三轮: 从 IdsReportPanel 读 delta-driven 的累计 TP/FP
-        #   IdsLineParser 已在 _parse_line 先 emit tp_delta/fp_delta, 这里读 _tp_count/_fp_count 已最新.
+        # ⭐ 第六十一轮: note 列加 frame= (旧固件无 frame= 时只写 prob=)
+        prob_note = f'prob={prob_x1000/1000:.3f}' if prob_x1000 >= 0 else 'no_prob'
+        if h743_frame > 0:
+            note_with_frame = f'{prob_note} frame={h743_frame}'
+        else:
+            note_with_frame = prob_note
         self.test_logger.log_alarm(
             alarm_count=count,
             prob_x1000=prob_x1000 if prob_x1000 >= 0 else None,
             is_fp=is_fp,
-            running_tp=self.ids_report._tp_count,
-            running_fp=self.ids_report._fp_count,
-            note=f'prob={prob_x1000/1000:.3f}' if prob_x1000 >= 0 else 'no_prob',
+            h743_frame=h743_frame,
+            note=note_with_frame,
         )
+
+    def _on_alarm_annotated(self, count: int, prob_x1000: int,
+                             label: str, h743_frame: int) -> None:
+        """⭐ 第六十五轮 (2026-10-13): IdsLineParser.alarm_annotated 信号回调.
+
+        在 RX 区域最后一行 (即 [ALARM] 原始 RX 行) 末尾追加 "(attack)" /
+        "(normal)" / "(?)" 简注. 不换行不重新起行, 直接 inline 紧贴.
+
+        Args:
+            count: H743 当前累计 frames_attack
+            prob_x1000: H743 printf 输出的 prob=0.NNN × 1000 (-1 = 旧固件)
+            label: "attack" / "normal" / "?" (h743_frame 在 _pc_frame_binary 里查不到时)
+            h743_frame: H743 上行 frame=K 字段
+        """
+        # 颜色: attack 红色, normal 灰色, ? 黄色
+        if label == "attack":
+            color = "#cc3333"
+            tag = "(attack)"
+        elif label == "normal":
+            color = "#888888"
+            tag = "(normal)"
+        else:
+            color = "#cc9933"
+            tag = "(?)"
+        if hasattr(self, 'rx_panel') and self.rx_panel is not None:
+            # ⭐ Round 70 (2026-10-13): 用 QTextCharFormat 显式 setForeground, 避免
+            #   insertHtml 留下 cursor format 被下一个 append() 继承, 之前观察到的
+            #   "[ALARM] N (attack)" 整行变灰 / "(normal)" 变红 即此问题.
+            #   insertHtml 后 cursor.charFormat().foreground() 仍带新色, 下次 text_edit.append
+            #   新段落继承该色, 出现颜色错位. 修复: insert 前 reset 字符格式为默认.
+            cursor = self.rx_panel.text_edit.textCursor()
+            cursor.movePosition(cursor.End)
+            # 显式重置字符格式 (避免继承前一次 insertHtml 留下的彩色 format)
+            default_fmt = QTextCharFormat()
+            default_fmt.setForeground(QColor())  # 默认前景 (黑)
+            cursor.setCharFormat(default_fmt)
+            cursor.insertHtml(f' <span style="color: {color};"><b>{tag}</b></span>')
+            # 再次重置, 避免下一个 append 继承
+            cursor.movePosition(cursor.End)
+            cursor.setCharFormat(default_fmt)
+            self.rx_panel.text_edit.setTextCursor(cursor)
+            self.rx_panel.text_edit.ensureCursorVisible()
 
     # --- 全局统计 ---
     def _record_send(self, n_bytes: int, is_attack: bool = False):
@@ -1896,8 +3087,16 @@ class RTUReplayGUI(QMainWindow):
         self.total_frames += 1
         self.total_bytes += n_bytes
         self.frame_sizes.append(n_bytes)
-        # ⭐ 第二十轮: 告诉 IdsLineParser 最近一帧是不是 attack (用于 FP 判定)
-        self.ids_parser.set_last_was_attack(is_attack)
+        # ⭐ 第二十轮: 告诉 IdsLineParser 最近一帧是不是 attack (用于 FP 判定).
+        #   ⚠️ 2026-10-01 第二十五轮 bug 修复: 仅手动模式下调用. 自动模式下 worker.frame_sent_type
+        #   已直接 connect 到 ids_parser.set_last_was_attack (line 1781), 这里再调一次会让
+        #   _binary_history 每个 binary 存 2 份, H743 [ALARM] N 读 _binary_history[-N..-1]
+        #   时映射到错误的帧, TP/FP 分类彻底错乱 (测试中 F1=47% 几乎一半是 duplicate 导致的
+        #   wrong window offset, carry-over 救不了, 真根因在此).
+        if self.worker is None:  # 仅手动模式需要此处显式通知 parser
+            self.ids_parser.set_last_was_attack(is_attack)
+            # ⭐ 第四十八轮: 手动模式也喂 per-window 评估器
+            self.ids_report._window_eval.on_frame(is_attack)
         # ⭐ 第二十一轮: 写测试日志 SEND 事件
         if self.test_logger.is_open:
             self.test_logger.log_send(
@@ -1986,12 +3185,25 @@ class RTUReplayGUI(QMainWindow):
     CAT_NAMES = {0: 'normal', 1: 'nmri', 2: 'cmri', 3: 'msci',
                  4: 'mpci', 5: 'mfci', 6: 'dos', 7: 'recon'}
 
-    def _on_manual_toggle(self, state: int):
-        enabled = bool(state)
-        # 启用手动时,禁用自动按钮 (避免冲突)
-        self.start_btn.setEnabled(not enabled)
-        if enabled and not self.manual_loaded:
-            self._log("手动模式已启用,点 [📥 加载] 应用过滤")
+    def _set_manual_state(self, loaded: bool):
+        """⭐ 第三十轮 (2026-10-02): 手动模式状态完全由 manual_loaded 驱动.
+        加载 → 启用手动 (禁用自动按钮 + 状态标签变绿).
+        清空 → 关闭手动 (启用自动按钮 + 状态标签变灰).
+        """
+        if loaded:
+            self.manual_status_label.setText("▶ 手动模式: 已加载")
+            self.manual_status_label.setStyleSheet(
+                "color: #006600; font-weight: bold;"
+            )
+            # 启用手动时, 禁用自动按钮 (避免冲突)
+            self.start_btn.setEnabled(False)
+        else:
+            self.manual_status_label.setText("⏸ 手动模式: 未加载")
+            self.manual_status_label.setStyleSheet(
+                "color: #888; font-weight: bold;"
+            )
+            # 清空后允许自动回放
+            self.start_btn.setEnabled(True)
 
     def _manual_load(self):
         """读取 CSV + 应用 attack 过滤 + 缓存到内存 (不启动 worker)。"""
@@ -2036,6 +3248,8 @@ class RTUReplayGUI(QMainWindow):
         self.reset_ptr_btn.setEnabled(True)
         self.reload_btn.setEnabled(True)
         self.unload_btn.setEnabled(True)
+        # ⭐ 第三十轮: 手动模式开启 → 禁用自动按钮, 状态标签变绿
+        self._set_manual_state(loaded=True)
 
     def _manual_reset_ptr(self):
         """手动指针回到首帧 (保留已加载行)。"""
@@ -2062,6 +3276,8 @@ class RTUReplayGUI(QMainWindow):
         # 清空预览
         self.preview_label.setText("帧预览: (加载后显示)")
         self.pos_label.setText("— / —")
+        # ⭐ 第三十轮: 手动模式关闭 → 启用自动按钮, 状态标签变灰
+        self._set_manual_state(loaded=False)
         self.cat_label.setText("类别: —")
         self._log("🗑 已清空手动加载")
 
@@ -2166,11 +3382,54 @@ class RTUReplayGUI(QMainWindow):
             self._rx_reader.data_received.connect(self.rx_panel.append_bytes)
             # ⭐ 同时把字节流喂给 IdsLineParser (解析 [ALARM] N 行)
             self._rx_reader.data_received.connect(self.ids_parser.feed)
+            # ⭐ 2026-10-19 SITE 4 capture: 把原始字节同时转发给 raw dump sink
+            self._rx_reader.data_received.connect(self._on_rx_dump_data)
             self._rx_reader.start()
             self._log("✓ RX reader 启动 (100ms 轮询)")
         except Exception as e:
             self._log(f"⚠ RX reader 启动失败: {e}")
             self._rx_reader = None
+
+    # ⭐ 2026-10-19 SITE 4 capture: 原始字节落到文件, 无 buffer 上限.
+    #   跟现有 rx_panel/ids_parser 并联 (Qt 信号多 slot 安全).
+    def _toggle_rx_dump(self, checked: bool):
+        if checked:
+            ts = time.strftime("%Y%m%d-%H%M%S")
+            os.makedirs('logs', exist_ok=True)
+            path = os.path.join('logs', f'rx_raw_{ts}.log')
+            try:
+                f = open(path, 'wb', buffering=0)  # unbuffered, 立即落盘
+            except (OSError, IOError) as e:
+                self._log(f"❌ RX dump 打开失败: {e}")
+                self.rx_dump_btn.setChecked(False)
+                return
+            self._rx_dump_file = f
+            self._rx_dump_path = path
+            self._rx_dump_n_bytes = 0
+            self._log(f"📥 RX dump 已开启 → {path}")
+        else:
+            f = self._rx_dump_file
+            if f is not None:
+                try:
+                    f.close()
+                except Exception:
+                    pass
+                n = self._rx_dump_n_bytes
+                self._log(f"💾 RX dump 已关闭: {self._rx_dump_path} ({n} bytes)")
+            self._rx_dump_file = None
+
+    def _on_rx_dump_data(self, chunk: bytes):
+        """Qt slot — 把 RX 字节原样写盘. 在主线程同步, 简单可靠."""
+        f = self._rx_dump_file
+        if f is None:
+            return
+        try:
+            f.write(chunk)
+            self._rx_dump_n_bytes += len(chunk)
+        except Exception as e:
+            self._log(f"⚠ RX dump write failed: {e}")
+            # 自动停
+            self.rx_dump_btn.setChecked(False)
 
     def _stop_rx_reader(self):
         """关闭串口前/窗口关闭前停 RX 线程."""
