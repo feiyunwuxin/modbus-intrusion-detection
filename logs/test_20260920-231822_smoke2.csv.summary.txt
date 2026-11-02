@@ -1,0 +1,12 @@
+Test Summary
+============================================================
+Log file:        logs\test_20260920-231822_smoke2.csv
+Total frames:    5
+  Attack (Sent): 2
+  Normal:        3
+TP:              1
+FP:              2
+Recall (TP/Sent):0.5000  (50.00%)
+FPR    (FP/Norm):0.6667  (66.67%)
+Precision:       0.3333
+F1:              0.4000

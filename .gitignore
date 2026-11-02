@@ -78,18 +78,24 @@ MCU/MDK-ARM/H743test_TFLM/
 MCU/MDK-ARM/*.uvguix.*
 # uVision 调试序列日志
 MCU/MDK-ARM/H743test_Sequences_*.log
+# uVision 工程手工备份 (调试过程中的快照, 噪声)
+MCU/MDK-ARM/*.bak
+MCU/MDK-ARM/*.bak2
+MCU/MDK-ARM/*.bak_int8
+MCU/MDK-ARM/*.good
+MCU/MDK-ARM/*.disabled
 # 例外: 各 target 的构建日志 (证明 0 error, 体积小)
-/MCU/MDK-ARM/build_*.log
-/MCU/MDK-ARM/b_*.log
+!/MCU/MDK-ARM/build_*.log
+!/MCU/MDK-ARM/b_*.log
 
 # ============================================================
 # MCU 串口回放原始日志 (logs/ 共 377 MB; summary .txt 已入库)
 # ============================================================
 logs/*.csv
 # 例外: 报告正文引用的 3 份全量回放原始日志 (可审计)
-/logs/test_20261027-232828_auto-40ms.csv
-/logs/test_20261027-212756_auto-40ms.csv
-/logs/test_20261021-003650_auto-40ms.csv
+!/logs/test_20261027-232828_auto-40ms.csv
+!/logs/test_20261027-212756_auto-40ms.csv
+!/logs/test_20261021-003650_auto-40ms.csv
 
 # --- 系统 ---
 .DS_Store

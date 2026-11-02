@@ -1,0 +1,34 @@
+[C 源码] ch32_inference.c 的 t_in 公式 = t + k * dilation - pad
+[C 源码] ch32_inference_hybrid.c 的 t_in 公式 = t + k * dilation - pad
+[C 源码] dequant = wq_f[i] = (float)w_o[i] * wsc[o];
+[C 源码] 累加器初值 = float sum = b[o]; (bias 先加)
+[C 源码] 权重 RAM 拷贝: 无 ✅ (常驻 Flash)
+
+[窗口] 取部署区前 64 个窗 (frame>=200001)
+
+[1] Hybrid kernel (按 C 源码, float32) vs numpy 批量参考 (float64)
+   4/64   8/64   12/64   16/64   20/64   24/64   28/64   32/64   36/64   40/64   44/64   48/64   52/64   56/64   60/64   64/64C:\Users\wangbin\AppData\Roaming\Python\Python314\site-packages\sklearn\base.py:525: InconsistentVersionWarning: Trying to unpickle estimator RobustScaler from version 1.5.1 when using version 1.9.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+C:\work\Claude\Issue\parity_hybrid_int16.py:168: RuntimeWarning: overflow encountered in exp
+  sc[o] = np.float32(1.0 / (1.0 + np.exp(-s)))
+
+    max|Δprob|  = 4.007e-07   PASS ✅
+    max|Δlogit| = 5.675e-06   PASS ✅
+
+[2] Hybrid kernel vs ONNX FP32 (onnxruntime)
+    case   ONNX logit       RouteE FP32      Hybrid INT16     |H-ONNX|    
+    0      -1.488802        -1.488802        -1.489359        5.573e-04   
+    1      -1.657636        -1.657636        -1.657673        3.672e-05   
+    2      -0.848917        -0.848917        -0.849431        5.133e-04   
+    3      -1.103458        -1.103458        -1.103837        3.792e-04   
+    4      126.417206       126.417200       126.418930       1.724e-03   
+    5      108.428139       108.428135       108.427994       1.450e-04   
+    max|RouteE_FP32 - ONNX| = 5.488e-06   PASS ✅
+    max|Hybrid_INT16 - ONNX| = 1.724e-03   PASS ✅
+
+[3] 决策一致性: Hybrid vs FP32 (部署区 64 窗, thr=0.5)
+    决策翻转 = 0 / 64   PASS ✅
+    max|Δprob| (Hybrid vs FP32) = 2.390e-04
+
+结论: 全部通过 ✅

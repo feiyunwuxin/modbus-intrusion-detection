@@ -1,0 +1,15 @@
+Test Summary
+============================================================
+Log file:        logs\test_20261001-005250_auto-40ms.csv
+Total frames:    35949
+  Attack (Sent): 7705
+  Normal:        28244
+TP:              6926
+FP:              1750
+TN:              26494  (= Normal - FP)
+FN:              779  (= Attack - TP)
+Recall (TP/Sent):0.8989  (89.89%)
+FPR    (FP/Norm):0.0620  (6.20%)
+Precision:       0.7983  (79.83%)
+F1:              0.8456  (84.56%)
+Accuracy:        0.9297  (92.97%)

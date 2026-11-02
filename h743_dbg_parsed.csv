@@ -1,0 +1,2 @@
+idx,slave,func,gain,reset_rate,deadband,cycle_time,rate,system_mode,control_scheme,pump,solenoid,pressure_measurement,crc_rate,timestamp_ms,payload_len,is_response,feat_0,feat_1,feat_2,feat_3,feat_4,feat_5,feat_6,feat_7,feat_8,feat_9,feat_10,feat_11,feat_12,feat_13,feat_14,feat_15,feat_16,feat_17,feat_18,feat_19,feat_20,feat_21,feat_22
+1,4,3,119.0,0.0,0.6706,1.791,0.5538,0,0,0,0,103.195,1371.5,1418682163000,46,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0795,-0.0876,-0.093,0.0,-0.1,0.0208,0.0099,0.0073,-0.1,0.02,0.03,0.0

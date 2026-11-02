@@ -1,0 +1,12 @@
+Test Summary
+============================================================
+Log file:        logs\test_20260928-231243_manual-274628rows.csv
+Total frames:    2060
+  Attack (Sent): 324
+  Normal:        1736
+TP:              0
+FP:              0
+Recall (TP/Sent):0.0000  (0.00%)
+FPR    (FP/Norm):0.0000  (0.00%)
+Precision:       0.0000
+F1:              0.0000

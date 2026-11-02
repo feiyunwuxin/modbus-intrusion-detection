@@ -1,0 +1,45 @@
+C:\Users\wangbin\AppData\Roaming\Python\Python314\site-packages\sklearn\base.py:525: InconsistentVersionWarning: Trying to unpickle estimator RobustScaler from version 1.5.1 when using version 1.9.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+[calib] train 区窗口 12500 个 (frame<=200000), 用时 15.5s
+[calib] 采样 4000 窗, 形状 (4000, 23, 16)
+[calib] 250/4000[calib] 500/4000[calib] 750/4000[calib] 1000/4000[calib] 1250/4000[calib] 1500/4000[calib] 1750/4000[calib] 2000/4000[calib] 2250/4000[calib] 2500/4000[calib] 2750/4000[calib] 3000/4000[calib] 3250/4000[calib] 3500/4000[calib] 3750/4000[calib] 4000/4000
+
+=== 激活范围 (train 区 4000 窗) ===
+  x        [    -8.00000,     10.00000]  absmax=10.0000
+  c1_0     [     0.00000,     11.41225]  absmax=11.4123
+  c2_0     [     0.00000,     13.33818]  absmax=13.3382
+  se_0     [     0.00000,      7.08510]  absmax=7.0851
+  res_0    [   -13.02732,      5.66219]  absmax=13.0273
+  add_0    [     0.00000,      6.96864]  absmax=6.9686
+  seh_0    [     0.00000,      7.14558]  absmax=7.1456
+  c1_1     [     0.00000,      9.59491]  absmax=9.5949
+  c2_1     [     0.00000,     14.53608]  absmax=14.5361
+  se_1     [     0.00000,     14.48653]  absmax=14.4865
+  add_1    [     0.00000,     16.04346]  absmax=16.0435
+  seh_1    [     0.00000,     11.28695]  absmax=11.2869
+  c1_2     [     0.00000,      9.11254]  absmax=9.1125
+  c2_2     [     0.00000,     11.44020]  absmax=11.4402
+  se_2     [     0.00000,     11.44018]  absmax=11.4402
+  add_2    [     0.00000,     22.35622]  absmax=22.3562
+  seh_2    [     0.00000,     32.39215]  absmax=32.3922
+  gap      [     0.00000,      9.66984]  absmax=9.6698
+  fc1      [     0.00000,     16.74689]  absmax=16.7469
+  logit    [    -2.96450,     51.40483]  absmax=51.4048
+
+=== requant 检查 (shift>0 -> int32 左移, 需 acc_max*2^shift < 2^31) ===
+  tcn_0_conv1      nterms= 69 shift=[-9,-4] acc_max=  2234565 ->      2234565  OK 
+  tcn_0_conv2      nterms= 96 shift=[-10,-8] acc_max=  3108960 ->      3108960  OK 
+  tcn_0_residual   nterms= 23 shift=[-10,-6] acc_max=   744855 ->       744855  OK 
+  tcn_1_conv1      nterms= 96 shift=[-7,-4] acc_max=  3108960 ->      3108960  OK 
+  tcn_1_conv2      nterms= 96 shift=[-9,-8] acc_max=  3108960 ->      3108960  OK 
+  tcn_2_conv1      nterms= 96 shift=[-9,-7] acc_max=  3108960 ->      3108960  OK 
+  tcn_2_conv2      nterms= 96 shift=[-8,-7] acc_max=  3108960 ->      3108960  OK 
+  tcn_0_se_fc1     nterms= 32 shift=[-10,-7] acc_max=  1036320 ->      1036320  OK 
+  tcn_1_se_fc1     nterms= 32 shift=[-19,0] acc_max=  1036320 ->      1036320  OK 
+  tcn_2_se_fc1     nterms= 32 shift=[-23,-8] acc_max=  1036320 ->      1036320  OK 
+  fc1              nterms= 32 shift=[-28,0] acc_max=  1036320 ->      1036320  OK 
+
+[write] i8_base.h
+[write] 数组 67 个, 权重+参数共 25192 B (24.6 KB) [FP32 权重是 20493*4 = 81972 B]
+[write] int8_qparams_base.json

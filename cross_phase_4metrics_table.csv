@@ -1,0 +1,22 @@
+phase,model,category,params_K,test_group,n,n_attack_pct,Accuracy,Precision,Recall,F1-Score,Macro_F1
+五 SOTA (07-26),★ TCN+SE 23-dim ch=32 5-seed ensemble,DL-TCN+SE (5-seed),79K,"window16 (test=3432, Attack=53%)",3432,52.6,0.8776,0.9553,0.805,0.8737,0.8775
+三 (06-12/14),TCN+SE v3 window16,DL-TCN+SE,v1b→v3c,"window16 (test=3432, Attack=52%)",3432,52.6,0.8406,0.9538,0.7324,0.8286,0.8398
+三 (06-12/14),TCN+SE v2 window16,DL-TCN+SE,v1b→v3c,"window16 (test=3432, Attack=52%)",3432,52.6,0.8377,0.9581,0.723,0.8241,0.8367
+二 (06-09/10),TCN v3a deep,DL,TCN_v3a,"window8 (test=6865, Attack=49%)",6865,50.0,0.8341,0.9508,0.7045,0.8093,0.8312
+二 (06-09/10),CNN-LSTM,DL,CNN_LSTM,"window8 (test=6865, Attack=49%)",6865,50.0,0.8326,0.9517,0.7007,0.8071,0.8296
+二 (06-09/10),LSTM+Attention,DL,DL_Attn,"window16 (test=3432, Attack=52%)",3432,52.6,0.8188,0.9346,0.7047,0.8035,0.8177
+三 (06-12/14),TCN v3c deep window16,DL-TCN+SE,v1b→v3c,"window16 (test=3432, Attack=52%)",3432,52.6,0.8196,0.9714,0.677,0.7979,0.8175
+二 (06-09/10),ShuffleNet1D,DL-light,ShuffleNet,"window8 (test=6865, Attack=49%)",6865,50.0,0.822,0.9528,0.6774,0.7918,0.8182
+三 (06-12/14),TCN v3b window16,DL-TCN+SE,v1b→v3c,"window16 (test=3432, Attack=52%)",3432,52.6,0.8132,0.9671,0.6676,0.7899,0.8109
+二 (06-09/10),MobileNet1D,DL-light,MobileNet,"window8 (test=6865, Attack=49%)",6865,50.0,0.8176,0.9456,0.6739,0.7869,0.8138
+三 (06-12/14),TCN+SE v1b window16,DL-TCN+SE,v1b→v3c,"window16 (test=3432, Attack=52%)",3432,52.6,0.803,0.9638,0.6499,0.7763,0.8002
+二 (06-09/10),1D Transformer,DL,Transformer,"window16 (test=3432, Attack=52%)",3432,52.6,0.7952,0.9734,0.6277,0.7632,0.7914
+二 (06-09/10),CNN v2,DL,CNN_w4,"window4 (test=13731, Attack=48%)",13731,48.7,0.7701,0.9262,0.5738,0.7086,0.7594
+二 (06-09/10),RNN Basic,DL,RNN,"window8 (test=6865, Attack=49%)",6865,50.0,0.7529,0.9059,0.5643,0.6954,0.7438
+二 (06-09/10),LSTM v2,DL,LSTM_w4,"window4 (test=13731, Attack=48%)",13731,48.7,0.7399,0.8563,0.5602,0.6773,0.7297
+二 (06-09/10),FNN (MLP) v2,DL,FNN,"no_window (test=54927, Attack=21%)",54927,21.9,0.8836,0.9029,0.5242,0.6633,0.7965
+二 (06-09/10),Decision Tree v2,ML,DT,"no_window (test=54927, Attack=21%)",54927,21.9,0.8842,0.9327,0.5068,0.6567,0.7935
+一 (06-08),"LightGBM baseline (32 特征, 重训)",GBDT,—,"stage1_t70 (test=82,389, Attack=21.6%)",82389,21.6,0.8129,0.5478,0.7694,0.64,0.0
+二 (06-09/10),Random Forest v2,ML,RF,"no_window (test=54927, Attack=21%)",54927,21.9,0.7858,0.5062,0.8357,0.6305,0.7398
+二 (06-09/10),LightGBM 19-dim,GBDT,LGB_19,"no_window (test=54927, Attack=21%)",54927,21.9,0.7714,0.4872,0.8689,0.6243,0.73
+二 (06-09/10),SVM 19-dim,ML,SVM,"no_window (test=54927, Attack=21%)",54927,21.9,0.8298,0.9521,0.2335,0.375,0.6383

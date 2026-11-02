@@ -1,0 +1,28 @@
+[sweep] 构建窗口 ...
+C:\Users\wangbin\AppData\Roaming\Python\Python314\site-packages\sklearn\base.py:525: InconsistentVersionWarning: Trying to unpickle estimator RobustScaler from version 1.5.1 when using version 1.9.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+[sweep] 17164 窗 (train 12500), 用时 20.4s
+[sweep] train 区输入范围: [-8.000, 10.000]
+
+FP32 基线 (train 区, thr=0.5): F1=0.8868 FPR=0.0092 R=0.8036 P=0.9892
+----------------------------------------------------------------------------------------------------
+  候选 (输入/激活)             train 区 (用于选择)                 部署区 (仅参考)                     
+                         F1     FPR    R      P         F1     FPR    R      P        
+  sym10/max              0.8853 0.0203 0.8096 0.9766   0.8658 0.0743 0.8161 0.9219
+  sym10/99.99            0.8871 0.0184 0.8111 0.9789   0.8662 0.0734 0.8161 0.9228
+  sym10/99.9             0.8868 0.0176 0.8099 0.9798   0.8686 0.0649 0.8141 0.9309
+  sym10/99.0             0.8514 0.0113 0.7493 0.9858   0.8416 0.0333 0.7491 0.9602
+  asym-10_10/max         0.8879 0.0159 0.8105 0.9817   0.8641 0.0725 0.8120 0.9233
+  asym-10_10/99.99       0.8873 0.0146 0.8085 0.9831   0.8662 0.0694 0.8133 0.9264
+  asym-10_10/99.9        0.8875 0.0136 0.8081 0.9842   0.8685 0.0640 0.8133 0.9317
+  asym-10_10/99.0        0.8510 0.0089 0.7470 0.9888   0.8399 0.0329 0.7462 0.9606
+  asym-obs/max           0.8883 0.0144 0.8100 0.9833   0.8670 0.0698 0.8149 0.9261
+  asym-obs/99.99         0.8877 0.0136 0.8085 0.9842   0.8644 0.0734 0.8133 0.9225
+  asym-obs/99.9          0.8864 0.0141 0.8067 0.9836   0.8693 0.0645 0.8149 0.9314
+  asym-obs/99.0          0.8511 0.0084 0.7466 0.9894   0.8389 0.0382 0.7482 0.9546
+----------------------------------------------------------------------------------------------------
+==> 选中 (train 区 F1 最优): asym-obs/max   train F1=0.8883 (FP32 0.8868, Δ=+0.0015)  train FPR=0.0144 (FP32 0.0092)
+==> 该候选在部署区: F1=0.8670 FPR=0.0698 (FP32: F1=0.8671 FPR=0.0591)
+==> 正式 header 已更新: C:\work\Claude\Issue\MCU/Core/Inc/model_v4_se_23dim_ch32_int8_s42.h
+==> 扫描结果写入 C:\work\Claude\Issue\quant_sweep.json

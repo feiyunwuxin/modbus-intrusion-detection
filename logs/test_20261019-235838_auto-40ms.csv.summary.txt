@@ -1,0 +1,19 @@
+Test Summary
+============================================================
+Log file:        logs\test_20261019-235838_auto-40ms.csv
+
+─── Per-Window 评估 (跟训练 max-aggregation 1:1, window=16) ───
+Total windows:   471
+  Attack (Sent): 236  (16 帧任一帧 attack → max-aggregation)
+  Normal:        235  (16 帧全 normal)
+  Detected:      1  (H743 windows_attack 累计, 含 FP)
+  Missed (FN):   236  (Attack - TP, 应跟下方 FN 一致)
+TP:              0
+FP:              1
+TN:              234
+FN:              236
+Recall (TP/Atk): 0.0000  (0.00%)  ⭐ 跟训练 Recall 对比
+FPR    (FP/Norm):0.0043  (0.43%)
+Precision:       0.0000  (0.00%)
+F1:              0.0000  (0.00%)  ⭐ 跟训练 F1m 对比
+Accuracy:        0.4968  (49.68%)

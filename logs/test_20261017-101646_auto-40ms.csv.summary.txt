@@ -1,0 +1,33 @@
+Test Summary
+============================================================
+Log file:        logs\test_20261017-101646_auto-40ms.csv
+
+─── Per-Frame 评估 (旧, 诊断用) ───
+Total frames:    1057
+  Attack (Sent): 177
+  Normal:        880
+TP:              28
+FP:              36
+TN:              844  (= Normal - FP)
+FN:              149  (= Attack - TP)
+Recall (TP/Sent):0.1582  (15.82%)
+FPR    (FP/Norm):0.0409  (4.09%)
+Precision:       0.4375  (43.75%)
+F1:              0.2324  (23.24%)
+Accuracy:        0.8250  (82.50%)
+
+─── Per-Window 评估 (跟训练 max-aggregation 1:1, window=16) ───
+Total windows:   66
+  Attack (Sent): 28  (16 帧任一帧 attack → max-aggregation)
+  Normal:        38  (16 帧全 normal)
+  Detected:      65  (H743 windows_attack 累计, 含 FP)
+  Missed (FN):   0  (Attack - TP, 应跟下方 FN 一致)
+TP:              28
+FP:              37
+TN:              1
+FN:              0
+Recall (TP/Atk): 1.0000  (100.00%)  ⭐ 跟训练 Recall 对比
+FPR    (FP/Norm):0.9737  (97.37%)
+Precision:       0.4308  (43.08%)
+F1:              0.6022  (60.22%)  ⭐ 跟训练 F1m 对比
+Accuracy:        0.4394  (43.94%)
