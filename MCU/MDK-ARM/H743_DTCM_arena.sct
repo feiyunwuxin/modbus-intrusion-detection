@@ -1,0 +1,34 @@
+;; ============================================================================
+;; H743_DTCM_arena.sct -- 链接脚本, TFLite Micro arena 放 D2 SRAM (256KB)
+;;
+;;  内存布局 (H743, 2MB Flash + 128KB AXI SRAM + 128KB DTCM + 256KB D2 SRAM):
+;;    0x08000000  Flash 2MB   : .text + .rodata + .data init
+;;    0x20000000  DTCM  128KB : 默认 .bss/.data (stack 16KB 在顶)
+;;    0x24000000  AXI   128KB : .dma_buffer (USART1 RX) + .axi_sram (g_last_ch32_input)
+;;    0x30000000  D2 SRAM 256KB: .bss.tflm_d2 (TFLite arena 192KB)
+;;
+;;  ⭐ 2026-10-17: arena 60/80/96KB 在 DTCM/AXI AllocateTensors 失败, 搬 D2 SRAM
+;;  注意: Keil uVision 默认 H743test.sct 会在 rebuild 时自动重生成,
+;;        所以用本文件 + Project Options → Linker → Scatter File 指定.
+;; ============================================================================
+LR_IROM1 0x08000000 0x00200000 {
+  ER_IROM1 0x08000000 0x00200000 {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO, +XO)
+  }
+  ;; DTCM @ 0x20000000, 128 KB - 默认 .bss/.data (含 stack 16KB)
+  RW_DTCM 0x20000000 0x00020000 {
+    .ANY (+RW, +ZI)
+  }
+  ;; AXI SRAM @ 0x24000000, 128 KB (H743 实际, scatter 之前错写 512KB)
+  RW_AXI 0x24000000 0x00020000 {
+    * (.dma_buffer)
+    * (.axi_sram)
+    .ANY (+RW, +ZI)
+  }
+  ;; ⭐ D2 SRAM @ 0x30000000, 256 KB - TFLM arena
+  RW_D2 0x30000000 0x00040000 {
+    * (.bss.tflm_d2)
+  }
+}

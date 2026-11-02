@@ -29,6 +29,12 @@
 #include "modbus_rtu.h"
 #include "sliding_window.h"
 
+#ifdef CH32_BACKEND_TFLM
+/* 'T' 命令用的上机自检入口. 只在 TFLM 工程 (ch32_inference_tflm.c) 里存在,
+ * 所以声明也放在同一个 #ifdef 里, Route E 固件完全不受影响. */
+extern int ch32_tflm_selftest(void);
+#endif
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -199,7 +205,11 @@ int main(void)
   }
 	/* 2026-10-17: 删除 1B IT 启动 (HAL_UART_Receive_IT 静默返回 HAL_BUSY 因 RxState=BUSY_RX)
 	 *   'D' 命令改在 stm32h7xx_it.c HAL_UARTEx_RxEventCallback IDLE 回调里检测. */
+#ifdef CH32_BACKEND_TFLM
+	printf("\r\n=== TFLite Micro Initial (FP32 weights, TFLM reference kernels) ===\r\n");
+#else
 	printf("\r\n=== Route E Initial (Hand-rolled C kernel, no TFLM) ===\r\n");
+#endif
 	/* DBG BYPASS 2: 早期 bypass, 即使 ch32_init fail 也能验证 GPIO */
 	for (volatile int k = 0; k < 4000000; k++);  /* 让 user 看到 startup print */
 	/* ⭐ 2026-10-18 路线 E 迁移: ch32_init() 返回 void (不再是 uint8_t)
@@ -207,7 +217,11 @@ int main(void)
 	 *   无此风险, 启动失败直接 HardFault 即可. */
 	ch32_init();  /* 启动期一次性 INT8 -> FP32 dequant (~3 ms @ 480 MHz) */
 	ch32_mem_info_t mi = ch32_get_mem_info();
+#ifdef CH32_BACKEND_TFLM
+	printf("\r\n=== TCN+SE ch=32 23-dim H743 Deployment (TFLM) ===\r\n");
+#else
 	printf("\r\n=== TCN+SE ch=32 23-dim H743 Deployment (Route E) ===\r\n");
+#endif
 	printf("Weights (FP32): %u B (%u KB)\r\n",
 	       (unsigned)mi.weights_fp32_bytes,
 	       (unsigned)(mi.weights_fp32_bytes / 1024));
@@ -298,6 +312,21 @@ int main(void)
 				printf("\r\n[D-CMD] DMA-TX 1472B done\r\n");
 			}
 			/* 不需要 re-arm 1B IT: 'D' 由 IDLE 回调里下一个 1-byte 'D' 触发 */
+#ifdef CH32_BACKEND_TFLM
+			/* ⭐ 2026-10-26 TFLM 工程: 'T' = controlled-input 自检.
+			 *   5 个 controlled input (ZEROS/ONES/HALF/NEG1/TWOS) 跑 MCU 解释器,
+			 *   输出跟 PC 侧 experiments/tflm_fp32/artifacts/tflm_selftest_ref.json
+			 *   对拍. 判读 (见 tflm_runtime.cpp 里的注释):
+			 *     - 5 个恒定      -> 图/运行时在 MCU 上坏了
+			 *     - 5 个互不相同但与 PC 不一致 -> 算子数值实现差异
+			 *     - 5 个与 PC 一致 -> 运行时 OK, 问题在数据通路
+			 *   只有 TFLM 工程编译这个分支, Route E 固件逐字节不变. */
+			if (cmd_rx_byte == 'T') {
+				printf("\r\n[T-CMD] running TFLM controlled-input self-test\r\n");
+				int trc = ch32_tflm_selftest();
+				printf("[T-CMD] self-test rc=%d\r\n", trc);
+			}
+#endif
 		}
 
 		/* ⭐ 2026-10-17: 消费 ISR 置的 inference pending flag.

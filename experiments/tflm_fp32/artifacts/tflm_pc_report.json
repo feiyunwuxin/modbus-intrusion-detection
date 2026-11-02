@@ -1,0 +1,41 @@
+{
+  "n_windows": 17164,
+  "model": "model_tflm_fp32_s42.tflite",
+  "parity_tflite_vs_ort": {
+    "max_abs_err_logit": 1.1444091796875e-05,
+    "median_abs_err_logit": 2.384185791015625e-07,
+    "max_rel_err": 0.0011795930404010617,
+    "decision_flips": 0,
+    "n": 17164
+  },
+  "parity_ref_vs_optimized_kernel": {
+    "max_abs_err_logit": 9.5367431640625e-06,
+    "decision_flips": 0
+  },
+  "parity_tflite_vs_c_kernel": {
+    "n": 17164,
+    "max_abs_err_prob": 1.2211590284527674e-06,
+    "median_abs_err_prob": 8.150262742478986e-09,
+    "decision_flips": 0
+  },
+  "deploy_zone_tflite_pc": {
+    "tp": 1950,
+    "fp": 133,
+    "tn": 2116,
+    "fn": 465,
+    "precision": 0.9361497839654345,
+    "recall": 0.8074534161490683,
+    "f1": 0.8670520231213873,
+    "fpr": 0.05913739439751001
+  },
+  "deploy_zone_c_kernel_pc": {
+    "tp": 1950,
+    "fp": 133,
+    "tn": 2116,
+    "fn": 465,
+    "precision": 0.9361497839654345,
+    "recall": 0.8074534161490683,
+    "f1": 0.8670520231213873,
+    "fpr": 0.05913739439751001
+  }
+}

@@ -1,0 +1,48 @@
+;; ============================================================================
+;; H743_TFLM_arena.sct -- TFLM 工程的链接脚本 (TFLite Micro FP32 对照)
+;;
+;;  从 H743_DTCM_arena.sct 派生, 区别只有一处:
+;;    ** 把 TFLM arena (.bss.tflm_d2) 明确放到 D2 SRAM, 且放在 DTCM 的 .ANY 之前 **
+;;    (原脚本里 RW_D2 排在最后, 而 RW_DTCM 里有 `.ANY (+RW, +ZI)`,
+;;     显式选择器优先于 .ANY, 但把 RW_D2 提前是为了不依赖这个优先级细节)
+;;
+;;  内存布局 (H743: 2MB Flash + 128KB DTCM + 128KB AXI + 256KB D2 SRAM):
+;;    0x08000000  Flash 2MB   : .text + .rodata + .data init + .tflite 模型 (93.6KB)
+;;    0x20000000  DTCM  128KB : HEAP (128KB, startup 里的 Heap_Size)
+;;    0x24000000  AXI   128KB : STACK (16KB) + .axi_sram (sw_buf 等) + app .bss
+;;    0x30000000  D2    256KB : .bss.tflm_d2 = TFLM arena (96KB)
+;;
+;;  ⭐ arena 为什么放 D2 而不是 DTCM:
+;;    DTCM 里 HEAP 就占了 128KB (startup 的 Heap_Size=0x20000), 塞不下 arena;
+;;    D2 SRAM (0x30000000, SRAM1+SRAM2 连续 256KB) 目前完全空着, 正好.
+;;
+;;  ⚠ 现有两个 target (H743test / H743test_INT8) 仍然用 H743_DTCM_arena.sct,
+;;    本脚本**只**给新的 H743test_TFLM.uvprojx 用, 互不影响.
+;; ============================================================================
+LR_IROM1 0x08000000 0x00200000 {
+  ER_IROM1 0x08000000 0x00200000 {
+    *.o (RESET, +First)
+    *(InRoot$$Sections)
+    .ANY (+RO, +XO)
+  }
+
+  ;; ⭐ D2 SRAM @ 0x30000000, 256 KB - TFLM arena (96KB)
+  ;;   放在 DTCM 之前, 保证 .bss.tflm_d2 不会被 DTCM 的 .ANY 抢走.
+  RW_D2 0x30000000 0x00040000 {
+    * (.bss.tflm_d2)
+  }
+
+  ;; DTCM @ 0x20000000, 128 KB - HEAP (显式指定, 跟现有工程保持一致)
+  RW_DTCM 0x20000000 0x00020000 {
+    * (HEAP)
+    .ANY (+RW, +ZI)
+  }
+
+  ;; AXI SRAM @ 0x24000000, 128 KB - STACK + sw_buf 等
+  RW_AXI 0x24000000 0x00020000 {
+    * (STACK)
+    * (.dma_buffer)
+    * (.axi_sram)
+    .ANY (+RW, +ZI)
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "label": "Route E (基线)",
+  "log": "logs\\test_20261021-203113_auto-40ms.csv",
+  "n_deploy_windows": 4664,
+  "n_alarm_windows": 2083,
+  "parity_vs_pc": {
+    "max_abs_dprob": 0.01599995883746519,
+    "median_abs_dprob": 0.000986617917699717,
+    "p99_abs_dprob": 0.0010000000000000009,
+    "mean_abs_dprob": 0.0008435947174062273,
+    "decision_flips": 0,
+    "log_quantization_floor": 0.0
+  },
+  "deploy_zone_mcu": {
+    "tp": 1950,
+    "fp": 133,
+    "tn": 2116,
+    "fn": 465,
+    "precision": 0.9361497839654345,
+    "recall": 0.8074534161490683,
+    "f1": 0.8670520231213873,
+    "fpr": 0.05913739439751001
+  },
+  "deploy_zone_pc": {
+    "tp": 1950,
+    "fp": 133,
+    "tn": 2116,
+    "fn": 465,
+    "precision": 0.9361497839654345,
+    "recall": 0.8074534161490683,
+    "f1": 0.8670520231213873,
+    "fpr": 0.05913739439751001
+  }
+}

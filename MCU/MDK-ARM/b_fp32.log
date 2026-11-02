@@ -1,0 +1,9 @@
+*** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'H743test'
+linking...
+H743_DTCM_arena.sct(32): warning: L6314W: No section matches pattern *(.bss.tflm_d2).
+Program Size: Code=64784 RO-data=84836 RW-data=4448 ZI-data=237440  
+Finished: 0 information, 1 warning and 0 error messages.
+FromELF: creating hex file...
+"H743test\H743test.axf" - 0 Error(s), 1 Warning(s).
+Build Time Elapsed:  00:00:02

@@ -1,0 +1,48 @@
+{
+  "model": "model_tflm_fp32_s42.tflite",
+  "op_resolver": "BUILTIN_REF",
+  "input_shape": [
+    1,
+    23,
+    16
+  ],
+  "output": "logit (1-D, 1 element)",
+  "note": "logit_hex 是 float64 的精确表示; logit_f32_hex 是 float32 的精确表示. MCU 上按 float32 计算, 对拍请用 logit_f32_hex (或 1e-5 容差).",
+  "cases": {
+    "ZEROS": {
+      "fill_value": 0.0,
+      "logit": 42.25140380859375,
+      "logit_hex": "0x1.5202e00000000p+5",
+      "prob": 1.0,
+      "logit_f32_hex": "0x1.5202e00000000p+5"
+    },
+    "ONES": {
+      "fill_value": 1.0,
+      "logit": 224.27757263183594,
+      "logit_hex": "0x1.c08e1e0000000p+7",
+      "prob": 1.0,
+      "logit_f32_hex": "0x1.c08e1e0000000p+7"
+    },
+    "HALF": {
+      "fill_value": 0.5,
+      "logit": 115.24600219726562,
+      "logit_hex": "0x1.ccfbe80000000p+6",
+      "prob": 1.0,
+      "logit_f32_hex": "0x1.ccfbe80000000p+6"
+    },
+    "NEG1": {
+      "fill_value": -1.0,
+      "logit": 19.762008666992188,
+      "logit_hex": "0x1.3c31300000000p+4",
+      "prob": 0.9999999973850182,
+      "logit_f32_hex": "0x1.3c31300000000p+4"
+    },
+    "TWOS": {
+      "fill_value": 2.0,
+      "logit": 431.7593688964844,
+      "logit_hex": "0x1.afc2660000000p+8",
+      "prob": 1.0,
+      "logit_f32_hex": "0x1.afc2660000000p+8"
+    }
+  }
+}

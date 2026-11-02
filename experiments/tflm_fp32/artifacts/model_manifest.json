@@ -1,0 +1,1619 @@
+{
+  "source_onnx": "C:\\work\\Claude\\Issue\\model_v4_se_23dim_ch32_s42.onnx",
+  "source_onnx_sha256": "de4d2f38b6cdae8f109cdf8e82cffef2bf99e669f0621e533e911e34e82bec77",
+  "tflite": "C:\\work\\Claude\\Issue\\experiments\\tflm_fp32\\artifacts\\model_tflm_fp32_s42.tflite",
+  "tflite_sha256": "eaee5340fbefa00032f10de559e1246daad81f422a82fa7bf83114bc75582aef",
+  "tflite_bytes": 93596,
+  "mode": "native",
+  "op_sequence": [
+    "TRANSPOSE",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "CONV_2D",
+    "RESHAPE",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "MEAN",
+    "RESHAPE",
+    "FULLY_CONNECTED",
+    "FULLY_CONNECTED",
+    "LOGISTIC",
+    "EXPAND_DIMS",
+    "MUL",
+    "ADD",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "MEAN",
+    "RESHAPE",
+    "FULLY_CONNECTED",
+    "FULLY_CONNECTED",
+    "LOGISTIC",
+    "EXPAND_DIMS",
+    "MUL",
+    "ADD",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "EXPAND_DIMS",
+    "CONV_2D",
+    "RESHAPE",
+    "MEAN",
+    "RESHAPE",
+    "FULLY_CONNECTED",
+    "FULLY_CONNECTED",
+    "LOGISTIC",
+    "EXPAND_DIMS",
+    "MUL",
+    "ADD",
+    "MEAN",
+    "RESHAPE",
+    "FULLY_CONNECTED",
+    "FULLY_CONNECTED",
+    "RESHAPE"
+  ],
+  "op_set": [
+    "ADD",
+    "CONV_2D",
+    "EXPAND_DIMS",
+    "FULLY_CONNECTED",
+    "LOGISTIC",
+    "MEAN",
+    "MUL",
+    "RESHAPE",
+    "TRANSPOSE"
+  ],
+  "conv_dilation_pairs": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      4,
+      1
+    ]
+  ],
+  "input_shape": [
+    1,
+    23,
+    16
+  ],
+  "output_shape": [
+    1
+  ],
+  "subgraph_input_index": 0,
+  "subgraph_output_index": 86,
+  "operators": [
+    {
+      "op": "TRANSPOSE",
+      "inputs": [
+        0,
+        26
+      ],
+      "outputs": [
+        37
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        37,
+        36
+      ],
+      "outputs": [
+        38
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        38,
+        17,
+        7
+      ],
+      "outputs": [
+        39
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 0
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        39,
+        10
+      ],
+      "outputs": [
+        40
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        38,
+        16,
+        6
+      ],
+      "outputs": [
+        41
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        41,
+        10
+      ],
+      "outputs": [
+        42
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        42,
+        36
+      ],
+      "outputs": [
+        43
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        43,
+        15,
+        5
+      ],
+      "outputs": [
+        44
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        44,
+        10
+      ],
+      "outputs": [
+        45
+      ]
+    },
+    {
+      "op": "MEAN",
+      "inputs": [
+        45,
+        35
+      ],
+      "outputs": [
+        46
+      ]
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        46,
+        9
+      ],
+      "outputs": [
+        47
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        47,
+        25,
+        34
+      ],
+      "outputs": [
+        48
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        48,
+        24,
+        27
+      ],
+      "outputs": [
+        49
+      ]
+    },
+    {
+      "op": "LOGISTIC",
+      "inputs": [
+        49
+      ],
+      "outputs": [
+        50
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        50,
+        35
+      ],
+      "outputs": [
+        51
+      ]
+    },
+    {
+      "op": "MUL",
+      "inputs": [
+        45,
+        51
+      ],
+      "outputs": [
+        52
+      ]
+    },
+    {
+      "op": "ADD",
+      "inputs": [
+        52,
+        40
+      ],
+      "outputs": [
+        53
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        53,
+        36
+      ],
+      "outputs": [
+        54
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        54,
+        14,
+        4
+      ],
+      "outputs": [
+        55
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 2,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        55,
+        10
+      ],
+      "outputs": [
+        56
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        56,
+        36
+      ],
+      "outputs": [
+        57
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        57,
+        13,
+        3
+      ],
+      "outputs": [
+        58
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 2,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        58,
+        10
+      ],
+      "outputs": [
+        59
+      ]
+    },
+    {
+      "op": "MEAN",
+      "inputs": [
+        59,
+        35
+      ],
+      "outputs": [
+        60
+      ]
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        60,
+        9
+      ],
+      "outputs": [
+        61
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        61,
+        23,
+        28
+      ],
+      "outputs": [
+        62
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        62,
+        22,
+        29
+      ],
+      "outputs": [
+        63
+      ]
+    },
+    {
+      "op": "LOGISTIC",
+      "inputs": [
+        63
+      ],
+      "outputs": [
+        64
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        64,
+        35
+      ],
+      "outputs": [
+        65
+      ]
+    },
+    {
+      "op": "MUL",
+      "inputs": [
+        59,
+        65
+      ],
+      "outputs": [
+        66
+      ]
+    },
+    {
+      "op": "ADD",
+      "inputs": [
+        66,
+        53
+      ],
+      "outputs": [
+        67
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        67,
+        36
+      ],
+      "outputs": [
+        68
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        68,
+        12,
+        2
+      ],
+      "outputs": [
+        69
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 4,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        69,
+        10
+      ],
+      "outputs": [
+        70
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        70,
+        36
+      ],
+      "outputs": [
+        71
+      ]
+    },
+    {
+      "op": "CONV_2D",
+      "inputs": [
+        71,
+        11,
+        1
+      ],
+      "outputs": [
+        72
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 4,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        72,
+        10
+      ],
+      "outputs": [
+        73
+      ]
+    },
+    {
+      "op": "MEAN",
+      "inputs": [
+        73,
+        35
+      ],
+      "outputs": [
+        74
+      ]
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        74,
+        9
+      ],
+      "outputs": [
+        75
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        75,
+        21,
+        30
+      ],
+      "outputs": [
+        76
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        76,
+        20,
+        31
+      ],
+      "outputs": [
+        77
+      ]
+    },
+    {
+      "op": "LOGISTIC",
+      "inputs": [
+        77
+      ],
+      "outputs": [
+        78
+      ]
+    },
+    {
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        78,
+        35
+      ],
+      "outputs": [
+        79
+      ]
+    },
+    {
+      "op": "MUL",
+      "inputs": [
+        73,
+        79
+      ],
+      "outputs": [
+        80
+      ]
+    },
+    {
+      "op": "ADD",
+      "inputs": [
+        80,
+        67
+      ],
+      "outputs": [
+        81
+      ]
+    },
+    {
+      "op": "MEAN",
+      "inputs": [
+        81,
+        35
+      ],
+      "outputs": [
+        82
+      ]
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        82,
+        9
+      ],
+      "outputs": [
+        83
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        83,
+        19,
+        32
+      ],
+      "outputs": [
+        84
+      ]
+    },
+    {
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        84,
+        18,
+        33
+      ],
+      "outputs": [
+        85
+      ]
+    },
+    {
+      "op": "RESHAPE",
+      "inputs": [
+        85,
+        8
+      ],
+      "outputs": [
+        86
+      ]
+    }
+  ],
+  "tensors": [
+    {
+      "index": 0,
+      "name": "input",
+      "shape": [
+        1,
+        23,
+        16
+      ],
+      "type": 0,
+      "buffer": 1
+    },
+    {
+      "index": 1,
+      "name": "Relu_9;BiasAdd_6;conv1d_6/Squeeze;Const_25;conv1d_6",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 2
+    },
+    {
+      "index": 2,
+      "name": "Relu_8;BiasAdd_5;conv1d_5/Squeeze;Const_23;conv1d_5",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 3
+    },
+    {
+      "index": 3,
+      "name": "Relu_5;BiasAdd_4;conv1d_4/Squeeze;Const_15;conv1d_4",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 4
+    },
+    {
+      "index": 4,
+      "name": "Relu_4;BiasAdd_3;conv1d_3/Squeeze;Const_13;conv1d_3",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 5
+    },
+    {
+      "index": 5,
+      "name": "Relu_1;BiasAdd_2;conv1d_2/Squeeze;Const_5;conv1d_2",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 6
+    },
+    {
+      "index": 6,
+      "name": "Relu;BiasAdd_1;conv1d_1/Squeeze;Const_3;conv1d_1",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 7
+    },
+    {
+      "index": 7,
+      "name": "BiasAdd;conv1d/Squeeze;Const_1;conv1d",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 8
+    },
+    {
+      "index": 8,
+      "name": "Squeeze_4",
+      "shape": [
+        1
+      ],
+      "type": 2,
+      "buffer": 9
+    },
+    {
+      "index": 9,
+      "name": "arith.constant",
+      "shape": [
+        2
+      ],
+      "type": 2,
+      "buffer": 10
+    },
+    {
+      "index": 10,
+      "name": "arith.constant1",
+      "shape": [
+        3
+      ],
+      "type": 2,
+      "buffer": 11
+    },
+    {
+      "index": 11,
+      "name": "conv1d_6",
+      "shape": [
+        32,
+        1,
+        3,
+        32
+      ],
+      "type": 0,
+      "buffer": 12
+    },
+    {
+      "index": 12,
+      "name": "conv1d_5",
+      "shape": [
+        32,
+        1,
+        3,
+        32
+      ],
+      "type": 0,
+      "buffer": 13
+    },
+    {
+      "index": 13,
+      "name": "conv1d_4",
+      "shape": [
+        32,
+        1,
+        3,
+        32
+      ],
+      "type": 0,
+      "buffer": 14
+    },
+    {
+      "index": 14,
+      "name": "conv1d_3",
+      "shape": [
+        32,
+        1,
+        3,
+        32
+      ],
+      "type": 0,
+      "buffer": 15
+    },
+    {
+      "index": 15,
+      "name": "conv1d_2",
+      "shape": [
+        32,
+        1,
+        3,
+        32
+      ],
+      "type": 0,
+      "buffer": 16
+    },
+    {
+      "index": 16,
+      "name": "conv1d_1",
+      "shape": [
+        32,
+        1,
+        3,
+        23
+      ],
+      "type": 0,
+      "buffer": 17
+    },
+    {
+      "index": 17,
+      "name": "conv1d",
+      "shape": [
+        32,
+        1,
+        1,
+        23
+      ],
+      "type": 0,
+      "buffer": 18
+    },
+    {
+      "index": 18,
+      "name": "MatMul_7",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 19
+    },
+    {
+      "index": 19,
+      "name": "MatMul_6",
+      "shape": [
+        32,
+        32
+      ],
+      "type": 0,
+      "buffer": 20
+    },
+    {
+      "index": 20,
+      "name": "MatMul_5",
+      "shape": [
+        32,
+        4
+      ],
+      "type": 0,
+      "buffer": 21
+    },
+    {
+      "index": 21,
+      "name": "MatMul_4",
+      "shape": [
+        4,
+        32
+      ],
+      "type": 0,
+      "buffer": 22
+    },
+    {
+      "index": 22,
+      "name": "MatMul_3",
+      "shape": [
+        32,
+        4
+      ],
+      "type": 0,
+      "buffer": 23
+    },
+    {
+      "index": 23,
+      "name": "MatMul_2",
+      "shape": [
+        4,
+        32
+      ],
+      "type": 0,
+      "buffer": 24
+    },
+    {
+      "index": 24,
+      "name": "MatMul_1",
+      "shape": [
+        32,
+        4
+      ],
+      "type": 0,
+      "buffer": 25
+    },
+    {
+      "index": 25,
+      "name": "MatMul",
+      "shape": [
+        4,
+        32
+      ],
+      "type": 0,
+      "buffer": 26
+    },
+    {
+      "index": 26,
+      "name": "transpose/perm",
+      "shape": [
+        3
+      ],
+      "type": 2,
+      "buffer": 27
+    },
+    {
+      "index": 27,
+      "name": "Const_10",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 28
+    },
+    {
+      "index": 28,
+      "name": "Const_18",
+      "shape": [
+        4
+      ],
+      "type": 0,
+      "buffer": 29
+    },
+    {
+      "index": 29,
+      "name": "Const_20",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 30
+    },
+    {
+      "index": 30,
+      "name": "Const_28",
+      "shape": [
+        4
+      ],
+      "type": 0,
+      "buffer": 31
+    },
+    {
+      "index": 31,
+      "name": "Const_30",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 32
+    },
+    {
+      "index": 32,
+      "name": "Const_34",
+      "shape": [
+        32
+      ],
+      "type": 0,
+      "buffer": 33
+    },
+    {
+      "index": 33,
+      "name": "Const_36",
+      "shape": [
+        1
+      ],
+      "type": 0,
+      "buffer": 34
+    },
+    {
+      "index": 34,
+      "name": "Const_8",
+      "shape": [
+        4
+      ],
+      "type": 0,
+      "buffer": 35
+    },
+    {
+      "index": 35,
+      "name": "arith.constant2",
+      "shape": [],
+      "type": 2,
+      "buffer": 36
+    },
+    {
+      "index": 36,
+      "name": "arith.constant3",
+      "shape": [],
+      "type": 2,
+      "buffer": 37
+    },
+    {
+      "index": 37,
+      "name": "transpose",
+      "shape": [
+        1,
+        16,
+        23
+      ],
+      "type": 0,
+      "buffer": 38
+    },
+    {
+      "index": 38,
+      "name": "conv1d/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        23
+      ],
+      "type": 0,
+      "buffer": 39
+    },
+    {
+      "index": 39,
+      "name": "BiasAdd;conv1d/Squeeze;Const_1;conv1d1",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 40
+    },
+    {
+      "index": 40,
+      "name": "BiasAdd;conv1d/Squeeze;Const_1",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 41
+    },
+    {
+      "index": 41,
+      "name": "Relu;BiasAdd_1;conv1d_1/Squeeze;Const_3;conv1d_11",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 42
+    },
+    {
+      "index": 42,
+      "name": "Relu;BiasAdd_1;conv1d_1/Squeeze;Const_3",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 43
+    },
+    {
+      "index": 43,
+      "name": "conv1d_2/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 44
+    },
+    {
+      "index": 44,
+      "name": "Relu_1;BiasAdd_2;conv1d_2/Squeeze;Const_5;conv1d_21",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 45
+    },
+    {
+      "index": 45,
+      "name": "Relu_1;BiasAdd_2;conv1d_2/Squeeze;Const_5",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 46
+    },
+    {
+      "index": 46,
+      "name": "Mean",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 47
+    },
+    {
+      "index": 47,
+      "name": "Squeeze",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 48
+    },
+    {
+      "index": 48,
+      "name": "MatMul;Relu_2;Add",
+      "shape": [
+        1,
+        4
+      ],
+      "type": 0,
+      "buffer": 49
+    },
+    {
+      "index": 49,
+      "name": "MatMul_1;Add_1",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 50
+    },
+    {
+      "index": 50,
+      "name": "Sigmoid",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 51
+    },
+    {
+      "index": 51,
+      "name": "ExpandDims",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 52
+    },
+    {
+      "index": 52,
+      "name": "Mul",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 53
+    },
+    {
+      "index": 53,
+      "name": "Relu_3;Add_2",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 54
+    },
+    {
+      "index": 54,
+      "name": "conv1d_3/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 55
+    },
+    {
+      "index": 55,
+      "name": "Relu_4;BiasAdd_3;conv1d_3/Squeeze;Const_13;conv1d_31",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 56
+    },
+    {
+      "index": 56,
+      "name": "Relu_4;BiasAdd_3;conv1d_3/Squeeze;Const_13",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 57
+    },
+    {
+      "index": 57,
+      "name": "conv1d_4/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 58
+    },
+    {
+      "index": 58,
+      "name": "Relu_5;BiasAdd_4;conv1d_4/Squeeze;Const_15;conv1d_41",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 59
+    },
+    {
+      "index": 59,
+      "name": "Relu_5;BiasAdd_4;conv1d_4/Squeeze;Const_15",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 60
+    },
+    {
+      "index": 60,
+      "name": "Mean_1",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 61
+    },
+    {
+      "index": 61,
+      "name": "Squeeze_1",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 62
+    },
+    {
+      "index": 62,
+      "name": "MatMul_2;Relu_6;Add_3",
+      "shape": [
+        1,
+        4
+      ],
+      "type": 0,
+      "buffer": 63
+    },
+    {
+      "index": 63,
+      "name": "MatMul_3;Add_4",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 64
+    },
+    {
+      "index": 64,
+      "name": "Sigmoid_1",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 65
+    },
+    {
+      "index": 65,
+      "name": "ExpandDims_1",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 66
+    },
+    {
+      "index": 66,
+      "name": "Mul_1",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 67
+    },
+    {
+      "index": 67,
+      "name": "Relu_7;Add_5",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 68
+    },
+    {
+      "index": 68,
+      "name": "conv1d_5/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 69
+    },
+    {
+      "index": 69,
+      "name": "Relu_8;BiasAdd_5;conv1d_5/Squeeze;Const_23;conv1d_51",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 70
+    },
+    {
+      "index": 70,
+      "name": "Relu_8;BiasAdd_5;conv1d_5/Squeeze;Const_23",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 71
+    },
+    {
+      "index": 71,
+      "name": "conv1d_6/ExpandDims",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 72
+    },
+    {
+      "index": 72,
+      "name": "Relu_9;BiasAdd_6;conv1d_6/Squeeze;Const_25;conv1d_61",
+      "shape": [
+        1,
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 73
+    },
+    {
+      "index": 73,
+      "name": "Relu_9;BiasAdd_6;conv1d_6/Squeeze;Const_25",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 74
+    },
+    {
+      "index": 74,
+      "name": "Mean_2",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 75
+    },
+    {
+      "index": 75,
+      "name": "Squeeze_2",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 76
+    },
+    {
+      "index": 76,
+      "name": "MatMul_4;Relu_10;Add_6",
+      "shape": [
+        1,
+        4
+      ],
+      "type": 0,
+      "buffer": 77
+    },
+    {
+      "index": 77,
+      "name": "MatMul_5;Add_7",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 78
+    },
+    {
+      "index": 78,
+      "name": "Sigmoid_2",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 79
+    },
+    {
+      "index": 79,
+      "name": "ExpandDims_2",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 80
+    },
+    {
+      "index": 80,
+      "name": "Mul_2",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 81
+    },
+    {
+      "index": 81,
+      "name": "Relu_11;Add_8",
+      "shape": [
+        1,
+        16,
+        32
+      ],
+      "type": 0,
+      "buffer": 82
+    },
+    {
+      "index": 82,
+      "name": "Mean_3",
+      "shape": [
+        1,
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 83
+    },
+    {
+      "index": 83,
+      "name": "Squeeze_3",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 84
+    },
+    {
+      "index": 84,
+      "name": "MatMul_6;Relu_12;Add_9",
+      "shape": [
+        1,
+        32
+      ],
+      "type": 0,
+      "buffer": 85
+    },
+    {
+      "index": 85,
+      "name": "MatMul_7;Add_10",
+      "shape": [
+        1,
+        1
+      ],
+      "type": 0,
+      "buffer": 86
+    },
+    {
+      "index": 86,
+      "name": "Identity",
+      "shape": [
+        1
+      ],
+      "type": 0,
+      "buffer": 87
+    }
+  ],
+  "translate_trace": [
+    "INPUT: transpose (N,C,T) -> (N,T,C)",
+    "Conv: /tcn/tcn.0/residual/Conv [native d=1]",
+    "Conv: /tcn/tcn.0/conv1/Conv [native d=1]",
+    "Relu: /tcn/tcn.0/Relu",
+    "Conv: /tcn/tcn.0/conv2/Conv [native d=1]",
+    "Relu: /tcn/tcn.0/Relu_1",
+    "GlobalAveragePool: /tcn/tcn.0/se/gap/GlobalAveragePool",
+    "Constant: /tcn/tcn.0/se/Constant",
+    "Squeeze: /tcn/tcn.0/se/Squeeze",
+    "Gemm: /tcn/tcn.0/se/fc1/Gemm",
+    "Relu: /tcn/tcn.0/se/Relu",
+    "Gemm: /tcn/tcn.0/se/fc2/Gemm",
+    "Sigmoid: /tcn/tcn.0/se/Sigmoid",
+    "Constant: /tcn/tcn.0/se/Constant_1",
+    "Unsqueeze: /tcn/tcn.0/se/Unsqueeze",
+    "Mul: /tcn/tcn.0/se/Mul",
+    "Add: /tcn/tcn.0/Add",
+    "Relu: /tcn/tcn.0/Relu_2",
+    "Conv: /tcn/tcn.1/conv1/Conv [native d=2]",
+    "Relu: /tcn/tcn.1/Relu",
+    "Conv: /tcn/tcn.1/conv2/Conv [native d=2]",
+    "Relu: /tcn/tcn.1/Relu_1",
+    "GlobalAveragePool: /tcn/tcn.1/se/gap/GlobalAveragePool",
+    "Constant: /tcn/tcn.1/se/Constant",
+    "Squeeze: /tcn/tcn.1/se/Squeeze",
+    "Gemm: /tcn/tcn.1/se/fc1/Gemm",
+    "Relu: /tcn/tcn.1/se/Relu",
+    "Gemm: /tcn/tcn.1/se/fc2/Gemm",
+    "Sigmoid: /tcn/tcn.1/se/Sigmoid",
+    "Constant: /tcn/tcn.1/se/Constant_1",
+    "Unsqueeze: /tcn/tcn.1/se/Unsqueeze",
+    "Mul: /tcn/tcn.1/se/Mul",
+    "Add: /tcn/tcn.1/Add",
+    "Relu: /tcn/tcn.1/Relu_2",
+    "Conv: /tcn/tcn.2/conv1/Conv [native d=4]",
+    "Relu: /tcn/tcn.2/Relu",
+    "Conv: /tcn/tcn.2/conv2/Conv [native d=4]",
+    "Relu: /tcn/tcn.2/Relu_1",
+    "GlobalAveragePool: /tcn/tcn.2/se/gap/GlobalAveragePool",
+    "Constant: /tcn/tcn.2/se/Constant",
+    "Squeeze: /tcn/tcn.2/se/Squeeze",
+    "Gemm: /tcn/tcn.2/se/fc1/Gemm",
+    "Relu: /tcn/tcn.2/se/Relu",
+    "Gemm: /tcn/tcn.2/se/fc2/Gemm",
+    "Sigmoid: /tcn/tcn.2/se/Sigmoid",
+    "Constant: /tcn/tcn.2/se/Constant_1",
+    "Unsqueeze: /tcn/tcn.2/se/Unsqueeze",
+    "Mul: /tcn/tcn.2/se/Mul",
+    "Add: /tcn/tcn.2/Add",
+    "Relu: /tcn/tcn.2/Relu_2",
+    "GlobalAveragePool: /gap/GlobalAveragePool",
+    "Constant: /Constant",
+    "Squeeze: /Squeeze",
+    "Gemm: /fc1/Gemm",
+    "Relu: /Relu",
+    "Gemm: /fc2/Gemm",
+    "Constant: /Constant_1",
+    "Squeeze: /Squeeze_1"
+  ]
+}

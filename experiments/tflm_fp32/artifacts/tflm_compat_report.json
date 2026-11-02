@@ -1,0 +1,681 @@
+{
+  "n_operators": 50,
+  "op_set": [
+    "ADD",
+    "CONV_2D",
+    "EXPAND_DIMS",
+    "FULLY_CONNECTED",
+    "LOGISTIC",
+    "MEAN",
+    "MUL",
+    "RESHAPE",
+    "TRANSPOSE"
+  ],
+  "input_shape": [
+    1,
+    23,
+    16
+  ],
+  "output_shape": [
+    1
+  ],
+  "subgraph_input_index": 0,
+  "subgraph_output_index": 86,
+  "operators": [
+    {
+      "index": 0,
+      "op": "TRANSPOSE",
+      "inputs": [
+        0,
+        26
+      ],
+      "outputs": [
+        37
+      ]
+    },
+    {
+      "index": 1,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        37,
+        36
+      ],
+      "outputs": [
+        38
+      ]
+    },
+    {
+      "index": 2,
+      "op": "CONV_2D",
+      "inputs": [
+        38,
+        17,
+        7
+      ],
+      "outputs": [
+        39
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 0
+    },
+    {
+      "index": 3,
+      "op": "RESHAPE",
+      "inputs": [
+        39,
+        10
+      ],
+      "outputs": [
+        40
+      ]
+    },
+    {
+      "index": 4,
+      "op": "CONV_2D",
+      "inputs": [
+        38,
+        16,
+        6
+      ],
+      "outputs": [
+        41
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 5,
+      "op": "RESHAPE",
+      "inputs": [
+        41,
+        10
+      ],
+      "outputs": [
+        42
+      ]
+    },
+    {
+      "index": 6,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        42,
+        36
+      ],
+      "outputs": [
+        43
+      ]
+    },
+    {
+      "index": 7,
+      "op": "CONV_2D",
+      "inputs": [
+        43,
+        15,
+        5
+      ],
+      "outputs": [
+        44
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 1,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 8,
+      "op": "RESHAPE",
+      "inputs": [
+        44,
+        10
+      ],
+      "outputs": [
+        45
+      ]
+    },
+    {
+      "index": 9,
+      "op": "MEAN",
+      "inputs": [
+        45,
+        35
+      ],
+      "outputs": [
+        46
+      ],
+      "keep_dims": true
+    },
+    {
+      "index": 10,
+      "op": "RESHAPE",
+      "inputs": [
+        46,
+        9
+      ],
+      "outputs": [
+        47
+      ]
+    },
+    {
+      "index": 11,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        47,
+        25,
+        34
+      ],
+      "outputs": [
+        48
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 12,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        48,
+        24,
+        27
+      ],
+      "outputs": [
+        49
+      ],
+      "fused_activation": 0
+    },
+    {
+      "index": 13,
+      "op": "LOGISTIC",
+      "inputs": [
+        49
+      ],
+      "outputs": [
+        50
+      ]
+    },
+    {
+      "index": 14,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        50,
+        35
+      ],
+      "outputs": [
+        51
+      ]
+    },
+    {
+      "index": 15,
+      "op": "MUL",
+      "inputs": [
+        45,
+        51
+      ],
+      "outputs": [
+        52
+      ]
+    },
+    {
+      "index": 16,
+      "op": "ADD",
+      "inputs": [
+        52,
+        40
+      ],
+      "outputs": [
+        53
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 17,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        53,
+        36
+      ],
+      "outputs": [
+        54
+      ]
+    },
+    {
+      "index": 18,
+      "op": "CONV_2D",
+      "inputs": [
+        54,
+        14,
+        4
+      ],
+      "outputs": [
+        55
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 2,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 19,
+      "op": "RESHAPE",
+      "inputs": [
+        55,
+        10
+      ],
+      "outputs": [
+        56
+      ]
+    },
+    {
+      "index": 20,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        56,
+        36
+      ],
+      "outputs": [
+        57
+      ]
+    },
+    {
+      "index": 21,
+      "op": "CONV_2D",
+      "inputs": [
+        57,
+        13,
+        3
+      ],
+      "outputs": [
+        58
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 2,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 22,
+      "op": "RESHAPE",
+      "inputs": [
+        58,
+        10
+      ],
+      "outputs": [
+        59
+      ]
+    },
+    {
+      "index": 23,
+      "op": "MEAN",
+      "inputs": [
+        59,
+        35
+      ],
+      "outputs": [
+        60
+      ],
+      "keep_dims": true
+    },
+    {
+      "index": 24,
+      "op": "RESHAPE",
+      "inputs": [
+        60,
+        9
+      ],
+      "outputs": [
+        61
+      ]
+    },
+    {
+      "index": 25,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        61,
+        23,
+        28
+      ],
+      "outputs": [
+        62
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 26,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        62,
+        22,
+        29
+      ],
+      "outputs": [
+        63
+      ],
+      "fused_activation": 0
+    },
+    {
+      "index": 27,
+      "op": "LOGISTIC",
+      "inputs": [
+        63
+      ],
+      "outputs": [
+        64
+      ]
+    },
+    {
+      "index": 28,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        64,
+        35
+      ],
+      "outputs": [
+        65
+      ]
+    },
+    {
+      "index": 29,
+      "op": "MUL",
+      "inputs": [
+        59,
+        65
+      ],
+      "outputs": [
+        66
+      ]
+    },
+    {
+      "index": 30,
+      "op": "ADD",
+      "inputs": [
+        66,
+        53
+      ],
+      "outputs": [
+        67
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 31,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        67,
+        36
+      ],
+      "outputs": [
+        68
+      ]
+    },
+    {
+      "index": 32,
+      "op": "CONV_2D",
+      "inputs": [
+        68,
+        12,
+        2
+      ],
+      "outputs": [
+        69
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 4,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 33,
+      "op": "RESHAPE",
+      "inputs": [
+        69,
+        10
+      ],
+      "outputs": [
+        70
+      ]
+    },
+    {
+      "index": 34,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        70,
+        36
+      ],
+      "outputs": [
+        71
+      ]
+    },
+    {
+      "index": 35,
+      "op": "CONV_2D",
+      "inputs": [
+        71,
+        11,
+        1
+      ],
+      "outputs": [
+        72
+      ],
+      "padding": 0,
+      "stride_w": 1,
+      "stride_h": 1,
+      "dilation_w": 4,
+      "dilation_h": 1,
+      "fused_activation": 1
+    },
+    {
+      "index": 36,
+      "op": "RESHAPE",
+      "inputs": [
+        72,
+        10
+      ],
+      "outputs": [
+        73
+      ]
+    },
+    {
+      "index": 37,
+      "op": "MEAN",
+      "inputs": [
+        73,
+        35
+      ],
+      "outputs": [
+        74
+      ],
+      "keep_dims": true
+    },
+    {
+      "index": 38,
+      "op": "RESHAPE",
+      "inputs": [
+        74,
+        9
+      ],
+      "outputs": [
+        75
+      ]
+    },
+    {
+      "index": 39,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        75,
+        21,
+        30
+      ],
+      "outputs": [
+        76
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 40,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        76,
+        20,
+        31
+      ],
+      "outputs": [
+        77
+      ],
+      "fused_activation": 0
+    },
+    {
+      "index": 41,
+      "op": "LOGISTIC",
+      "inputs": [
+        77
+      ],
+      "outputs": [
+        78
+      ]
+    },
+    {
+      "index": 42,
+      "op": "EXPAND_DIMS",
+      "inputs": [
+        78,
+        35
+      ],
+      "outputs": [
+        79
+      ]
+    },
+    {
+      "index": 43,
+      "op": "MUL",
+      "inputs": [
+        73,
+        79
+      ],
+      "outputs": [
+        80
+      ]
+    },
+    {
+      "index": 44,
+      "op": "ADD",
+      "inputs": [
+        80,
+        67
+      ],
+      "outputs": [
+        81
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 45,
+      "op": "MEAN",
+      "inputs": [
+        81,
+        35
+      ],
+      "outputs": [
+        82
+      ],
+      "keep_dims": true
+    },
+    {
+      "index": 46,
+      "op": "RESHAPE",
+      "inputs": [
+        82,
+        9
+      ],
+      "outputs": [
+        83
+      ]
+    },
+    {
+      "index": 47,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        83,
+        19,
+        32
+      ],
+      "outputs": [
+        84
+      ],
+      "fused_activation": 1
+    },
+    {
+      "index": 48,
+      "op": "FULLY_CONNECTED",
+      "inputs": [
+        84,
+        18,
+        33
+      ],
+      "outputs": [
+        85
+      ],
+      "fused_activation": 0
+    },
+    {
+      "index": 49,
+      "op": "RESHAPE",
+      "inputs": [
+        85,
+        8
+      ],
+      "outputs": [
+        86
+      ]
+    }
+  ],
+  "notes": [
+    "TRANSPOSE#0 perm=[3] -> 可读",
+    "EXPAND_DIMS#1 axis rank=0 -> 可读",
+    "CONV_2D#2 dilation_w=1 fused_act=0",
+    "CONV_2D#4 dilation_w=1 fused_act=1",
+    "EXPAND_DIMS#6 axis rank=0 -> 可读",
+    "CONV_2D#7 dilation_w=1 fused_act=1",
+    "MEAN#9 axes=rank0 numel=1 keep_dims=1 -> TFLM 可读",
+    "FC#11 w=[4, 32] fused_act=1",
+    "FC#12 w=[32, 4] fused_act=0",
+    "EXPAND_DIMS#14 axis rank=0 -> 可读",
+    "ADD#16 fused_act=1 (TFLM add.cc 会做输出端 clamp)",
+    "EXPAND_DIMS#17 axis rank=0 -> 可读",
+    "CONV_2D#18 dilation_w=2 fused_act=1",
+    "EXPAND_DIMS#20 axis rank=0 -> 可读",
+    "CONV_2D#21 dilation_w=2 fused_act=1",
+    "MEAN#23 axes=rank0 numel=1 keep_dims=1 -> TFLM 可读",
+    "FC#25 w=[4, 32] fused_act=1",
+    "FC#26 w=[32, 4] fused_act=0",
+    "EXPAND_DIMS#28 axis rank=0 -> 可读",
+    "ADD#30 fused_act=1 (TFLM add.cc 会做输出端 clamp)",
+    "EXPAND_DIMS#31 axis rank=0 -> 可读",
+    "CONV_2D#32 dilation_w=4 fused_act=1",
+    "EXPAND_DIMS#34 axis rank=0 -> 可读",
+    "CONV_2D#35 dilation_w=4 fused_act=1",
+    "MEAN#37 axes=rank0 numel=1 keep_dims=1 -> TFLM 可读",
+    "FC#39 w=[4, 32] fused_act=1",
+    "FC#40 w=[32, 4] fused_act=0",
+    "EXPAND_DIMS#42 axis rank=0 -> 可读",
+    "ADD#44 fused_act=1 (TFLM add.cc 会做输出端 clamp)",
+    "MEAN#45 axes=rank0 numel=1 keep_dims=1 -> TFLM 可读",
+    "FC#47 w=[32, 32] fused_act=1",
+    "FC#48 w=[1, 32] fused_act=0"
+  ],
+  "errors": [],
+  "tflm_compatible": true
+}

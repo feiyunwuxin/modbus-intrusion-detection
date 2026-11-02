@@ -21,6 +21,79 @@
  * ============================================================================
  */
 #include "ch32_inference.h"
+
+/* ============================================================================
+ * 后端分派: FP32 (默认) / 全量 INT8 (CMSIS-NN) / Hybrid INT16 权重
+ *
+ *   CH32_USE_INT8    = 0 -> 本文件的 FP32 手写 kernel (2026-08 部署真值)
+ *   CH32_USE_INT8    = 1 -> ch32_inference_int8.c 的 INT8 kernel
+ *   CH32_USE_HYBRID  = 1 -> ch32_inference_hybrid.c 的 Hybrid kernel
+ *                       (INT16 权重常驻 Flash + FP32 激活, 不拷 RAM)
+ *
+ * 对外 API (ch32_init / ch32_forward / ch32_benchmark / ch32_dwt_init /
+ * ch32_get_mem_info) 三个后端同名同义, 调用方无需改动.
+ * ⚠️ INT8 / HYBRID target 里 **不链接** FP32 权重 (省 80 KB Flash).
+ * ============================================================================ */
+#if CH32_USE_HYBRID
+
+#include "ch32_inference_hybrid.h"
+
+void ch32_init(void)
+{
+    ch32_hybrid_init();
+}
+
+float ch32_forward(const float* x, size_t len)
+{
+    return ch32_hybrid_forward(x, len);
+}
+
+uint32_t ch32_benchmark(int n_runs)
+{
+    return ch32_hybrid_benchmark(n_runs);
+}
+
+void ch32_dwt_init(void)
+{
+    ch32_hybrid_dwt_init();
+}
+
+ch32_mem_info_t ch32_get_mem_info(void)
+{
+    return ch32_hybrid_get_mem_info();
+}
+
+#elif CH32_USE_INT8
+
+#include "ch32_inference_int8.h"
+
+void ch32_init(void)
+{
+    ch32_int8_init();
+}
+
+float ch32_forward(const float* x, size_t len)
+{
+    return ch32_int8_forward(x, len);
+}
+
+uint32_t ch32_benchmark(int n_runs)
+{
+    return ch32_int8_benchmark(n_runs);
+}
+
+void ch32_dwt_init(void)
+{
+    ch32_int8_dwt_init();
+}
+
+ch32_mem_info_t ch32_get_mem_info(void)
+{
+    return ch32_int8_get_mem_info();
+}
+
+#else /* !CH32_USE_INT8 && !CH32_USE_HYBRID */
+
 #include "model_v4_se_23dim_ch32_fp32_s42.h"   /* ⭐⭐⭐ FULL FP32, no INT8 scales */
 #include <string.h>
 #include <math.h>
@@ -447,3 +520,5 @@ ch32_mem_info_t ch32_get_mem_info(void)
 
     return m;
 }
+
+#endif /* !CH32_USE_INT8 && !CH32_USE_HYBRID */

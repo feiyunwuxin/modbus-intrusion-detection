@@ -1,0 +1,20 @@
+*** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'H743test'
+../Core/Src/modbus_ids.c(98): warning: variable 's_swdbg2_windows' is not needed and will not be emitted [-Wunneeded-internal-declaration]
+   98 | static const int s_swdbg2_windows[] = {2, 3, 7, 15, 51, 0, 1, 8};  /* 5 FN + 3 TP */
+      |                  ^~~~~~~~~~~~~~~~
+../Core/Src/modbus_ids.c(99): warning: unused variable 'SWDBG2_N' [-Wunused-const-variable]
+   99 | static const int SWDBG2_N = (int)(sizeof(s_swdbg2_windows) / sizeof(s_swdbg2_windows[0]));
+      |                  ^~~~~~~~
+../Core/Src/modbus_ids.c(100): warning: unused variable 's_swdbg2_call' [-Wunused-variable]
+  100 | static int s_swdbg2_call = 0;
+      |            ^~~~~~~~~~~~~
+3 warnings generated.
+compiling modbus_ids.c...
+linking...
+H743_DTCM_arena.sct(32): warning: L6314W: No section matches pattern *(.bss.tflm_d2).
+Program Size: Code=64784 RO-data=84836 RW-data=4448 ZI-data=237440  
+Finished: 0 information, 1 warning and 0 error messages.
+FromELF: creating hex file...
+"H743test\H743test.axf" - 0 Error(s), 4 Warning(s).
+Build Time Elapsed:  00:00:05

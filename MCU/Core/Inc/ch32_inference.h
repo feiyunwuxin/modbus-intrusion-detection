@@ -54,6 +54,31 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* --- 推理后端选择 -------------------------------------------------------- *
+ *   0 = FP32 手写 C kernel   (ch32_inference.c,          2026-08 部署真值)
+ *   1 = 全量 INT8 + CMSIS-NN (ch32_inference_int8.c,     2026-10-21)
+ *   2 = Hybrid INT16 权重    (ch32_inference_hybrid.c,    2026-10-27)
+ *       权重 int16 per-channel 存 Flash (不拷 RAM) + 激活 FP32 + 按通道 dequant.
+ *       PC 侧结论 (exp_hybrid_conclusion.py): 部署区 F1 0.8671 / FPR 0.0591,
+ *       跟 FP32 **逐窗 0 决策翻转** => 拿到 INT8 的资源, 保住 FP32 的精度.
+ * 三个后端对外 API 完全一致 (ch32_init / ch32_forward / ...),
+ * 由 ch32_inference.c 分派, 调用方 (main.c / modbus_ids.c) 无需改动.
+ * Keil 里有三个 target:
+ *   H743test        (FP32)   H743test_INT8 (CH32_USE_INT8=1)
+ *   H743test_HYBRID (CH32_USE_HYBRID=1)
+ */
+#ifndef CH32_USE_INT8
+#define CH32_USE_INT8 0
+#endif
+
+#ifndef CH32_USE_HYBRID
+#define CH32_USE_HYBRID 0
+#endif
+
+#if CH32_USE_INT8 && CH32_USE_HYBRID
+#error "CH32_USE_INT8 与 CH32_USE_HYBRID 不能同时为 1"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
