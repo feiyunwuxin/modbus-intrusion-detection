@@ -29,6 +29,16 @@ tflite-micro/
 # --- 原始数据集 (有 csv 转换脚本,不必入库) ---
 IanArffDataset.arff
 IanArffDataset.csv
+# F32/Raw1 两份字节完全相同 (md5 9dfc3d4c...), 只保留 F32 一份入库
+IanArffDatasetRaw1.csv
+
+# --- 课题交付压缩包 (不入库) ---
+Issue.rar
+
+# --- 陈旧工程快照 (2026-10-15 的旧副本, 186 MB) ---
+# 里面的 full_int8 后端已改名为 int8, 现存 MCU/Core/{Src,Inc}/ch32_inference_int8.*
+# TestH743/H743test/ 是 MCU/ 的旧副本 (含重复的 Drivers)
+TestH743/
 
 # --- 大型数据文件 ---
 *.npy
@@ -51,6 +61,35 @@ processed_meta_*.json
 # --- 日志 ---
 *.log
 *.tmp
+
+# --- 临时扫描头文件 (量化脚本中间产物) ---
+i8_*_tmp*.h
+*_sweep_tmp.h
+
+# ============================================================
+# MCU / Keil 构建产物 (2026-11-02)
+# ============================================================
+# 4 个 target 的编译输出目录 (.axf/.hex/.o/.d/.map)
+MCU/MDK-ARM/H743test/
+MCU/MDK-ARM/H743test_INT8/
+MCU/MDK-ARM/H743test_HYBRID/
+MCU/MDK-ARM/H743test_TFLM/
+# uVision 调试会话状态 (per-user)
+MCU/MDK-ARM/*.uvguix.*
+# uVision 调试序列日志
+MCU/MDK-ARM/H743test_Sequences_*.log
+# 例外: 各 target 的构建日志 (证明 0 error, 体积小)
+/MCU/MDK-ARM/build_*.log
+/MCU/MDK-ARM/b_*.log
+
+# ============================================================
+# MCU 串口回放原始日志 (logs/ 共 377 MB; summary .txt 已入库)
+# ============================================================
+logs/*.csv
+# 例外: 报告正文引用的 3 份全量回放原始日志 (可审计)
+/logs/test_20261027-232828_auto-40ms.csv
+/logs/test_20261027-212756_auto-40ms.csv
+/logs/test_20261021-003650_auto-40ms.csv
 
 # --- 系统 ---
 .DS_Store
