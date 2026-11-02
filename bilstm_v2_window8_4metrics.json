@@ -1,0 +1,25 @@
+{
+  "model": "BiLSTM v2 window=8",
+  "note": "Loaded from lstm_binary_v2_window8.py default bidirectional=True run on 2026-09-17",
+  "convention": "Binary / Positive-class (Attack)",
+  "threshold": 0.5,
+  "n_windows": 6865,
+  "n_normal": 3434,
+  "n_attack": 3431,
+  "Accuracy": 0.8170429715950474,
+  "Precision": 0.9351740696278511,
+  "Recall": 0.6811425240454678,
+  "F1-Score": 0.7881956155143339,
+  "Macro_F1": 0.8135849872443465,
+  "confusion_matrix": [
+    [
+      3272,
+      162
+    ],
+    [
+      1094,
+      2337
+    ]
+  ],
+  "history_note": "Originally trained 2026-06-09. Retrained 2026-09-17 with bit-perfect F1m=0.8136@0.5 \u2014 99-day reproducibility confirmed."
+}

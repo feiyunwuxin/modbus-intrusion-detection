@@ -1,0 +1,94 @@
+{
+  "log": "logs\\test_20261011-173212_auto-40ms.csv",
+  "sanity": {
+    "tp": 6969,
+    "fp": 2001,
+    "tn": 6342,
+    "fn": 1852,
+    "n_windows": 17164,
+    "expected": {
+      "tp": 6969,
+      "fp": 2001,
+      "n_windows": 17164
+    },
+    "ok": true
+  },
+  "residue_distribution": {
+    "fp_counts": [
+      357,
+      795,
+      819,
+      30,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "tp_counts": [
+      1139,
+      2929,
+      2788,
+      113,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "chi_square_uniformity": {
+    "fp": {
+      "chi2": 9442.35832083958,
+      "p": 0.0,
+      "df": 15
+    },
+    "tp": {
+      "chi2": 33581.035873152534,
+      "p": 0.0,
+      "df": 15
+    }
+  },
+  "mode": {
+    "fp": 2,
+    "tp": 1
+  },
+  "lag": {
+    "count": 8971,
+    "min_ms": 0,
+    "max_ms": 119,
+    "mean_ms": 36.6,
+    "median_ms": 39,
+    "std_ms": 13.3,
+    "buckets": {
+      "0-40ms (within 1 frame)": 4728,
+      "40-80ms (1-2 frame lag)": 4236,
+      "80-120ms (2-3 frame lag)": 7,
+      "120-160ms (3-4 frame lag)": 0,
+      "160-200ms (4-5 frame lag)": 0,
+      ">=200ms (>=5 frame lag)": 0
+    },
+    "pct_under_160ms": 100.0,
+    "n_lag_gt_160ms": 0
+  },
+  "residue_pattern_explanation": "Residue 0-3 cluster (and 4-15 = 0) is fully explained by 0-3 frame alarm-emission lag, NOT by window misalignment. H743 and PC evaluate the same 16 frames per window.",
+  "decision": {
+    "verdict": "Threshold/Model",
+    "next": "Phase 2A \u2014 threshold retune + heuristic lookback on PC side (or Phase 2B-light: H743 prints prob/frame_idx to enable correct PC-side attribution).",
+    "rationale": "All 8971 alarms arrive at PC within 119ms (100.00% under 160ms) of the most recent PC SEND. The residue 0-3 cluster is fully explained by a -2-frame pipeline lag (mean=37ms, median=39ms, ~0.9 frames @ 40ms interval).\n\nH743 and PC evaluate the **same 16 frames per window** (frames are sent in order and H743 processes in arrival order), so the window BOUNDARIES are aligned.\n\nThe 2001 FPs (all **pure-normal windows**) arise because the alarm printf lags by ~0.9 frames; the alarm is then attributed to a *later* window via IdsLineParser._recent_alarm_frames.append() (rtu_replay_gui.py:1009), which inflates per-window FPR.\n\n**Fix options (cheapest first)**:\n  (a) **Heuristic lookback on PC side** \u2014 when alarm arrives at residue \u2264 3, also mark the previous window as alarm=True. Effect: recoveries for FP\u2192TP where the original attack was in the previous window. Estimated gain: up to 800 FPs could become TPs.\n  (b) **H743 firmware prints `[ALARM] count prob=P.KKK frame=K` so PC knows exactly which frame H743 evaluated** \u2014 proper fix. Requires firmware rebuild + flash (~30min + 3h re-test).\n  (c) **Threshold retune** alone \u2014 won't reduce FP (model is right that those 16 frames look attacky, but PC missed the attack label due to lag). Bound to help less than (a)+(b)."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "input": "logs/test_20261001-090703_auto-40ms.csv",
+  "max_delay": 16,
+  "n_frames": 2734,
+  "n_attack_frames": 430,
+  "n_normal_frames": 2304,
+  "n_alarms": 356,
+  "run_level": {
+    "n_runs": 218,
+    "n_detected": 201,
+    "n_missed": 17,
+    "recall": 0.9220183486238532,
+    "avg_ttd": 2.7064676616915424,
+    "immediate_pct": 21.100917431192663,
+    "within_3_pct": 69.72477064220183
+  },
+  "per_length": {
+    "1": {
+      "runs": 90,
+      "detected": 81,
+      "recall": 0.9,
+      "avg_ttd": 2.7037037037037037
+    },
+    "3": {
+      "runs": 84,
+      "detected": 76,
+      "recall": 0.9047619047619048,
+      "avg_ttd": 2.973684210526316
+    },
+    "2": {
+      "runs": 44,
+      "detected": 44,
+      "recall": 1.0,
+      "avg_ttd": 2.25
+    }
+  },
+  "per_frame": {
+    "recall": 0.22325581395348837,
+    "precision": 0.2696629213483146,
+    "tp": 96,
+    "fp": 260
+  },
+  "csv_summary": {
+    "total": 2734,
+    "attack": 430,
+    "normal": 2304,
+    "tp": 209,
+    "fp": 423
+  }
+}

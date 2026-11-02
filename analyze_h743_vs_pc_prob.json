@@ -1,0 +1,15 @@
+{
+  "n_h743_alarms": 1546,
+  "attack_windows": 2415,
+  "normal_windows": 2249,
+  "h743_atk_alarms": 1488,
+  "h743_norm_alarms": 58,
+  "h743_prob_mean": 0.8547244501940492,
+  "pc_last_mean": 0.9990634358407301,
+  "pc_max_mean": 0.9997113281511552,
+  "diff_last_median": -0.11399985098838805,
+  "diff_max_median": -0.11449961256980895,
+  "pct_absdiff_gt_0_1_last": 0.5420439844760673,
+  "h743_reported_pc_also_reported_at_0_5": 1546,
+  "atk_missed_by_h743_but_pc_high": 535
+}

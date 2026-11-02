@@ -1,0 +1,81 @@
+{
+  "log": "test_20261012-002126_auto-40ms.csv",
+  "total_alarms": 8971,
+  "out_of_range_alarms": 0,
+  "by_category": [
+    {
+      "category": "Normal",
+      "tp": 5810,
+      "fp": 0,
+      "total_alarms": 5810,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9257
+    },
+    {
+      "category": "DoS",
+      "tp": 796,
+      "fp": 0,
+      "total_alarms": 796,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9886
+    },
+    {
+      "category": "Recon",
+      "tp": 1250,
+      "fp": 0,
+      "total_alarms": 1250,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9812
+    },
+    {
+      "category": "MPCI",
+      "tp": 162,
+      "fp": 0,
+      "total_alarms": 162,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9543
+    },
+    {
+      "category": "MSCI",
+      "tp": 547,
+      "fp": 0,
+      "total_alarms": 547,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9736
+    },
+    {
+      "category": "NMRI",
+      "tp": 157,
+      "fp": 0,
+      "total_alarms": 157,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9969
+    },
+    {
+      "category": "CMRI",
+      "tp": 77,
+      "fp": 0,
+      "total_alarms": 77,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.9939
+    },
+    {
+      "category": "MFCI",
+      "tp": 172,
+      "fp": 0,
+      "total_alarms": 172,
+      "fp_pct": 0.0,
+      "median_prob": 0.999,
+      "mean_prob": 0.996
+    }
+  ],
+  "normal_alarms_as_fp": 5810,
+  "n_bytes_top_fp": []
+}

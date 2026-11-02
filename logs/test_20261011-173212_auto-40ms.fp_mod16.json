@@ -1,0 +1,111 @@
+{
+  "log": "logs\\test_20261011-173212_auto-40ms.csv",
+  "sanity": {
+    "tp": 6969,
+    "fp": 2001,
+    "tn": 6342,
+    "fn": 1852,
+    "n_windows": 17164,
+    "expected": {
+      "tp": 6969,
+      "fp": 2001,
+      "n_windows": 17164
+    },
+    "ok": true
+  },
+  "residue_distribution": {
+    "fp_counts": [
+      357,
+      795,
+      819,
+      30,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "tp_counts": [
+      1139,
+      2929,
+      2788,
+      113,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "total_counts": [
+      1496,
+      3724,
+      3607,
+      143,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "chi_square_uniformity": {
+    "fp": {
+      "chi2": 9442.35832083958,
+      "p_value": 0.0,
+      "df": 15,
+      "reject_uniform": true
+    },
+    "tp": {
+      "chi2": 33581.035873152534,
+      "p_value": 0.0,
+      "df": 15,
+      "reject_uniform": true
+    },
+    "total": {
+      "chi2": 43002.51282051282,
+      "p_value": 0.0,
+      "df": 15
+    }
+  },
+  "mode": {
+    "fp": 2,
+    "tp": 1
+  },
+  "residue_0_share": {
+    "fp_pct": 17.84,
+    "tp_pct": 16.34
+  },
+  "fp_window_content": {
+    "pure_normal_count": 2001,
+    "mixed_count": 0,
+    "pure_normal_pct": 100.0
+  },
+  "decision": {
+    "verdict": "Misaligned",
+    "next": "Phase 2B (firmware window sync)",
+    "rationale": "FP mode residue = 2, TP mode residue = 1 \u2014 H743 windows are shifted by ~2 frames vs PC.",
+    "alpha": 0.05,
+    "chi2_critical_df15": 24.996
+  }
+}

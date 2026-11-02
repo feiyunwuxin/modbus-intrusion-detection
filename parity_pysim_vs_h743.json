@@ -1,0 +1,27 @@
+{
+  "csv": "C:\\work\\Claude\\Issue\\IanArffDataset.csv",
+  "start_frame": 200000,
+  "n_frames": 74628,
+  "pc_inferences": 74613,
+  "elapsed_s": 97.66530513763428,
+  "attack_windows": 2415,
+  "normal_windows": 2249,
+  "pc": {
+    "TP": 2206,
+    "FN": 209,
+    "FP": 1030,
+    "recall_at_0_5": 0.9134575569358178,
+    "fpr_at_0_5": 0.45798132503334815
+  },
+  "h743": {
+    "alarm_rows": 1546,
+    "detected_windows": 1540,
+    "TP_windows": 1482,
+    "FP_windows": 58,
+    "FN_windows": 933,
+    "FN_with_PC_high_prob": 724,
+    "FN_with_PC_low_prob": 209,
+    "FP_with_PC_high_prob": 58,
+    "FP_with_PC_low_prob": 0
+  }
+}

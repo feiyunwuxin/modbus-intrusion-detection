@@ -1,0 +1,13 @@
+{
+  "n_features": 23,
+  "n_params": 41489,
+  "best_epoch": 19,
+  "train_time_s": 187.2,
+  "test_macro_f1": 0.8278677412065978,
+  "test_binary_f1": 0.8124199743918054,
+  "test_accuracy": 0.8292540792540792,
+  "test_roc_auc": 0.8614388087450859,
+  "test_pr_auc": 0.9020928959105379,
+  "channels": 48,
+  "seed": 456
+}

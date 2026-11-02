@@ -1,0 +1,18 @@
+{
+  "per_seed": [
+    {
+      "seed": 42,
+      "n_samples": 30,
+      "time_s": 3.1193714141845703,
+      "max_diff": 0.8928876442621707,
+      "mean_diff": 0.4978398378459217,
+      "median_diff": 0.822235899746863,
+      "agreement": 0.4,
+      "pt_positive": 12,
+      "qi_positive": 30
+    }
+  ],
+  "avg_max_diff": 0.8928876442621707,
+  "avg_mean_diff": 0.4978398378459217,
+  "avg_agreement": 0.4
+}

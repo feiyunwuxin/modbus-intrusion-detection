@@ -1,0 +1,112 @@
+{
+  "seeds": {
+    "42": {
+      "tflite_bytes": 47264,
+      "header_path": "MCU/Core/Inc\\model_data_s42.h",
+      "var_name": "g_model_s42"
+    },
+    "123": {
+      "tflite_bytes": 47376,
+      "header_path": "MCU/Core/Inc\\model_data_s123.h",
+      "var_name": "g_model_s123"
+    },
+    "456": {
+      "tflite_bytes": 47376,
+      "header_path": "MCU/Core/Inc\\model_data_s456.h",
+      "var_name": "g_model_s456"
+    },
+    "789": {
+      "tflite_bytes": 47384,
+      "header_path": "MCU/Core/Inc\\model_data_s789.h",
+      "var_name": "g_model_s789"
+    },
+    "1024": {
+      "tflite_bytes": 47384,
+      "header_path": "MCU/Core/Inc\\model_data_s1024.h",
+      "var_name": "g_model_s1024"
+    }
+  },
+  "quant_meta": {
+    "42": {
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "input_dtype": "<class 'numpy.int8'>",
+      "input_scale": 0.07058823853731155,
+      "input_zp": -15,
+      "output_shape": [
+        1
+      ],
+      "output_dtype": "<class 'numpy.int8'>",
+      "output_scale": 0.19469593465328217,
+      "output_zp": -112
+    },
+    "123": {
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "input_dtype": "<class 'numpy.int8'>",
+      "input_scale": 0.07058823853731155,
+      "input_zp": -15,
+      "output_shape": [
+        1
+      ],
+      "output_dtype": "<class 'numpy.int8'>",
+      "output_scale": 0.27009105682373047,
+      "output_zp": -118
+    },
+    "456": {
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "input_dtype": "<class 'numpy.int8'>",
+      "input_scale": 0.07058823853731155,
+      "input_zp": -15,
+      "output_shape": [
+        1
+      ],
+      "output_dtype": "<class 'numpy.int8'>",
+      "output_scale": 0.22926905751228333,
+      "output_zp": -118
+    },
+    "789": {
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "input_dtype": "<class 'numpy.int8'>",
+      "input_scale": 0.07058823853731155,
+      "input_zp": -15,
+      "output_shape": [
+        1
+      ],
+      "output_dtype": "<class 'numpy.int8'>",
+      "output_scale": 0.15187865495681763,
+      "output_zp": -112
+    },
+    "1024": {
+      "input_shape": [
+        1,
+        23,
+        16
+      ],
+      "input_dtype": "<class 'numpy.int8'>",
+      "input_scale": 0.07058823853731155,
+      "input_zp": -15,
+      "output_shape": [
+        1
+      ],
+      "output_dtype": "<class 'numpy.int8'>",
+      "output_scale": 0.22172710299491882,
+      "output_zp": -114
+    }
+  },
+  "total_flash_kb": 231.234375
+}

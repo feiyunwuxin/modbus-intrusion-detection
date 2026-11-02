@@ -1,0 +1,72 @@
+{
+  "phase": "phase1_lgb_baseline_2026-06-08",
+  "model": "LightGBM",
+  "binary_clf_n_estimators": 400,
+  "multiclass_clf_n_estimators": 600,
+  "n_features": 32,
+  "train_size": 192239,
+  "test_size": 82389,
+  "binary_test_dist": {
+    "0": 64584,
+    "1": 17805
+  },
+  "multiclass_test_classes": 36,
+  "binary": {
+    "thr_0.5": {
+      "metrics": {
+        "accuracy": 0.8129240553957445,
+        "precision": 0.5478285211549229,
+        "recall": 0.7693906206121875,
+        "f1": 0.6399757071780617
+      },
+      "confusion_matrix": [
+        [
+          53277,
+          11307
+        ],
+        [
+          4106,
+          13699
+        ]
+      ],
+      "support_attack": 17805,
+      "support_normal": 64584
+    },
+    "test_scan_best_f1": {
+      "best_threshold": 0.8100000000000002,
+      "metrics": {
+        "accuracy": 0.9026690456250227,
+        "precision": 0.9094560669456067,
+        "recall": 0.6103903397921933,
+        "f1": 0.7304990757855823
+      },
+      "confusion_matrix": [
+        [
+          63502,
+          1082
+        ],
+        [
+          6937,
+          10868
+        ]
+      ],
+      "note": "test-derived, baseline pipeline.py has no val set; only reference"
+    }
+  },
+  "multiclass": {
+    "macro": {
+      "accuracy": 0.8303657041595358,
+      "precision": 0.45557794157485926,
+      "recall": 0.4128940738534459,
+      "f1": 0.41995180887962985,
+      "n_classes": 36
+    },
+    "weighted": {
+      "accuracy": 0.8303657041595358,
+      "precision": 0.8050350201957723,
+      "recall": 0.8303657041595358,
+      "f1": 0.8140405982764087,
+      "n_classes": 36
+    }
+  }
+}
