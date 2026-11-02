@@ -36,7 +36,6 @@ from modbus_replay.gui.widgets import (
     RxPanel,
 )
 from modbus_replay.serial_worker import SerialReader, SerialWorker
-
 # Optional IDS dependency — requires `pip install -e ".[ids]"`. The GUI
 # launches cleanly without it; only the IDS path errors with a friendly
 # message in that case.

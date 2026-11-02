@@ -1,0 +1,18 @@
+=== BiGRU (hidden=128) 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8408  BestEp=9/14  Params=125,761  TrainT=46.5s
+
+--- seed=123 ---
+  F1m=0.8499  BestEp=11/16  Params=125,761  TrainT=51.5s
+
+--- seed=456 ---
+  F1m=0.8285  BestEp=12/17  Params=125,761  TrainT=54.8s
+
+--- seed=789 ---
+  F1m=0.8335  BestEp=9/14  Params=125,761  TrainT=2572.3s
+
+--- seed=1024 ---
+  F1m=0.8514  BestEp=12/17  Params=125,761  TrainT=57.0s
+
+[saved meta] processed_meta_gru_23dim_w16_h128.json

@@ -1,0 +1,19 @@
+{
+  "n_samples": 200,
+  "seed": 42,
+  "fp32_model": "D:\\workspace\\claude\\Issue\\Issue\\model_v4_se_23dim_b64_ch32_do01_window16_s42.pt",
+  "mcu_header": "D:\\workspace\\claude\\Issue\\Issue\\KeilH743\\H743\\Core\\Inc\\model_v4_se_23dim_ch32_hybrid_s42.h",
+  "max_prob_diff": 0.00182747930998306,
+  "mean_prob_diff": 2.0054115294051434e-05,
+  "verdict_agreement": 1.0,
+  "fp32_threshold": 0.5,
+  "mcu_threshold": 0.49,
+  "fp32_accuracy": 0.59,
+  "fp32_f1": 0.7421383647798742,
+  "mcu_accuracy": 0.59,
+  "mcu_f1": 0.7421383647798742,
+  "fp32_inference_seconds": 0.16341114044189453,
+  "mcu_inference_seconds": 0.1665966510772705,
+  "fp32_ms_per_sample": 0.8170557022094727,
+  "mcu_ms_per_sample": 0.8329832553863525
+}

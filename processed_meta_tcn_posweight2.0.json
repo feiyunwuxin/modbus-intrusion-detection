@@ -1,0 +1,88 @@
+{
+  "model": "TCN baseline + pos_weight=2.0",
+  "tag": "tcn_pw2",
+  "config": {
+    "pos_weight": 2.0,
+    "epochs": 20,
+    "batch": 64,
+    "lr": 0.004,
+    "wd": 1e-05,
+    "patience": 5,
+    "grad_clip": 0.5
+  },
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1024
+  ],
+  "n_seeds": 5,
+  "n_models": 5,
+  "per_seed": [
+    {
+      "seed": 42,
+      "n_params": 20001,
+      "best_epoch": 12,
+      "train_time_s": 33.07310652732849,
+      "test_macro_f1": 0.8722974357475703,
+      "test_binary_f1": 0.8690974297668859,
+      "test_accuracy": 0.8723776223776224,
+      "test_precision": 0.9435431537962362,
+      "test_recall": 0.8055401662049861,
+      "test_roc_auc": 0.8944497886258038
+    },
+    {
+      "seed": 123,
+      "n_params": 20001,
+      "best_epoch": 7,
+      "train_time_s": 22.850123643875122,
+      "test_macro_f1": 0.8654085016735126,
+      "test_binary_f1": 0.8594083562061604,
+      "test_accuracy": 0.8656759906759907,
+      "test_precision": 0.9559023066485753,
+      "test_recall": 0.7806094182825485,
+      "test_roc_auc": 0.8995826998350208
+    },
+    {
+      "seed": 456,
+      "n_params": 20001,
+      "best_epoch": 20,
+      "train_time_s": 40.03429937362671,
+      "test_macro_f1": 0.879320425720868,
+      "test_binary_f1": 0.8768590124925639,
+      "test_accuracy": 0.8793706293706294,
+      "test_precision": 0.9466923570969814,
+      "test_recall": 0.8166204986149584,
+      "test_roc_auc": 0.9059116672086518
+    },
+    {
+      "seed": 789,
+      "n_params": 20001,
+      "best_epoch": 12,
+      "train_time_s": 32.77309441566467,
+      "test_macro_f1": 0.8666099118273032,
+      "test_binary_f1": 0.8610519914867741,
+      "test_accuracy": 0.8668414918414918,
+      "test_precision": 0.954177897574124,
+      "test_recall": 0.7844875346260388,
+      "test_roc_auc": 0.90110650092705
+    },
+    {
+      "seed": 1024,
+      "n_params": 20001,
+      "best_epoch": 9,
+      "train_time_s": 28.39942455291748,
+      "test_macro_f1": 0.858289776859448,
+      "test_binary_f1": 0.8544910179640719,
+      "test_accuracy": 0.8583916083916084,
+      "test_precision": 0.9296416938110749,
+      "test_recall": 0.7905817174515235,
+      "test_roc_auc": 0.8774943942848095
+    }
+  ],
+  "summary": {
+    "f1m_mean": 0.8683852103657405,
+    "f1m_std": 0.007054285215671206
+  }
+}

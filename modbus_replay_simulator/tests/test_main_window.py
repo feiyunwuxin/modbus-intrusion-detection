@@ -193,13 +193,10 @@ def test_main_window_open_idempotent_when_already_open(qapp, monkeypatch):
     win._on_open_port()  # second click — should be a no-op
     assert len(call_count) == 1, "Serial() must only be called once"
     assert win._probe_serial is fake_handle
-    # Stop the SerialReader that _on_open_port spawned. Without this
-    # cleanup the QThread outlives the test and pytest-qt's session
-    # finalizer blocks waiting for it. The reader's run() exits
-    # cleanly when stop() flips the loop flag (we don't rely on the
-    # AttributeError-on-object path that would otherwise kick in).
-    win._rx_reader.stop()
-    win._rx_reader.wait(1000)
+    # Close so the background SerialReader QThread stops before the test
+    # returns. Without this pytest-qt's qapp teardown waits on the
+    # still-running reader and the suite hangs.
+    win._on_close_port()
 
 
 def test_main_window_verbose_chk_default_on(qapp):
@@ -388,6 +385,138 @@ def test_main_window_csv_load_runs_progress_callback(qapp, tmp_path, monkeypatch
 
 def test_main_window_verbose_chk_passed_to_worker(qapp, tmp_path, monkeypatch):
     """📋 显示发送日志 checkbox state is forwarded to SerialWorker.verbose_tx.
+
+    Captures the kwargs passed to SerialWorker so we don't actually
+    start a thread.
+    """
+    captured = {}
+    class FakeWorker:
+        # Stub signals/properties/methods that MainWindow touches after
+        # constructing the worker. Signals must be connect()-able.
+        class _Signal:
+            def connect(self, *_a, **_kw):
+                pass
+        progress = _Signal()
+        state_changed = _Signal()
+        log_message = _Signal()
+        rx_received = _Signal()
+        finished_run = _Signal()
+
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+        def start(self):
+            pass
+
+    # Patch the SerialWorker symbol imported into main_window's namespace.
+    monkeypatch.setattr(
+        "modbus_replay.gui.main_window.SerialWorker",
+        FakeWorker,
+    )
+
+    csv = tmp_path / "tiny.csv"
+    csv.write_text(
+        "address,function,length,setpoint,gain,reset rate,deadband,"
+        "cycle time,rate,system mode,control scheme,pump,solenoid,"
+        "pressure measurement,crc rate,command response,time\n"
+        "1,3,8,0,0,0,0,0,0.0,0,0,0,0,0.0,0,0,1000\n",
+        encoding="utf-8",
+    )
+
+    # 1. verbose checkbox OFF → verbose_tx=False
+    win = MainWindow()
+    win._probe_serial = _FakeSerialHandle()  # bypass port-not-open guard
+    win.csv_edit.setText(str(csv))
+    win.port_selector.port_combo.clear()
+    win.port_selector.port_combo.addItem("COM_FAKE")
+    win.verbose_chk.setChecked(False)
+    win._on_start()
+    assert captured.get("verbose_tx") is False
+
+    # 2. verbose checkbox ON → verbose_tx=True. ``_on_start`` auto-closes
+    # the probe at the top of the flow so the worker can take the port;
+    # re-arm the probe handle so the second call still passes the new
+    # ``_probe_serial is None`` guard.
+    win._probe_serial = _FakeSerialHandle()
+    win.verbose_chk.setChecked(True)
+    win._on_start()
+    assert captured.get("verbose_tx") is True
+
+
+def test_main_window_start_closes_probe_handle(qapp, tmp_path, monkeypatch):
+    """Clicking ▶ 开始 with the probe port open must close the probe
+    first — otherwise the SerialWorker can't acquire the same COM
+    port on Windows (exclusive handles). The probe's reader is
+    stopped and the handle released before the worker is constructed.
+    """
+    csv = tmp_path / "tiny.csv"
+    csv.write_text(
+        "address,function,length,setpoint,gain,reset rate,deadband,"
+        "cycle time,rate,system mode,control scheme,pump,solenoid,"
+        "pressure measurement,crc rate,command response,time\n"
+        "1,3,8,0,0,0,0,0,0.0,0,0,0,0,0.0,0,0,1000\n",
+        encoding="utf-8",
+    )
+
+    class FakeWorker:
+        class _Signal:
+            def connect(self, *_a, **_kw):
+                pass
+        progress = _Signal(); state_changed = _Signal()
+        log_message = _Signal(); rx_received = _Signal()
+        finished_run = _Signal()
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+        def start(self):
+            pass
+
+    # Stub the probe handle so we don't need real pyserial / hardware.
+    reader_stopped = []
+    handle_closed = []
+    class FakeReader:
+        def stop(self):
+            reader_stopped.append(True)
+        def wait(self, *_a):
+            pass
+    class FakeSerialHandle:
+        def close(self):
+            handle_closed.append(True)
+
+    # Stub QProgressDialog so the load dialog is a no-op.
+    class FakeProgress:
+        def __init__(self, *a, **kw):
+            pass
+        def setWindowTitle(self, *_a): pass
+        def setCancelButton(self, *_a): pass
+        def setWindowModality(self, *_a): pass
+        def setMinimumDuration(self, *_a): pass
+        def show(self): pass
+        def close(self): pass
+        def setMaximum(self, *_a): pass
+        def setValue(self, *_a): pass
+        def setLabelText(self, *_a): pass
+
+    import modbus_replay.gui.main_window as mw
+    monkeypatch.setattr(mw, "QProgressDialog", FakeProgress)
+    monkeypatch.setattr(mw, "SerialWorker", FakeWorker)
+    monkeypatch.setattr(mw, "SerialReader", lambda *_a, **_kw: FakeReader())
+
+    win = MainWindow()
+    win.csv_edit.setText(str(csv))
+    win.port_selector.port_combo.clear()
+    win.port_selector.port_combo.addItem("COM_FAKE")
+
+    # Simulate the probe already being open — that is exactly the
+    # state that previously caused PermissionError on Start.
+    win._probe_serial = FakeSerialHandle()
+    win._rx_reader = FakeReader()
+
+    win._on_start()
+
+    assert reader_stopped == [True], "probe reader must be stopped"
+    assert handle_closed == [True], "probe handle must be closed"
+    assert win._probe_serial is None
+    assert win._rx_reader is None
+    """📋 详细日志 checkbox state is forwarded to SerialWorker.verbose_tx.
 
     Captures the kwargs passed to SerialWorker so we don't actually
     start a thread.

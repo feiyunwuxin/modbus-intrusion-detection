@@ -7,19 +7,27 @@ exercises real serial hardware. Run this checklist once per release
 candidate (or after any change to `frame_format.py`,
 `replay_engine.py`, `serial_worker.py`, or `gui/main_window.py`).
 
-Automated coverage already in place (92 tests):
+Automated coverage already in place (139 tests):
 
-* 6 `csv_loader` — preserves `?`, missing-column guard, etc.
+* 9 `csv_loader` — preserves `?`, missing-column guard, progress
+  callback semantics (start/mid/end fires + `progress_every`
+  override).
 * 8 `frame_format` — round-trip, NaN encoding, size = 32, etc.
 * 7 `replay_engine` — pacing, encoding, first-packet direction.
-* 7 `serial_worker` — write progress, stop, error, paused-state, tx_event signal, etc.
-* 8 `gui/widgets` — PortSelector defaults, ProgressPanel, LogPanel, IdsPanel.
-* 9 `gui/main_window` — composition + missing-CSV / missing-port guards + IDS panel wiring.
-* 5 `gui/rx_panel` — receive-panel rendering.
+* 12 `serial_worker` — write progress, stop, error, paused-state,
+  tx_event signal, verbose TX, RX forwarding (`rx_received` → RxPanel),
+  reader clean shutdown.
+* 6 `gui/widgets` — PortSelector defaults, ProgressPanel (no
+  embedded bar — modal dialog does it), LogPanel, RxPanel format,
+  IdsPanel.
+* 19 `gui/main_window` — composition, Start-disabled gating,
+  probe-before-replay auto-close, verbose default, missing-CSV /
+  missing-port guards, IDS panel wiring.
+* 15 `gui/rx_panel` — receive-panel rendering.
 * 5 `integration_loopback` — 50-row round-trip, NaN round-trip,
   first-packet direction, real-dataset size guard (274,628 rows),
   real-dataset first-50-frame round-trip.
-* 37 `ids_pipeline` / `ids_panel` / `ids_worker` — bit-match featurizer
+* 58 `ids_pipeline` / `ids_panel` / `ids_worker` — bit-match featurizer
   + window builder, threshold / scaler loaders, IdsPanel widget
   states, IdsWorker QThread lifecycle.
 
@@ -194,7 +202,7 @@ action — confirm with the maintainer before pushing.)
 |---------|--------------|-----|
 | `ERROR open failed: PermissionError` | Another process holds the COM port | Close PuTTY / Arduino IDE / another simulator instance |
 | `ERROR open failed: FileNotFoundError` | Wrong COM port selected | Click **🔄 刷新** and re-pick |
-| Progress bar stuck at 0 | MCU is not actually reading; pyserial write buffer full | Check MCU UART config; reduce baud; check ground connection |
+| 当前行号标签卡在 - | MCU is not actually reading; pyserial write buffer full | Check MCU UART config; reduce baud; check ground connection |
 | WARN `write error at row N` followed by retry | Transient USB hiccup | Benign once; repeated → replace cable |
 | First packet decoded as `direction=0` on MCU | MCU forgot to honor the `is_first_packet` flag | Re-flash firmware with the documented first-packet convention |
 

@@ -1,0 +1,29 @@
+=== TTA Experiment on TCN Baseline ===
+
+  N_TTA=10, ¦Ò=0.02¡Áfeature_std
+
+Loaded data: X_test=(3432, 23, 16), y_test=(3432,)
+
+  seed=42: F1_no_tta=0.8741  F1_tta=0.8723  ¦¤=-0.0018
+  seed=123: F1_no_tta=0.8765  F1_tta=0.8759  ¦¤=-0.0007
+  seed=456: F1_no_tta=0.8718  F1_tta=0.8680  ¦¤=-0.0038
+  seed=789: F1_no_tta=0.8666  F1_tta=0.8649  ¦¤=-0.0017
+  seed=1024: F1_no_tta=0.8736  F1_tta=0.8761  ¦¤=+0.0026
+
+======================================================================
+Config                                      Thr      Acc        P        R       F1
+----------------------------------------------------------------------
+TCN baseline (no TTA) @ best thr          0.380   0.8881   0.9540   0.8271   0.8861
+TCN + TTA @ best thr                      0.470   0.8867   0.9464   0.8316   0.8853
+TCN baseline (no TTA) @ thr=0.5           0.500   0.8829   0.9582   0.8127   0.8795
+TCN + TTA @ thr=0.5                       0.500   0.8867   0.9521   0.8260   0.8846
+
+Delta (TTA vs no-TTA, both at best thr): -0.077pp
+
+Reference: Stacking M3@0.390 ¡ú F1=0.8904
+           TCN + TTA best thr ¡ú F1=0.8853
+           Delta vs stacking: -0.512pp
+
+>>> TTA HURTS TCN baseline <<<
+
+[saved] D:\workspace\claude\Issue\Issue\tta_tcn_baseline.json

@@ -1,0 +1,12 @@
+=== [16:57:10] Starting Multi-Scale TCN training (5 seeds) ===
+=== Multi-Scale TCN ¡Á 5 seeds ===
+  Kernels=(1, 3, 5, 7)  Dilations=(1, 2, 4)  Ch=32  Blocks=3
+
+  seed=42: F1=0.8477  best_ep=8  time=54.6s  params=63681
+  seed=123: F1=0.8406  best_ep=3  time=32.2s  params=63681
+  seed=456: F1=0.8621  best_ep=17  time=87.8s  params=63681
+  seed=789: F1=0.8664  best_ep=18  time=88.1s  params=63681
+  seed=1024: F1=0.8044  best_ep=2  time=31.7s  params=63681
+
+[saved meta] processed_meta_tcn_multiscale.json
+=== [17:02:10] Done ===

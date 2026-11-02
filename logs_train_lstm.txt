@@ -1,0 +1,18 @@
+=== BiLSTM 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8458  BestEp=9/14  Params=49,729  TrainT=15.4s
+
+--- seed=123 ---
+  F1m=0.8331  BestEp=11/16  Params=49,729  TrainT=17.7s
+
+--- seed=456 ---
+  F1m=0.8380  BestEp=13/18  Params=49,729  TrainT=19.5s
+
+--- seed=789 ---
+  F1m=0.8512  BestEp=18/20  Params=49,729  TrainT=21.3s
+
+--- seed=1024 ---
+  F1m=0.7990  BestEp=4/9  Params=49,729  TrainT=9.8s
+
+[saved meta] processed_meta_lstm_23dim_w16.json

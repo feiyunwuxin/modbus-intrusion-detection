@@ -1,0 +1,19 @@
+=== Multi-Scale TCN 5-seed ¡Á 4-metric Evaluation ===
+
+5-seed prob_mean ensemble:
+  Acc=0.8622  P=0.9562  R=0.7734  F1=0.8551
+
+Per-seed F1:
+  seed   42: F1=0.8477
+  seed  123: F1=0.8406
+  seed  456: F1=0.8621
+  seed  789: F1=0.8664
+  seed 1024: F1=0.8044
+
+vs TCN baseline (F1=0.8795): -2.44%
+vs Stacking M3@0.390 (F1=0.8904): -3.53%
+Target F1 >= 0.88: MISS
+
+[saved] D:\workspace\claude\Issue\Issue\multiscale_5seed_4metric.json
+[saved] D:\workspace\claude\Issue\Issue\multiscale_5seed_per_seed.csv
+[saved] D:\workspace\claude\Issue\Issue\MULTISCALE_LEADERBOARD.md

@@ -1,0 +1,36 @@
+=== Retrain TCN+SE 23-dim (B=64 + LR=4e-3 + ep=20 + ch=32 + do=0.1) × 5 seeds ===
+    保存到 model_v4_se_23dim_b64_ch32_do01_window16_s{seed}.pt
+
+--- seed=42 ---
+[saved pt] D:\workspace\claude\Issue\Issue\model_v4_se_23dim_b64_ch32_do01_window16_s42.pt  (20,877 params, 107,449 bytes)
+[saved pred] D:\workspace\claude\Issue\Issue\predictions_test_v4_se_23dim_b64_ch32_do01_window16_s42.csv
+  F1m=0.8673  PR-AUC=0.9117  BestEp=13/18  Params=20,877  TrainT=38.3s
+
+--- seed=123 ---
+[saved pt] D:\workspace\claude\Issue\Issue\model_v4_se_23dim_b64_ch32_do01_window16_s123.pt  (20,877 params, 107,579 bytes)
+[saved pred] D:\workspace\claude\Issue\Issue\predictions_test_v4_se_23dim_b64_ch32_do01_window16_s123.csv
+  F1m=0.8737  PR-AUC=0.9147  BestEp=19/20  Params=20,877  TrainT=44.4s
+
+--- seed=456 ---
+[saved pt] D:\workspace\claude\Issue\Issue\model_v4_se_23dim_b64_ch32_do01_window16_s456.pt  (20,877 params, 107,579 bytes)
+[saved pred] D:\workspace\claude\Issue\Issue\predictions_test_v4_se_23dim_b64_ch32_do01_window16_s456.csv
+  F1m=0.8714  PR-AUC=0.9197  BestEp=19/20  Params=20,877  TrainT=46.6s
+
+--- seed=789 ---
+[saved pt] D:\workspace\claude\Issue\Issue\model_v4_se_23dim_b64_ch32_do01_window16_s789.pt  (20,877 params, 107,515 bytes)
+[saved pred] D:\workspace\claude\Issue\Issue\predictions_test_v4_se_23dim_b64_ch32_do01_window16_s789.csv
+  F1m=0.8700  PR-AUC=0.9237  BestEp=14/19  Params=20,877  TrainT=46.7s
+
+--- seed=1024 ---
+[saved pt] D:\workspace\claude\Issue\Issue\model_v4_se_23dim_b64_ch32_do01_window16_s1024.pt  (20,877 params, 107,069 bytes)
+[saved pred] D:\workspace\claude\Issue\Issue\predictions_test_v4_se_23dim_b64_ch32_do01_window16_s1024.csv
+  F1m=0.8501  PR-AUC=0.9252  BestEp=5/10  Params=20,877  TrainT=23.6s
+
+[saved meta] D:\workspace\claude\Issue\Issue\processed_meta_v4_se_23dim_b64_ch32_do01_window16.json
+
+=== 5-seed prob mean ensemble ===
+  5-seed ensemble F1m = 0.8743  PR-AUC = 0.9238  BinF1 = 0.8702
+
+=== 5-seed ensemble F1m = 0.8743 ===
+    vs single seed mean = 0.8665, delta = +0.0078
+    单文件大小: [107449, 107579, 107579, 107515, 107069]

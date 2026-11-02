@@ -307,8 +307,6 @@ def test_serial_reader_emits_received_bytes(qapp):
     reader.wait(1000)
 
     assert captured == [b"\xaa\xbb"]
-
-
 # ---------------------------------------------------------------------------
 # tx_event signal — added for the PC-side IDS monitor.
 # ---------------------------------------------------------------------------

@@ -1,0 +1,77 @@
+=== [11:23:45] Starting Pure CNN (5 seeds) ===
+=== Pure CNN 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8311  BestEp=8/13  Params=9,729  TrainT=12.0s
+
+--- seed=123 ---
+  F1m=0.8342  BestEp=10/15  Params=9,729  TrainT=14.4s
+
+--- seed=456 ---
+  F1m=0.8056  BestEp=11/16  Params=9,729  TrainT=19.8s
+
+--- seed=789 ---
+  F1m=0.8370  BestEp=9/14  Params=9,729  TrainT=17.2s
+
+--- seed=1024 ---
+  F1m=0.8447  BestEp=17/20  Params=9,729  TrainT=25.2s
+
+[saved meta] processed_meta_cnn_23dim_w16.json
+=== [11:25:20] CNN done. BiLSTM h128 (5 seeds) ===
+=== BiLSTM (hidden=128) 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8583  BestEp=17/20  Params=164,929  TrainT=41.0s
+
+--- seed=123 ---
+  F1m=0.8182  BestEp=6/11  Params=164,929  TrainT=23.5s
+
+--- seed=456 ---
+  F1m=0.8447  BestEp=14/19  Params=164,929  TrainT=39.3s
+
+--- seed=789 ---
+  F1m=0.8549  BestEp=17/20  Params=164,929  TrainT=42.0s
+
+--- seed=1024 ---
+  F1m=0.8388  BestEp=20/20  Params=164,929  TrainT=42.0s
+
+[saved meta] processed_meta_lstm_23dim_w16_h128.json
+=== [11:28:34] BiLSTM done. BiGRU h128 (5 seeds) ===
+=== BiGRU (hidden=128) 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8408  BestEp=9/14  Params=125,761  TrainT=46.5s
+
+--- seed=123 ---
+  F1m=0.8499  BestEp=11/16  Params=125,761  TrainT=51.5s
+
+--- seed=456 ---
+  F1m=0.8285  BestEp=12/17  Params=125,761  TrainT=54.8s
+
+--- seed=789 ---
+  F1m=0.8335  BestEp=9/14  Params=125,761  TrainT=2572.3s
+
+--- seed=1024 ---
+  F1m=0.8514  BestEp=12/17  Params=125,761  TrainT=57.0s
+
+[saved meta] processed_meta_gru_23dim_w16_h128.json
+=== [12:15:03] BiGRU done. CNN-LSTM ch256,h128 (5 seeds) ===
+=== CNN-LSTM (conv=[256,256], LSTM hidden=128) 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8331  BestEp=5/10  Params=619,329  TrainT=39.3s
+
+--- seed=123 ---
+  F1m=0.8400  BestEp=16/20  Params=619,329  TrainT=420.0s
+
+--- seed=456 ---
+  F1m=0.8375  BestEp=20/20  Params=619,329  TrainT=82.5s
+
+--- seed=789 ---
+  F1m=0.8036  BestEp=2/7  Params=619,329  TrainT=30.5s
+
+--- seed=1024 ---
+  F1m=0.7937  BestEp=1/6  Params=619,329  TrainT=25.4s
+
+[saved meta] processed_meta_cnnlstm_23dim_w16_ch256.json
+=== [12:25:08] All v2 training complete ===

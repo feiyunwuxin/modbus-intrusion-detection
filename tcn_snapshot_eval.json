@@ -1,0 +1,63 @@
+{
+  "task": "TCN baseline + Snapshot Ensemble (5 snap \u00d7 5 seeds = 25 models)",
+  "n_seeds": 5,
+  "n_snapshots_per_seed": 5,
+  "snapshots_epochs": [
+    4,
+    8,
+    12,
+    16,
+    20
+  ],
+  "test_n": 3432,
+  "per_seed_snap_ens_f1_at_0.5": {
+    "42": {
+      "Accuracy": 0.87004662004662,
+      "Precision": 0.956960322797579,
+      "Recall": 0.788365650969529,
+      "F1-Score": 0.8645200486026732
+    },
+    "123": {
+      "Accuracy": 0.8604312354312355,
+      "Precision": 0.9559834938101788,
+      "Recall": 0.7700831024930748,
+      "F1-Score": 0.8530223995090519
+    },
+    "456": {
+      "Accuracy": 0.8688811188811189,
+      "Precision": 0.9574611748818366,
+      "Recall": 0.785595567867036,
+      "F1-Score": 0.8630553864881315
+    },
+    "789": {
+      "Accuracy": 0.8615967365967366,
+      "Precision": 0.9561042524005487,
+      "Recall": 0.7722991689750692,
+      "F1-Score": 0.8544284400858106
+    },
+    "1024": {
+      "Accuracy": 0.8694638694638694,
+      "Precision": 0.9575185434929198,
+      "Recall": 0.7867036011080333,
+      "F1-Score": 0.8637469586374696
+    }
+  },
+  "mean_per_seed_snap_ens_f1_at_0.5": 0.8597546466646273,
+  "full_25model_ensemble_at_0.5": {
+    "Accuracy": 0.8607226107226107,
+    "Precision": 0.9553877831159918,
+    "Recall": 0.771191135734072,
+    "F1-Score": 0.8534641324340895
+  },
+  "full_25model_ensemble_best_threshold": {
+    "threshold": 0.3,
+    "Accuracy": 0.8805361305361306,
+    "Precision": 0.9508726567550096,
+    "Recall": 0.8149584487534626,
+    "F1-Score": 0.8776849642004774
+  },
+  "baseline_f1": 0.8795,
+  "stacking_f1": 0.8904,
+  "delta_vs_baseline_pp": -0.18150357995225797,
+  "verdict": "SNAPSHOT ENSEMBLE HURTS"
+}

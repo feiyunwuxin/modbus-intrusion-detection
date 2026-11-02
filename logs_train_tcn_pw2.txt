@@ -1,0 +1,11 @@
+=== [17:15:09] TCN pos_weight=2.0 (5 seeds) ===
+=== TCN baseline + pos_weight=2.0 ¡Á 5 seeds ===
+
+  seed=42: F1=0.8691  R=0.8055  P=0.9435  best_ep=12  time=33.1s
+  seed=123: F1=0.8594  R=0.7806  P=0.9559  best_ep=7  time=22.9s
+  seed=456: F1=0.8769  R=0.8166  P=0.9467  best_ep=20  time=40.0s
+  seed=789: F1=0.8611  R=0.7845  P=0.9542  best_ep=12  time=32.8s
+  seed=1024: F1=0.8545  R=0.7906  P=0.9296  best_ep=9  time=28.4s
+
+[saved] processed_meta_tcn_posweight2.0.json
+=== [17:17:53] Done ===

@@ -34,7 +34,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import f1_score, roc_auc_score, average_precision_score
 
-BASE = r"C:\work\Claude\Issue"
+BASE = r"D:\workspace\claude\Issue\Issue"
 BATCH = 64
 LR = 4e-3
 EPOCHS = 20

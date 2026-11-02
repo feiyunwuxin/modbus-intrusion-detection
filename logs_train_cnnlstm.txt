@@ -1,0 +1,18 @@
+=== CNN-LSTM 23-dim ¡Á window=16 ¡Á 5 seeds ===
+
+--- seed=42 ---
+  F1m=0.8346  BestEp=5/10  Params=162,241  TrainT=21.2s
+
+--- seed=123 ---
+  F1m=0.8385  BestEp=8/13  Params=162,241  TrainT=27.2s
+
+--- seed=456 ---
+  F1m=0.8492  BestEp=14/19  Params=162,241  TrainT=40.4s
+
+--- seed=789 ---
+  F1m=0.8575  BestEp=15/20  Params=162,241  TrainT=44.9s
+
+--- seed=1024 ---
+  F1m=0.8168  BestEp=2/7  Params=162,241  TrainT=16.5s
+
+[saved meta] processed_meta_cnnlstm_23dim_w16.json
